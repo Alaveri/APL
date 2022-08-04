@@ -11,6 +11,7 @@ uses
   Drawing,
   WideStr,
   Collects,
+  MouseDrv,
   Streams;
 
 const
@@ -47,6 +48,23 @@ type
     Red: byte;
     Green: byte;
     Blue: byte;
+  end;
+  TMouseCursorImage = array[0..14, 0..10] of byte;
+  PMouseCursor = ^TMouseCursor;
+  TMouseCursor = object(TBaseObject)
+  private
+    _image: TMouseCursorImage;
+    _width, _height: word;
+    _visible: boolean;
+    _x, _y: integer;
+  public
+    BackData: PByte;
+    procedure Draw; virtual;
+    procedure Init; virtual;
+    destructor Done; virtual;
+    function Width: integer; virtual;
+    function Height: integer; virtual;
+    procedure StoreBackground(X, Y: integer); virtual;
   end;
   PFontData = ^TFontData;
   TFontData = array[0..255, 0..15] of byte;
@@ -133,6 +151,7 @@ type
   TGraphicsDriver = object(TObject)
   private
     _oldMode: byte;
+    _mouseCursor: PMouseCursor;
   public
     State: PGraphicsState;
     StateStack: PStack;
@@ -157,16 +176,20 @@ type
     procedure Line(x1, y1, x2, y2: integer); virtual;
     procedure HLine(x, y, width: integer); virtual;
     procedure VLine(x, y, height: integer); virtual;
-    procedure Rectangle(x1, y1, x2, y2: integer); virtual;
+    procedure Rectangle(x1, y1, width, height: integer); virtual;
     procedure FillRect(rect: TRect); virtual;
     procedure DrawImage(x, y, width, height: integer; image: PByte); virtual;
     procedure DrawText(x, y: integer; text: string); virtual;
     procedure DrawTextW(x, y: integer; text: TWideString); virtual;
     procedure SetStandardPalette; virtual;
-    procedure SetRgbPalette(palette: TRgbPalette);
+    procedure SetRgbPalette(palette: TRgbPalette); virtual;
     procedure PushState; virtual;
     procedure PopState; virtual;
     procedure Init; virtual;
+    procedure ShowMouseCursor; virtual;
+    procedure HideMouseCursor; virtual;
+    procedure EraseMouseCursor(mouseState: TMouseState); virtual;
+    procedure DrawMouseCursor(mouseState: TMouseState); virtual;
     destructor Done; virtual;
   end;
 
@@ -174,6 +197,26 @@ var
   Graphics: PGraphicsDriver;
 
 implementation
+
+const
+  DefaultMouseCursor: TMouseCursorImage =
+  (
+    ($27, $01, $01, $01, $01, $01, $01, $01, $01, $01, $01),
+    ($27, $27, $01, $01, $01, $01, $01, $01, $01, $01, $01),
+    ($27, $00, $27, $01, $01, $01, $01, $01, $01, $01, $01),
+    ($27, $00, $00, $27, $01, $01, $01, $01, $01, $01, $01),
+    ($27, $00, $00, $00, $27, $01, $01, $01, $01, $01, $01),
+    ($27, $00, $00, $00, $00, $27, $01, $01, $01, $01, $01),
+    ($27, $00, $00, $00, $00, $00, $27, $01, $01, $01, $01),
+    ($27, $00, $00, $00, $00, $00, $00, $27, $01, $01, $01),
+    ($27, $00, $00, $00, $00, $00, $00, $00, $27, $01, $01),
+    ($27, $00, $00, $00, $00, $00, $00, $00, $00, $27, $01),
+    ($27, $00, $00, $00, $27, $27, $27, $27, $27, $27, $27),
+    ($27, $00, $00, $27, $01, $01, $01, $01, $01, $01, $01),
+    ($27, $00, $27, $01, $01, $01, $01, $01, $01, $01, $01),
+    ($27, $27, $01, $01, $01, $01, $01, $01, $01, $01, $01),
+    ($27, $01, $01, $01, $01, $01, $01, $01, $01, $01, $01)
+  );
 
 procedure TGraphicsDriver.Init;
 var
@@ -190,6 +233,7 @@ begin
   State := New(PGraphicsState, Create);
   StateStack := New(PStack, Create);
   MoveTo(0, 0);
+  _mouseCursor := nil;
 end;
 
 function TGraphicsDriver.ForeColor: byte;
@@ -228,6 +272,9 @@ end;
 
 procedure TGraphicsDriver.SetMode(newMode: PGraphicsMode);
 begin
+  if (_mouseCursor <> nil) then Dispose(_mouseCursor, Done);
+  _mouseCursor := New(PMouseCursor, Create);
+  MouseDriver^.SetMouseResolution(Mode^.Width, Mode^.Height);  
 end;
 
 procedure TGraphicsDriver.SetPixel(x, y: integer);
@@ -246,8 +293,12 @@ procedure TGraphicsDriver.Line(x1, y1, x2, y2: integer);
 begin
 end;
 
-procedure TGraphicsDriver.Rectangle(x1, y1, x2, y2: integer);
+procedure TGraphicsDriver.Rectangle(x1, y1, width, height: integer);
 begin
+  HLine(x1, y1, width);
+  HLine(x1, height - 1, width);
+  VLine(x1, y1, height);
+  VLine(width - 1, y1, height);
 end;
 
 procedure TGraphicsDriver.HLine(x, y, width: integer);
@@ -433,6 +484,9 @@ end;
 destructor TGraphicsDriver.Done;
 begin
   TextMode(_oldMode);
+  if (_mouseCursor <> nil) then begin
+    Dispose(_mouseCursor, Done);
+  end;  
   Dispose(StateStack, Done);
   Dispose(State, Done);
   Dispose(SystemFont, Done);
@@ -447,6 +501,42 @@ begin
     exit;
   end;
   GetColor := 21 + ord(color) * 18 + intensity;
+end;
+
+procedure TGraphicsDriver.EraseMouseCursor(mouseState: TMouseState);
+begin
+  if (_mouseCursor^.BackData <> nil) and (_mouseCursor^._Visible) and (mouseState.Visible) then
+    Graphics^.DrawImage(_mouseCursor^._X, _mouseCursor^._Y, _mouseCursor^.Width, _mouseCursor^.Height, _mouseCursor^.BackData);
+end;
+
+procedure TGraphicsDriver.DrawMouseCursor(mouseState: TMouseState);
+begin
+  if (not _mouseCursor^._Visible) or (not mouseState.Visible) then exit;
+  _mouseCursor^.StoreBackground(mouseState.X, mouseState.Y);
+  _mouseCursor^._X := mouseState.X;
+  _mouseCursor^._Y := mouseState.Y;
+  _mouseCursor^.Draw;
+end;
+
+procedure TGraphicsDriver.ShowMouseCursor;
+var
+  mouseState: TMouseState;
+begin
+  _mouseCursor^._Visible := true;
+  MouseDriver^.State^.Visible := true;
+  MouseDriver^.GetMouseState(mouseState);
+  DrawMouseCursor(mouseState);
+  MouseDriver^.ShowMouse;
+end;
+
+procedure TGraphicsDriver.HideMouseCursor;
+var
+  mouseState: TMouseState;
+begin
+  EraseMouseCursor(MouseDriver^.State^);
+  _mouseCursor^._visible := false;
+  MouseDriver^.State^.Visible := false;
+  MouseDriver^.HideMouse;
 end;
 
 constructor TGraphicsMode.CreateEmpty;
@@ -707,6 +797,55 @@ begin
   BackColor := 0;
   XPos := 0;
   YPos := 0;
+end;
+
+procedure TMouseCursor.Init;
+begin
+  TBaseObject.Init;
+  _width := 11;
+  _height := 15;
+  _visible := true;
+  _y := 0;
+  _x := 0;
+  BackData := nil;
+  _image := DefaultMouseCursor;
+end;
+
+procedure TMouseCursor.Draw;
+var
+  xIndex, yIndex: integer;
+  pixel: PByte;
+  rect, mouseRect, clipRect: TRect;
+  xPos, yPos, startX, startY: integer;
+begin
+  if not _visible then exit;
+  Graphics^.DrawImage(_x, _y, _width, _height, @_image);
+end;
+
+procedure TMouseCursor.StoreBackground(x, y: integer);
+var
+  rect: TRect;
+begin
+  if (BackData = nil) then GetMem(BackData, Width * Height);
+  rect.Create(x, y, Width, Height);
+  Graphics^.GetImage(BackData, rect);
+end;
+
+function TMouseCursor.Width: integer;
+begin
+  Width := _width;
+end;
+
+function TMouseCursor.Height: integer;
+begin
+  Height := _height;
+end;
+
+destructor TMouseCursor.Done;
+begin
+  if (BackData <> nil) then
+    FreeMem(BackData, _width * _height);
+  TBaseObject.Done;
 end;
 
 end.

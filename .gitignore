@@ -3,4 +3,15 @@
 ################################################################################
 
 /.vs
-/.vs/Adl/v17
+/bin/*.tpu
+/XMSDEBUG.BIN
+/TURBO.TP
+/TURBO.DSK
+/BP.TP
+/BP.DSK
+/BIN/XMSDEBUG.BIN
+/BIN/AVDRAW.MAP
+/BIN/AVDRAW.EXE
+/BP.PSM
+*.bak
+*.$$$

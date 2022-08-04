@@ -88,7 +88,6 @@ type
     procedure MoveTo(x, y: integer); virtual;
     procedure LineTo(x, y: integer); virtual;
     procedure Line(x1, y1, x2, y2: integer); virtual;
-    procedure Rectangle(x1, y1, x2, y2: integer); virtual;
     procedure HLine(x, y, width: integer); virtual;
     procedure VLine(x, y, height: integer); virtual;
     procedure FillRect(rect: TRect); virtual;
@@ -228,6 +227,7 @@ begin
   _winFunc := SVgaMode^._vbeMode.WinFuncPtr;
   if (Mode = nil) then Mode := New(PGraphicsMode, Create);
   Mode^.Assign(SvgaMode^);
+  TGraphicsDriver.SetMode(newMode);
 end;
 
 procedure TSVgaDriver.SwitchBank(bank: word);
@@ -332,10 +332,6 @@ begin
 end;
 
 procedure TSVgaDriver.Line(x1, y1, x2, y2: integer);
-begin
-end;
-
-procedure TSVgaDriver.Rectangle(x1, y1, x2, y2: integer);
 begin
 end;
 
