@@ -101,8 +101,6 @@ begin
   Graphics^.SetMode(graphMode);
   Mode := newMode;
   MouseDriver^.SetMouseResolution(graphMode^.Width, graphMode^.Height);
-  if (_mouseCursor <> nil) then Dispose(_mouseCursor, Done);
-  _mouseCursor := New(PMouseCursor, Create);
 end;
 
 procedure TSvgaTextDriver.SetXY(newX, newY: byte);
@@ -193,7 +191,7 @@ var
   value: integer;
   count: integer;
 begin
-  TTextDriver.Init;
+  inherited Init;
   TypeName := 'TSvgaTextDriver';
   factory.CreateGraphicsDriver(gdSVga256, Graphics);
   for modeIndex := 0 to Graphics^.Modes^.Count - 1 do begin

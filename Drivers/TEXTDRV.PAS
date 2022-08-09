@@ -44,7 +44,6 @@ type
     Description: string;
     HelpText: string;
     procedure Init; virtual;
-    constructor CreateEmpty;
   end;
   PTextModeList = ^TTextModeList;
   TTextModeList = object(TObjectList)
@@ -97,6 +96,7 @@ implementation
 
 procedure TTextState.Init;
 begin
+  inherited Init;
   ForeColor := 0;
   BackColor := 0;
   X := 0;
@@ -136,7 +136,7 @@ end;
 
 procedure TTextMode.Init;
 begin
-  TObject.Init;
+  inherited Init;
   TypeName := 'TTextMode';
   Width := 0;
   Height := 0;
@@ -146,12 +146,6 @@ begin
   AdditionalData := 0;
   Description := '';
   HelpText := '';
-end;
-
-constructor TTextMode.CreateEmpty;
-begin
-  Id := '';
-  Init;
 end;
 
 function TTextModeList.GetItem(index: integer): PTextMode;
@@ -241,6 +235,7 @@ end;
 
 procedure TTextDriver.Init;
 begin
+  inherited Init;
   Modes := New(PTextModeList, Create);
   State := New(PTextState, Create);
   StateStack := New(PStack, Create);

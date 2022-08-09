@@ -25,6 +25,7 @@ implementation
 
 procedure TGraphicsFactory.Init;
 begin
+  inherited Init;
 end;
 
 procedure TGraphicsFactory.CreateGraphicsDriver(driverId: TGraphDrivers; var driver: PGraphicsDriver);

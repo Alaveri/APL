@@ -32,6 +32,7 @@ type
     function Equals(state: TMouseState): boolean;
     procedure Assign(var source: TPersistent); virtual;
     procedure AssignTo(var dest: TPersistent); virtual;
+    function GetTypeName: string; virtual;
     destructor Done; virtual;
   end;
   PMouseDriver = ^TMouseDriver;
@@ -40,6 +41,7 @@ type
   public
     State: PMouseState;
     StateStack: PStack;
+    function GetTypeName: string; virtual;
     procedure Init; virtual;
     procedure ShowMouse; virtual;
     procedure HideMouse; virtual;
@@ -136,8 +138,7 @@ const
 
 procedure TMouseState.Init;
 begin
-  TObject.Init;
-  TypeName := 'TMouseState';
+  inherited Init;
   X := 0;
   Y := 0;
   ButtonState := [];
@@ -168,6 +169,11 @@ begin
   state^.Y := Y;
   state^.ButtonState := ButtonState;
   state^.Visible := Visible;
+end;
+
+function TMouseState.GetTypeName: string;
+begin
+  GetTypeName := 'TMouseState';
 end;
 
 function TMouseState.Equals(state: TMouseState): boolean;
@@ -213,6 +219,11 @@ begin
   State := New(PMouseState, Create);
   if success then InitMouseCursor;
   StateStack := New(PStack, Create);
+end;
+
+function TMouseDriver.GetTypeName: string;
+begin
+  GetTypeName := 'TMouseDriver';
 end;
 
 procedure TMouseDriver.ShowMouse;

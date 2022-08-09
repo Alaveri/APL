@@ -5,12 +5,11 @@ interface
 
 uses
   Consts,
+  Strings,
+  StrUtils,
   Utils;
 
 type
-  (** Pointer to a byte.*)
-  PByte = ^byte;
-
   (** Pointer to a word.*)
   PWord = ^word;
 
@@ -41,10 +40,12 @@ type
   TBaseObject = object
   private
   public
-    (** Creates a new object of type TBaseObject. Create calls Init.*)
+    (** Creates a new object of type TBaseObject. Create calls Init. *)
+
     constructor Create;
 
-    (** Initializes this object. Called by Create. *)
+    (** Initializes this object. Called by Create.
+     *)
     procedure Init; virtual;
 
     (** Finalizes this object *)
@@ -59,13 +60,8 @@ type
   TObject = object(TBaseObject)
   private
   public
-    (** The name of this type.  Should be set in Init after any calls to the
-     * ancestor's Init.
-     *)
-    TypeName: string25;
-
     (** The id of this object *)
-    Id: string25;
+    Id: PChar;
 
     (** Creates a new object of type TObject.  Create calls Init. *)
     constructor Create;
@@ -76,13 +72,17 @@ type
      *)
     constructor CreateId(newId: string);
 
-    (** Initializes this object.  Called by Create and CreateId. *)
+    (** Initializes this object.  Called by Create and CreateId.
+     * @param typeName The name of this type.
+     *)
     procedure Init; virtual;
 
     (** Converts this object to a string.
     * @returns a string representation of this object.
     *)
     function ToString: string; virtual;
+    function GetTypeName: string; virtual;
+    destructor Done; virtual;
   end;
 
   (** Pointer to a callback invoked when a memory allocation fails *)
@@ -115,6 +115,7 @@ type
     * @param dest The destination object to be assigned to this object.
     *)
     procedure AssignTo(var dest: TPersistent); virtual;
+    function GetTypeName: string; virtual;
   end;
 
 var
@@ -141,31 +142,44 @@ end;
 
 constructor TObject.CreateId(newId: string);
 begin
-  Id := NewId;
   Init;
+  Id := NewLargeString(newId);
 end;
 
 constructor TObject.Create;
 begin
-  Id := '';
   Init;
+end;
+
+function TObject.GetTypeName: string;
+begin
+  GetTypeName := 'TObject';
 end;
 
 procedure TObject.Init;
 begin
-  TBaseObject.Init;
-  TypeName := 'TObject';
+  inherited Init;
+  id := nil;
 end;
 
 function TObject.ToString: string;
 begin
-  ToString := TypeName;
+  ToString := GetTypeName;
+end;
+
+destructor TObject.Done;
+begin
+  DisposeLargeString(Id);
 end;
 
 procedure TPersistent.Init;
 begin
   TObject.Init;
-  TypeName := 'TPersistent';
+end;
+
+function TPersistent.GetTypeName: string;
+begin
+  GetTypeName := 'TPersistent';
 end;
 
 procedure TPersistent.Assign(var source: TPersistent);

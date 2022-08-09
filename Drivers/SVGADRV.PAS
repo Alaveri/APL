@@ -7,7 +7,7 @@ uses
   Objects,
   GraphDrv,
   Utils,
-  WideStr,
+  StrUtils,
   Drawing;
 
 type
@@ -26,6 +26,50 @@ type
     Reserved: array[0..221] of byte;
     OemData: array[0..255] of byte
   end;
+  PSVgaMode = ^TSvgaMode;
+  TSvgaMode = object(TGraphicsMode)
+  private
+    Attributes: word;
+    Granularity: word;
+    WinFuncPtr: pointer;
+  public
+    procedure Init; virtual;
+    procedure Assign(var source: TPersistent); virtual;
+    procedure AssignTo(var dest: TPersistent); virtual;
+  end;
+  PSVgaDriver = ^TSVgaDriver;
+  TSVgaDriver = object(TGraphicsDriver)
+  private
+    _svgaDriver: integer;
+    _currentBank: integer;
+    _granularity: longint;
+    _winFunc: pointer;
+    procedure SwitchBank(bank: word);
+  public
+    function GetPixel(x, y: integer): byte; virtual;
+    procedure GetImage(var buffer: PByte; rect: TRect); virtual;
+    procedure SetMode(newMode: PGraphicsMode); virtual;
+    procedure SetPixel(x, y: integer); virtual;
+    procedure DrawText(x, y: integer; text: string); virtual;
+    procedure DrawTextLarge(x, y: integer; text: PChar); virtual;
+    procedure MoveTo(x, y: integer); virtual;
+    procedure LineTo(x, y: integer); virtual;
+    procedure Line(x1, y1, x2, y2: integer); virtual;
+    procedure HLine(x, y, width: integer); virtual;
+    procedure VLine(x, y, height: integer); virtual;
+    procedure FillRect(rect: TRect); virtual;
+    procedure DrawImage(x, y, width, height: integer; image: PByte); virtual;
+    procedure Init; virtual;
+    destructor Done; virtual;
+  end;
+
+implementation
+
+uses
+  Globals,
+  Dos;
+
+type
   PVbeMode = ^TVbeMode;
   TVbeMode = record
     Attributes: word; {depricated; bit 7 indicates linear fram buffer support}
@@ -62,50 +106,36 @@ type
     OffScreenMemSize: word;
     Reserved1: array[0..205] of byte;
   end;
-  PSVgaMode = ^TSvgaMode;
-  TSvgaMode = object(TGraphicsMode)
-  private
-    _vbeMode: TVbeMode;
-  public
-    procedure Init; virtual;
-  end;
-  PSVgaDriver = ^TSVgaDriver;
-  TSVgaDriver = object(TGraphicsDriver)
-  private
-    _svgaDriver: integer;
-    _currentBank: integer;
-    _granularity: longint;
-    _winFunc: pointer;
-    procedure SwitchBank(bank: word);
-  public
-    SvgaMode: PSvgaMode;
-    function GetPixel(x, y: integer): byte; virtual;
-    procedure GetImage(var buffer: PByte; rect: TRect); virtual;
-    procedure SetMode(newMode: PGraphicsMode); virtual;
-    procedure SetPixel(x, y: integer); virtual;
-    procedure DrawText(x, y: integer; text: string); virtual;
-    procedure DrawTextW(x, y: integer; text: TWideString); virtual;
-    procedure MoveTo(x, y: integer); virtual;
-    procedure LineTo(x, y: integer); virtual;
-    procedure Line(x1, y1, x2, y2: integer); virtual;
-    procedure HLine(x, y, width: integer); virtual;
-    procedure VLine(x, y, height: integer); virtual;
-    procedure FillRect(rect: TRect); virtual;
-    procedure DrawImage(x, y, width, height: integer; image: PByte); virtual;
-    procedure Init; virtual;
-    destructor Done; virtual;
-  end;
 
-implementation
-
-uses
-  Globals,
-  Dos;
 
 procedure TSvgaMode.Init;
 begin
-  TGraphicsMode.Init;
-  FillChar(_vbeMode, SizeOf(_vbeMode), 0);
+  inherited Init;
+  Granularity := 0;
+  Attributes := 0;
+  WinFuncPtr := nil;
+end;
+
+procedure TSvgaMode.Assign(var source: TPersistent);
+var
+  mode: PSVgaMode;
+begin
+  TGraphicsMode.Assign(source);
+  mode := PSVgaMode(@source);
+  Attributes := mode^.Attributes;
+  Granularity := mode^.Granularity;
+  WinFuncPtr := mode^.WinFuncPtr;
+end;
+
+procedure TSvgaMode.AssignTo(var dest: TPersistent);
+var
+  mode: PSVgaMode;
+begin
+  TGraphicsMode.AssignTo(dest);
+  mode := PSVgaMode(@dest);
+  mode^.Attributes := Attributes;
+  mode^.Granularity := Granularity;
+  mode^.WinFuncPtr := WinFuncPtr;
 end;
 
 procedure TSVgaDriver.Init;
@@ -117,14 +147,12 @@ var
   supported, status: byte;
   modePtr: PWord;
   modeInfo: TVbeMode;
-  vbeMode: word;
+  vbeModeIndex: word;
   colors: string;
-  test: PSvgaMode;
   index: integer;
+  vbeMode: TVbeMode;
 begin
   TGraphicsDriver.Init;
-  TypeName := 'TSVgaDriver';
-  SvgaMode := nil;
   _currentBank := -1;
   segm := Seg(info);
   offs := Ofs(info);
@@ -148,7 +176,7 @@ begin
   index := 0;
   while modePtr^ <> $FFFF do begin
     newMode := New(PSVgaMode, Create);
-    vbeMode := modePtr^;
+    vbeModeIndex := modePtr^;
     segm := Seg(modeInfo);
     offs := Ofs(modeInfo);
     with newMode^ do begin
@@ -156,37 +184,40 @@ begin
         mov  ax, $4F01
         mov  es, [segm]
         mov  di, [offs]
-        mov  cx, [vbeMode]
+        mov  cx, [vbeModeIndex]
         int  10h
       end;
-      _vbeMode := modeInfo;
-      Id := 'SVga'
-        + IntToStr(_vbeMode.Width)
+      vbeMode := modeInfo;
+      Id := NewLargeString('SVga'
+        + IntToStr(vbeMode.Width)
         + 'x'
-        + IntToStr(_vbeMode.Height)
+        + IntToStr(vbeMode.Height)
         + 'x'
-        + IntToStr(_vbeMode.Bpp);
-      Description := 'SVGA '
-        + IntToStr(_vbeMode.Width)
+        + IntToStr(vbeMode.Bpp));
+      Description := NewLargeString('SVGA '
+        + IntToStr(vbeMode.Width)
         + 'x'
-        + IntToStr(_vbeMode.Height)
-        + ' ';
-      case _vbeMode.Bpp of
+        + IntToStr(vbeMode.Height)
+        + ' ');
+      case vbeMode.Bpp of
           4: colors := '16';
           8: colors := '256';
           15: colors := '32k';
           16: colors := '64k';
           32: colors := '16m';
       end;
-      Description := Description + colors + ' color';
-      AdditionalData := vbeMode;
-      Width := _vbeMode.Width;
-      Height := _vbeMode.Height;
-      MaxX := _vbeMode.Width - 1;
-      MaxY := _vbeMode.Height - 1;
-      Bpp := _vbeMode.Bpp;
-      Pitch := _vbeMode.Pitch;
-      HelpText := 'Requires a VESA compliant Super VGA card.';
+      AppendStringToLarge(Description, colors + ' color');
+      AdditionalData := vbeModeIndex;
+      Width := vbeMode.Width;
+      Height := vbeMode.Height;
+      MaxX := vbeMode.Width - 1;
+      MaxY := vbeMode.Height - 1;
+      Bpp := vbeMode.Bpp;
+      Pitch := vbeMode.Pitch;
+      Attributes := vbeMode.Attributes;
+      Granularity := vbeMode.Granularity;
+      WinFuncPtr := vbeMode.WinFuncPtr;
+      HelpText := NewLargeString('Requires a VESA compliant Super VGA card.');
       FrameBuffer := Ptr($A000,$0000);
     end;
     Inc(modePtr);
@@ -210,10 +241,11 @@ end;
 procedure TSVgaDriver.SetMode(newMode: PGraphicsMode);
 var
   selectedMode: word;
+  svgaMode: PSVgaMode;
 begin
-  SvgaMode := PSVgaMode(newMode);
+  svgaMode := PSVgaMode(pointer(newMode));
   selectedMode := newMode^.AdditionalData;
-  if (bit7 in TBits(Lo(SvgaMode^._vbeMode.Attributes))) then begin
+  if (bit7 in TBits(Lo(SvgaMode^.Attributes))) then begin
     selectedMode := selectedMode or $4000;
   end;
   asm
@@ -223,8 +255,8 @@ begin
   end;
   if (Error.ErrorCode <> ecNone) then exit;
   SetStandardPalette;
-  _granularity := longint(SvgaMode^._vbeMode.Granularity) * 1024 - 1;
-  _winFunc := SVgaMode^._vbeMode.WinFuncPtr;
+  _granularity := longint(SvgaMode^.Granularity) * 1024 - 1;
+  _winFunc := SVgaMode^.WinFuncPtr;
   if (Mode = nil) then Mode := New(PGraphicsMode, Create);
   Mode^.Assign(SvgaMode^);
   TGraphicsDriver.SetMode(newMode);
@@ -278,7 +310,7 @@ var
   fontData: PFontData;
   sForeColor, sBackColor: byte;
 begin
-  if (Font = nil) then exit;
+  if (Font = nil) or (Length(text) = 0) then exit;
   maxX := Mode^.MaxX;
   maxY := Mode^.MaxY;
   pitch := Mode^.Pitch;
@@ -319,7 +351,7 @@ begin
 end;
 
 
-procedure TSVgaDriver.DrawTextW(x, y: integer; text: TWideString);
+procedure TSVgaDriver.DrawTextLarge(x, y: integer; text: PChar);
 begin
 end;
 
@@ -362,7 +394,20 @@ begin
 end;
 
 procedure TSVgaDriver.VLine(x, y, height: integer);
+var
+  index: integer;
+  offset: longint;
+  ptr: PByte;
+  bank: word;
 begin
+  for index := y to y + height - 1 do begin
+    offset := x + longint(index) * Mode^.Pitch;
+    bank := offset shr 16;
+    SwitchBank(bank);
+    ptr := Mode^.FrameBuffer;
+    Inc(ptr, offset);
+    ptr^ := ForeColor;
+  end;
 end;
 
 procedure TSVgaDriver.FillRect(rect: TRect);

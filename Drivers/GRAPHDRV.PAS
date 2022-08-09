@@ -9,9 +9,11 @@ uses
   Utils,
   Dos,
   Drawing,
-  WideStr,
   Collects,
+  Consts,
   MouseDrv,
+  StrUtils,
+  Strings,
   Streams;
 
 const
@@ -64,6 +66,7 @@ type
     destructor Done; virtual;
     function Width: integer; virtual;
     function Height: integer; virtual;
+    function GetTypeName: string; virtual;
     procedure StoreBackground(X, Y: integer); virtual;
   end;
   PFontData = ^TFontData;
@@ -75,16 +78,17 @@ type
     Width, Height: integer;
     MaxX, MaxY: integer;
     Bpp: byte;
-    Description: string;
-    HelpText: string;
+    Description: PChar;
+    HelpText: PChar;
     AdditionalData: integer;
     Pitch: word;
     FrameBuffer: pointer;
-    constructor CreateEmpty;
-    constructor CreateAssign(newId: string; mode:  TGraphicsMode);
+    function GetTypeName: string; virtual;
+    constructor CreateAssign(mode: TGraphicsMode);
     procedure Assign(var source: TPersistent); virtual;
     procedure AssignTo(var dest: TPersistent); virtual;
     procedure Init; virtual;
+    destructor Done; virtual;
   end;
   PGraphicsModeList = ^TGraphicsModeList;
   TGraphicsModeList = object(TObjectList)
@@ -94,6 +98,7 @@ type
     function Add(item: PGraphicsMode): integer;
     procedure Insert(index: integer; item: PGraphicsMode);
     function Where(predicate: TPredicate; var value): PGraphicsModeList;
+    function GetTypeName: string; virtual;
   end;
   PGraphicsDriver = ^TGraphicsDriver;
   PFont = ^TFont;
@@ -108,8 +113,7 @@ type
     Height: integer;
     FontData: PFontData;
     FontDataSize: integer;
-    constructor Create(newId: string);
-    constructor CreateAssign(newId: string; font: TFont);
+    constructor CreateAssign(font: TFont);
     destructor Done; virtual;
     procedure Assign(var source: TPersistent); virtual;
     procedure AssignTo(var dest: TPersistent); virtual;
@@ -118,15 +122,17 @@ type
     procedure WriteToStream(stream: TStream; var error: TError); virtual;
     function CharWidth(ch: char): integer; virtual;
     function TextWidth(text: string): integer; virtual;
-    function TextWidthW(text: TWideString): integer; virtual;
+    function TextWidthLarge(text: PChar): integer; virtual;
     function PixelSet(ch: char; x, y: byte): boolean; virtual;
+    function GetTypeName: string; virtual;
   end;
   PMonospaceFont = ^TMonospaceFont;
   TMonospaceFont = object(TFont)
   public
     procedure Init; virtual;
     function TextWidth(text: string): integer; virtual;
-    function TextWidthW(text: TWideString): integer; virtual;
+    function TextWidthLarge(text: PChar): integer; virtual;
+    function GetTypeName: string; virtual;
   end;
   PSystemFont = ^TSystemFont;
   TSystemFont = object(TMonospaceFont)
@@ -135,18 +141,22 @@ type
     function CharWidth(ch: char): integer; virtual;
     function PixelSet(ch: char; x, y: byte): boolean; virtual;
     function TextWidth(text: string): integer; virtual;
-    function TextWidthW(text: TWideString): integer; virtual;
+    function TextWidthLarge(text: PChar): integer; virtual;
+    function GetTypeName: string; virtual;
     procedure Init; virtual;
     destructor Done; virtual;
   end;
   PGraphicsState = ^TGraphicsState;
-  TGraphicsState = object(TObject)
+  TGraphicsState = object(TPersistent)
   private
   public
     ForeColor: byte;
     BackColor: byte;
     XPos, YPos: integer;
+    function GetTypeName: string; virtual;
     procedure Init; virtual;
+    procedure Assign(var source: TPersistent); virtual;
+    procedure AssignTo(var dest: TPersistent); virtual;
   end;
   TGraphicsDriver = object(TObject)
   private
@@ -166,7 +176,9 @@ type
     function BackColor: byte; virtual;
     function XPos: byte; virtual;
     function YPos: byte; virtual;
+    function GetTypeName: string; virtual;
     procedure GetImage(var buffer: PByte; rect: TRect); virtual;
+    procedure GetImageStream(stream: PStream; rect: TRect); virtual;
     procedure SetForeColor(color: byte); virtual;
     procedure SetBackColor(color: byte); virtual;
     procedure SetMode(newMode: PGraphicsMode); virtual;
@@ -179,8 +191,9 @@ type
     procedure Rectangle(x1, y1, width, height: integer); virtual;
     procedure FillRect(rect: TRect); virtual;
     procedure DrawImage(x, y, width, height: integer; image: PByte); virtual;
+    procedure DrawImageStream(x, y, width, height: integer; stream: PStream); virtual;
     procedure DrawText(x, y: integer; text: string); virtual;
-    procedure DrawTextW(x, y: integer; text: TWideString); virtual;
+    procedure DrawTextLarge(x, y: integer; text: PChar); virtual;
     procedure SetStandardPalette; virtual;
     procedure SetRgbPalette(palette: TRgbPalette); virtual;
     procedure PushState; virtual;
@@ -222,12 +235,11 @@ procedure TGraphicsDriver.Init;
 var
   oldMode: byte;
 begin
-  TObject.Init;
-  TypeName := 'TGraphicsDriver';
+  inherited Init;
   _oldMode := LastMode;
   ClearError(Error);
   Modes := New(PGraphicsModeList, Create);
-  SystemFont := New(PSystemFont, Create('SystemFont'));
+  SystemFont := New(PSystemFont, CreateId('SystemFont'));
   Font := SystemFont;
   Mode := nil;
   State := New(PGraphicsState, Create);
@@ -317,7 +329,16 @@ procedure TGraphicsDriver.DrawImage(x, y, width, height: integer; image: PByte);
 begin
 end;
 
+procedure TGraphicsDriver.DrawImageStream(x, y, width, height: integer; stream: PStream);
+begin
+
+end;
+
 procedure TGraphicsDriver.GetImage(var buffer: PByte; rect: TRect);
+begin
+end;
+
+procedure TGraphicsDriver.GetImageStream(stream: PStream; rect: TRect);
 begin
 end;
 
@@ -325,7 +346,7 @@ procedure TGraphicsDriver.DrawText(x, y: integer; text: string);
 begin
 end;
 
-procedure TGraphicsDriver.DrawTextW(x, y: integer; text: TWideString);
+procedure TGraphicsDriver.DrawTextLarge(x, y: integer; text: PChar);
 begin
 end;
 
@@ -493,6 +514,11 @@ begin
   TObject.Done;
 end;
 
+function TGraphicsDriver.GetTypeName: string;
+begin
+  GetTypeName := 'TGraphicsDriver';
+end;
+
 function TGraphicsDriver.GetColor(color: TStandardColor; intensity: byte): byte;
 begin
   if (color = scBlack) then
@@ -539,10 +565,15 @@ begin
   MouseDriver^.HideMouse;
 end;
 
-constructor TGraphicsMode.CreateEmpty;
-var
-  index: integer;
+constructor TGraphicsMode.CreateAssign(mode: TGraphicsMode);
 begin
+  Init;
+  Assign(mode);
+end;
+
+procedure TGraphicsMode.Init;
+begin
+  inherited Init;
   Width := 0;
   Height := 0;
   MaxX := 0;
@@ -550,22 +581,22 @@ begin
   Bpp := 0;
   AdditionalData := -1;
   Pitch := 0;
-  HelpText := '';
+  HelpText := nil;
+  Description := nil;
   FrameBuffer := nil;
+  HelpText := nil;
 end;
 
-constructor TGraphicsMode.CreateAssign(newId: string; mode: TGraphicsMode);
+destructor TGraphicsMode.Done;
 begin
-  Id := newId;
-  CreateId(newId);
-  Assign(mode);
-  Init;
+  DisposeLargeString(HelpText);
+  DisposeLargeString(Description);
+  TObject.Done;
 end;
 
-procedure TGraphicsMode.Init;
+function TGraphicsMode.GetTypeName: string;
 begin
-  TPersistent.Init;
-  TypeName := 'TGraphicsMode';
+  GetTypeName := 'TGraphicsMode';
 end;
 
 procedure TGraphicsMode.Assign(var source: TPersistent);
@@ -578,11 +609,10 @@ begin
   MaxX := mode^.MaxX;
   MaxY := mode^.MaxY;
   Bpp := mode^.Bpp;
-  Description := mode^.Description;
+  Description :=  CopyLargeString(mode^.Description);
   AdditionalData := mode^.AdditionalData;
-  HelpText := mode^.HelpText;
-  Id := mode^.Id;
-  TypeName := mode^.TypeName;
+  HelpText := CopyLargeString(mode^.HelpText);
+  Id := CopyLargeString(mode^.Id);
   Pitch := mode^.Pitch;
   FrameBuffer := mode^.FrameBuffer;
 end;
@@ -597,14 +627,19 @@ begin
   mode^.MaxX := MaxX;
   mode^.MaxY := MaxY;
   mode^.Bpp := Bpp;
-  mode^.Description := Description;
+  mode^.Description := CopyLargeString(Description);
   mode^.AdditionalData := AdditionalData;
-  mode^.HelpText := HelpText;
+  mode^.HelpText := CopyLargeString(HelpText);
   mode^.Pitch := Pitch;
-  mode^.TypeName := TypeName;
-  mode^.Id := Id;
+  mode^.Id := CopyLargeString(Id);
   mode^.FrameBuffer := FrameBuffer;
 end;
+
+function TGraphicsModeList.GetTypeName: string;
+begin
+  GetTypeName := 'TGraphicsModeList';
+end;
+
 
 function TGraphicsModeList.GetItem(index: integer): PGraphicsMode;
 begin
@@ -631,15 +666,8 @@ begin
   Where := PGraphicsModeList(TList.Where(predicate, value));
 end;
 
-constructor TFont.Create(newId: string);
+constructor TFont.CreateAssign(font: TFont);
 begin
-  Id := newId;
-  Init;
-end;
-
-constructor TFont.CreateAssign(newId: string; font: TFont);
-begin
-  Id := newId;
   Init;
   Assign(font);
 end;
@@ -668,6 +696,7 @@ begin
   Transparent := font^.Transparent;
   Initialized := font^.Initialized;
   Height := font^.Height;
+  Id := CopyLargeString(font^.Id);
 end;
 
 procedure TFont.AssignTo(var dest: TPersistent);
@@ -692,7 +721,6 @@ end;
 procedure TFont.Init;
 begin
   TPersistent.Init;
-  TypeName := 'TFont';
   FontData := nil;
   Version := 1.0;
   TransparentColor := 0;
@@ -700,6 +728,12 @@ begin
   Initialized := true;
   Height := 0;
 end;
+
+function TFont.GetTypeName: string;
+begin
+  GetTypeName := 'TFont';
+end;
+
 
 procedure TFont.ReadFromStream(stream: TStream; var error: TError);
 begin
@@ -717,7 +751,7 @@ function TFont.TextWidth(text: string): integer;
 begin
 end;
 
-function TFont.TextWidthW(text: TWideString): integer;
+function TFont.TextWidthLarge(text: PChar): integer;
 begin
 end;
 
@@ -728,14 +762,19 @@ end;
 procedure TMonospaceFont.Init;
 begin
   TFont.Init;
-  TypeName := 'TMonospaceFont';
 end;
+
+function TMonospaceFont.GetTypeName: string;
+begin
+  GetTypeName := 'TMonospaceFont';
+end;
+
 
 function TMonospaceFont.TextWidth(text: string): integer;
 begin
 end;
 
-function TMonospaceFont.TextWidthW(text: TWideString): integer;
+function TMonospaceFont.TextWidthLarge(text: PChar): integer;
 begin
 end;
 
@@ -747,12 +786,12 @@ begin
   TextWidth := width;
 end;
 
-function TSystemFont.TextWidthW(text: TWideString): integer;
+function TSystemFont.TextWidthLarge(text: PChar): integer;
 var
   width: integer;
 begin
-  width := text.Len * 8;
-  TextWidthW := width;
+  width := StrLen(text) * 8;
+  TextWidthLarge := width;
 end;
 
 procedure TSystemFont.Init;
@@ -761,8 +800,7 @@ var
   fontPtr: pointer;
 begin
   TMonospaceFont.Init;
-  TypeName := 'TSystemFont';
-  Id := 'System';
+  Id := NewLargeString('System');
   FillChar(regs, SizeOf(regs), 0);
   regs.ax := $1130;
   regs.bh := $06;
@@ -772,6 +810,11 @@ begin
   FontDataSize := 256 * Height;
   GetMem(FontData, FontDataSize);
   Move(fontPtr^, FontData^, FontDataSize);
+end;
+
+function TSystemFont.GetTypeName: string;
+begin
+  GetTypeName := 'TSystemFont';
 end;
 
 destructor TSystemFont.Done;
@@ -792,11 +835,39 @@ end;
 procedure TGraphicsState.Init;
 begin
   TObject.Init;
-  TypeName := 'TGraphicsState';
   ForeColor := 0;
   BackColor := 0;
   XPos := 0;
   YPos := 0;
+end;
+
+procedure TGraphicsState.Assign(var source: TPersistent); 
+var
+  mode: PGraphicsState;
+begin
+  TPersistent.Assign(source);
+  mode := PGraphicsState(@source);
+  mode^.ForeColor := ForeColor;
+  mode^.BackColor := BackColor;
+  mode^.XPos := XPos;
+  mode^.YPos := YPos;
+end;
+
+procedure TGraphicsState.AssignTo(var dest: TPersistent);
+var
+  mode: PGraphicsState;
+begin
+  TPersistent.AssignTo(dest);
+  mode := PGraphicsState(@dest);
+  ForeColor := mode^.ForeColor;
+  BackColor := mode^.BackColor;
+  XPos := mode^.XPos;
+  YPos := mode^.YPos;
+end;
+
+function TGraphicsState.GetTypeName: string;
+begin
+  GetTypeName := 'TGraphicsState';
 end;
 
 procedure TMouseCursor.Init;
@@ -827,7 +898,7 @@ var
   rect: TRect;
 begin
   if (BackData = nil) then GetMem(BackData, Width * Height);
-  rect.Create(x, y, Width, Height);
+  rect.CreateDims(x, y, Width, Height);
   Graphics^.GetImage(BackData, rect);
 end;
 
@@ -846,6 +917,11 @@ begin
   if (BackData <> nil) then
     FreeMem(BackData, _width * _height);
   TBaseObject.Done;
+end;
+
+function TMouseCursor.GetTypeName: string;
+begin
+  GetTypeName := 'TMouseCursor';
 end;
 
 end.

@@ -6,6 +6,7 @@ interface
 uses
   Consts,
   Utils,
+  Strings,
   Objects;
 
 type
@@ -17,9 +18,7 @@ type
     _capacity: integer;
   public
     { Constructors/Destructors and Initialization }
-    constructor CreateCapacity(newId: string; initialCapacity: integer);
-    constructor CreateId(newId: string);
-    constructor Create;
+    constructor CreateCapacity(initialCapacity: integer);
     destructor Done; virtual;
     procedure Init; virtual;
 
@@ -34,6 +33,7 @@ type
 
     { Misc Functions }
     function ToString: string; virtual;
+    function GetTypeName: string; virtual;
     procedure SetCapacity(cap: integer);
   end;
   PList = ^TList;
@@ -43,7 +43,7 @@ type
     _comparer: TComparer;
   public
     { Constructors/Destructors and Initialization }
-    constructor CreateSorted(newId: string; comparer: TComparer);
+    constructor CreateSorted(comparer: TComparer);
     procedure Init; virtual;
 
     { Modification Functions }
@@ -61,8 +61,8 @@ type
     procedure Insert(index: integer; item: pointer);
 
     { Misc Functions }
-    function ToString: string; virtual;
     function Where(predicate: TPredicate; var value): PList;
+    function GetTypeName: string; virtual;
   end;
   PObjectList = ^TObjectList;
   TObjectList = object(TList)
@@ -74,8 +74,9 @@ type
     function ToString: string; virtual;
     function GetItem(index: integer): PObject;
     function IndexOf(item: PObject): integer;
-    function IndexOfId(idToFind: string25): integer;
+    function IndexOfId(idToFind: PChar): integer;
     function Add(item: PObject): integer;
+    function GetTypeName: string; virtual;
     procedure Insert(index: integer; item: PObject);
     procedure Delete(index: integer);
     procedure Clear; virtual;
@@ -87,45 +88,44 @@ type
     procedure Init; virtual;
     function Push(obj: PObject): integer;
     function Pop: PObject;
+    function GetTypeName: string; virtual;
+  end;
+  PStringList = ^TStringList;
+  TStringList = object(TList)
+    procedure Init; virtual;
+    function ToString: string; virtual;
+    function GetItem(index: integer): PChar;
+    function IndexOf(item: PChar): integer;
+    function Add(item: PChar): integer;
+    procedure Insert(index: integer; item: PChar);
+    function GetTypeName: string; virtual;
   end;
 
 implementation
 
-constructor TCollection.CreateCapacity(newId: string; initialCapacity: integer);
+constructor TCollection.CreateCapacity(initialCapacity: integer);
 begin
-  Id := newId;
-  _capacity := 0;
+  Init;
   SetCapacity(initialCapacity);
-  Init;
-end;
-
-constructor TCollection.CreateId(newId: string);
-begin
-  Id := newId;
-  _capacity := 0;
-  SetCapacity(DefaultListCapacity);
-  Init;
-end;
-
-constructor TCollection.Create;
-begin
-  Id := '';
-  _capacity := 0;
-  SetCapacity(DefaultListCapacity);
-  Init;
 end;
 
 procedure TCollection.Init;
 begin
   TObject.Init;
-  TypeName := 'TList';
   _count := 0;
+  _buffer:= nil;
+  _capacity := 0;
 end;
 
 destructor TCollection.Done;
 begin
   if (_buffer <> nil) then FreeMem(_buffer, _capacity * SizeOf(Pointer));
   TObject.Done;
+end;
+
+function TCollection.GetTypeName;
+begin
+  GetTypeName := 'TCollection';
 end;
 
 procedure TCollection.SetCapacity(cap: integer);
@@ -214,31 +214,30 @@ begin
   ToString := 'TCollection';
 end;
 
-constructor TList.CreateSorted(newId: string; comparer: TComparer);
+constructor TList.CreateSorted(comparer: TComparer);
 begin
-  Id := newId;
-  _capacity := 0;
-  _comparer := comparer;
-  SetCapacity(DefaultListCapacity);
   Init;
+  _comparer := comparer;
   _sorted := true;
+  SetCapacity(DefaultListCapacity);
 end;
 
 procedure TList.Init;
 begin
-  TCollection.Init;
-  TypeName := 'TList';
+  inherited Init;
   _sorted := false;
+  _comparer := nil;
 end;
+
+function TList.GetTypeName;
+begin
+  GetTypeName := 'TList';
+end;
+
 
 function TList.Sorted: boolean;
 begin
   Sorted := _sorted;
-end;
-
-function TList.ToString: string;
-begin
-  ToString := 'TList';
 end;
 
 procedure TList.SetItem(index: integer; item: pointer);
@@ -270,6 +269,7 @@ var
   itemLoc: PPointer;
   index: integer;
 begin
+  if (_capacity = 0) then SetCapacity(DefaultListCapacity);
   if (_count + 1 > _capacity) then
   begin
     newCap := _capacity * 2;
@@ -389,6 +389,7 @@ var
   itemLoc: PPointer;
   locIndex: integer;
 begin
+  if (_capacity = 0) then SetCapacity(DefaultListCapacity);
   if (_count + 1 > _capacity) then
   begin
     newCap := _capacity * 2;
@@ -423,8 +424,12 @@ end;
 procedure TObjectList.Init;
 begin
   TList.Init;
-  TypeName := 'TObjectList';
   DisposeObjects := true;
+end;
+
+function TObjectList.GetTypeName;
+begin
+  GetTypeName := 'TObjectList';
 end;
 
 destructor TObjectList.Done;
@@ -458,16 +463,16 @@ begin
   IndexOf := TList.IndexOf(item);
 end;
 
-function TObjectList.IndexOfId(idToFind: string25): integer;
+function TObjectList.IndexOfId(idToFind: PChar): integer;
 var
   index: integer;
-  currentId: string25;
+  currentId: PChar;
 begin
   IndexOfId := -1;
   for index := 0 to _count - 1 do
   begin
     currentId := GetItem(index)^.Id;
-    if (currentId = idToFind) then
+    if (StrComp(currentId, idToFind) = 0) then
     begin
       IndexOfId := index;
       break;
@@ -517,6 +522,11 @@ begin
   DisposeObjects := false;
 end;
 
+function TStack.GetTypeName;
+begin
+  GetTypeName := 'TStack';
+end;
+
 function TStack.Push(obj: PObject): integer;
 begin
   Push := Add(obj);
@@ -528,6 +538,42 @@ begin
   if (_count = 0) then exit;
   Pop := GetItem(_count - 1);
   Delete(_count - 1);
+end;
+
+procedure TStringList.Init;
+begin
+  TList.Init;
+end;
+
+function TStringList.GetTypeName;
+begin
+  GetTypeName := 'TStringList';
+end;
+
+
+function TStringList.ToString: string;
+begin
+  ToString := GetTypeName;
+end;
+
+function TStringList.GetItem(index: integer): PChar;
+begin
+  GetItem := TList.GetItem(index);
+end;
+
+function TStringList.IndexOf(item: PChar): integer;
+begin
+  IndexOf := TList.IndexOf(item);
+end;
+
+function TStringList.Add(item: PChar): integer;
+begin
+  TList.Add(item);
+end;
+
+procedure TStringList.Insert(index: integer; item: PChar);
+begin
+  TList.Insert(index, item);
 end;
 
 end.

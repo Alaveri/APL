@@ -35,7 +35,6 @@ type
     _currentBuffer: integer;
     _currentBufferPos: integer;
   public
-    constructor Create;
     destructor Done; virtual;
     function Position: longint; virtual;
     function Length: longint; virtual;
@@ -56,6 +55,7 @@ type
     procedure Flush; virtual;
     procedure SetLength(newLength: longint); virtual;
     procedure WriteByte; virtual;
+    function GetTypeName: string; virtual;
   end;
   PMemoryStream = ^TMemoryStream;
   TMemoryStream = object(TStream)
@@ -69,7 +69,8 @@ type
     function ReadByte: byte; virtual;
     function WriteToStream(stream: TStream; count: longint): longint; virtual;
     function ReadFromStream(stream: TStream; count: longint): longint; virtual;
-    function  Buffer: pointer;
+    function GetTypeName: string; virtual;
+    function Buffer: pointer;
     procedure Init; virtual;
     procedure SetLength(newLength: longint); virtual;
     procedure WriteByte; virtual;
@@ -79,11 +80,6 @@ implementation
 
 const
   MaxAlloc = 65528;
-
-constructor TStream.Create;
-begin
-  Init;
-end;
 
 destructor TStream.Done;
 begin
@@ -151,15 +147,25 @@ end;
 
 procedure TStream.Init;
 begin
-  _position := -1;
+  inherited Init;
   ClearError(_error);
+  _position := -1;
   _status := ssEndOfStream;
   _length := 0;
   _canRead := false;
   _canWrite := false;
   _canSeek := false;
   _closed := true;
+  _buffers := nil;
+  _currentBuffer := -1;
+  _currentBufferPos := -1;
 end;
+
+function TStream.GetTypeName;
+begin
+  GetTypeName := 'TStream';
+end;
+
 
 procedure TStream.GetLastError(var error: TError);
 begin
@@ -192,17 +198,11 @@ var
   maxAllocSize: longint;
   newSize: longint;
 begin
-  _position := 0;
-  ClearError(_error);
-  _status := ssOk;
-  _canRead := true;
-  _canWrite := true;
-  _canSeek := true;
-  _closed := false;
-  _length := size;
+  Init;
   _buffers := New(PReferenceList, Create);
-  Memory^.BeginAllocTransaction;
+  _status := ssOk;
 
+  Memory^.BeginAllocTransaction;
   allocated := 0;
   while (allocated < size) do
   begin
@@ -275,8 +275,7 @@ end;
 
 procedure TMemoryStream.Init;
 begin
-  TStream.Init;
-  TypeName := 'TMemoryStream';
+  inherited Init;
 end;
 
 procedure TMemoryStream.SetLength(newLength: longint);
@@ -286,6 +285,12 @@ end;
 procedure TMemoryStream.WriteByte;
 begin
 end;
+
+function TMemoryStream.GetTypeName;
+begin
+  GetTypeName := 'TMemoryStream';
+end;
+
 
 begin
 end.

@@ -35,6 +35,7 @@ type
     procedure CursorOn; virtual;
     procedure CursorOff; virtual;
     procedure ClrScr; virtual;
+    function GetTypeName: string; virtual;
     destructor Done; virtual;
   end;
 
@@ -140,12 +141,17 @@ begin
   GetTextAttributes := fore or (back shl 4) or (byte(doBlink) shl 7);
 end;
 
+function TCrtTextDriver.GetTypeName: string;
+begin
+  GetTypeName := 'TCrtTextDriver';
+end;
+
 procedure TCrtTextDriver.Init;
 var
   newMode: PTextMode;
 begin
-  TTextDriver.Init;
-  TypeName := 'TCrtTextDriver';
+  inherited Init;
+  _startMode := -1;
   newMode := New(PTextMode, CreateEmpty);
   with newMode^ do begin
     Id := 'BW40';

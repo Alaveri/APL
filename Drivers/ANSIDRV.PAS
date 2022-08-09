@@ -60,6 +60,7 @@ end;
 
 procedure TAnsiDriver.Init;
 begin
+  inherited Init;
 end;
 
 procedure TAnsiDriver.HLine(x1, y1, width: byte; lineStyle: TLineStyle);

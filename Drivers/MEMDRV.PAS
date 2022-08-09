@@ -20,6 +20,7 @@ type
     function GetItem(index: integer): PReference;
     function IndexOf(item: PReference): integer;
     function Add(item: PReference): integer;
+    function GetTypeName: string; virtual;
     procedure Insert(index: integer; item: PReference);
   end;
   TReferenceType =
@@ -60,7 +61,7 @@ type
     procedure MoveToConventional(reference: PReference); virtual;
   public
     Error: TError;
-    constructor Create(reserved: longint);
+    constructor CreateReserved(reserved: longint);
     destructor Done; virtual;
     function XmsSupported: boolean;
     function XmsEnabled: boolean; virtual;
@@ -72,6 +73,7 @@ type
     function References: PReferenceList;
     function BufferSize: longint;
     function CurrentReference: PReference;
+    function GetTypeName: string; virtual;
     procedure InitXms;
     procedure Init; virtual;
     procedure SetCurrentReference(reference: PReference); virtual;
@@ -87,90 +89,6 @@ var
   Memory: PMemDrv;
 
 implementation
-
-type
-  PFreeRec = ^TFreeRec;
-  TFreeRec = record
-    next: PFreeRec;
-    size: longint;
-  end;
-
-procedure GetLargeMem(var memPtr: pointer; size: LongInt);
-var
-  block: word;
-  prev, free: PFreeRec;
-  temp, savedFreeList: pointer;
-begin
-  memPtr := nil;
-  if (size > MaxAvail) then exit;
-  if (size <= LargestVarSize) then begin
-    GetMem(memPtr, size);
-    exit;
-  end;
-
-{  Inc(size, 15);}
-  prev := PFreeRec(@FreeList);
-  free := prev^.Next;
-  while (free <> HeapPtr) and (free^.size < size) do begin
-    prev := free;
-    free := prev^.next;
-  end;
-
-  savedFreeList := FreeList;
-  FreeList := free;
-
-  while (size > 0) do begin
-    block := MinL(size, LargestVarSize);
-    Dec(size, block);
-    GetMem(temp, block);
-    if (temp = nil) then exit;
-  end;
-
-  memPtr := free;
-  if (prev^.next <> FreeList) then begin
-    prev^.next := FreeList;
-    FreeList := savedFreeList;
-  end;
-
-  if (memPtr = nil) then exit;
-  { return pointer with 0 offset }
-  if (Ofs(memPtr^) <> 0) then memPtr := Ptr(Seg(memPtr^) + 1, 0);  { hack }
-end;
-
-procedure IncPtr(var memPtr: pointer; count: word);
-var
-  memRec: TLongLowHigh;
-begin
-  memRec := TLongLowHigh(memPtr);
-  Inc(memRec.Low, count);
-  if memRec.Low < count then
-    Inc(memRec.High, SelectorInc);
-end;
-
-function Normalized(memPtr: pointer) : pointer;
-var
-  count : word;
-  memRec: TLongLowHigh;
-begin
-  memRec := TLongLowHigh(memPtr);
-  count := memRec.Low and $FFF0;
-  Normalized := Ptr(memRec.High + (count shr 4), memRec.Low and $000F);
-end;
-
-procedure FreeLargeMem(var memPtr: pointer; size: longint);
-var
-  block : word;
-begin
-  while (size > 0) do
-  begin
-    block := MinW(size, LargestVarSize);
-    Dec(size, block);
-    FreeMem(memPtr, block);
-    IncPtr(memPtr, block);
-    memPtr := Normalized(memPtr);
-  end;
-end;
-
 
 const
   HiWord = 1;
@@ -214,10 +132,10 @@ begin
   IsXms   := PReference(item)^.Xms = boolean(value);
 end;
 
-constructor TMemDrv.Create(reserved: longint);
+constructor TMemDrv.CreateReserved(reserved: longint);
 begin
-  _memReserved := reserved;
   Init;
+  _memReserved := reserved;
 end;
 
 function TMemDrv.References: PReferenceList;
@@ -265,7 +183,6 @@ var
   {$ENDIF}
 begin
   _xmsEnabled := false;
-  exit;
   if (XmsSupported) then
   begin
     XmsControl := GetXmsControlFunction;
@@ -410,7 +327,7 @@ begin
     while (index < count) and (LowerMaxAvail < reference^.Size) do
     begin
       current := _references^.GetItem(index);
-      if (not current^.Xms) then
+      if (current^.Xms) then
       begin
         Inc(index);
         continue;
@@ -707,7 +624,7 @@ var
 begin
   ClearError(error);
   { references are always sorted by Xms flag and Offset ascending }
-  _references := New(PReferenceList, CreateSorted('References', ReferenceOffsetCompare));
+  _references := New(PReferenceList, CreateSorted(ReferenceOffsetCompare));
   _currentReference := nil;
   _xmsVersion := 0;
   _xmsHandle := 0;
@@ -723,6 +640,11 @@ begin
   HeapError := @OnHeapError;
   XmsControl := nil;
   InitXms;
+end;
+
+function TMemDrv.GetTypeName;
+begin
+  GetTypeName := 'TMemDrv';
 end;
 
 function TReferenceList.GetItem(index: integer): PReference;
@@ -744,6 +666,12 @@ procedure TReferenceList.Insert(index: integer; item: PReference);
 begin
   TList.Insert(index, item);
 end;
+
+function TReferenceList.GetTypeName;
+begin
+  GetTypeName := 'TReferenceList';
+end;
+
 
 begin
 end.

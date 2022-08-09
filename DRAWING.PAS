@@ -10,10 +10,9 @@ type
   TRect = object(TBaseObject)
   public
     X, Y, Width, Height: longint;
-    constructor Create(newX, newY, newWidth, newHeight: longint);
+    constructor CreateDims(newX, newY, newWidth, newHeight: longint);
     constructor CreateCoords(newX, newY, newRight, newBottom: longint);
     constructor CreateRect(newRect: TRect);
-    constructor CreateEmpty;
     procedure SetDims(newX, newY, newWidth, newHeight: longint); virtual;
     procedure SetCoords(newX, newY, newRight, newBottom: longint); virtual;
     procedure SetRect(newRect: TRect); virtual;
@@ -22,6 +21,7 @@ type
     procedure Translate(dL, dT: longint); virtual;
     procedure Grow(dW, dH: integer); virtual;
     procedure Intersection(rect: TRect; var result: TRect); virtual;
+    procedure Init; virtual;
     function Right: integer; virtual;
     function Bottom: integer; virtual;
     function IntersectPoint(pX, pY: longint): boolean; virtual;
@@ -32,30 +32,34 @@ implementation
 
 constructor TRect.CreateRect(newRect: TRect);
 begin
+  Init;
   SetRect(newRect);
 end;
 
-constructor TRect.Create(newX, newY, newWidth, newHeight: longint);
+constructor TRect.CreateDims(newX, newY, newWidth, newHeight: longint);
 begin
+  Init;
   SetDims(newX, newY, newWidth, newHeight);
 end;
 
 constructor TRect.CreateCoords(newX, newY, newRight, newBottom: longint);
 begin
+  Init;
   SetCoords(newX, newY, newRight, newBottom);
-end;
-
-constructor TRect.CreateEmpty;
-begin
-  X := 0;
-  Y := 0;
-  Width := 0;
-  Height := 0;
 end;
 
 procedure TRect.SetRight(newRight: integer);
 begin
   Width := newRight - X + 1;
+end;
+
+procedure TRect.Init;
+begin
+  inherited Init;
+  X := 0;
+  Y := 0;
+  Width := 0;
+  Height := 0;
 end;
 
 procedure TRect.SetBottom(newBottom: integer);
@@ -129,6 +133,7 @@ end;
 
 procedure TRect.Intersection(rect: TRect; var result: TRect);
 begin
+  result.Create;
   if (not IntersectRect(rect)) then exit;
   result.CreateCoords(MaxL(X, rect.X), MaxL(Y, rect.Y), MinL(Right, rect.Right), MinL(Bottom, rect.Bottom));
 end;

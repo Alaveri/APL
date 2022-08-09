@@ -29,6 +29,7 @@ implementation
 
 procedure TTextDriverFactory.Init;
 begin
+  inherited Init;
 end;
 
 procedure TTextDriverFactory.CreateTextDriver(driverId: TTextDrivers; var driver: PTextDriver);

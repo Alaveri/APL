@@ -23,7 +23,6 @@ type
     private
       _keyPressed: boolean;
     public
-     constructor Create;
      destructor Done; virtual;
      procedure Init; virtual;
      function BufferLength: byte; virtual;
@@ -33,6 +32,7 @@ type
      function InsertMode: boolean; virtual;
      function ScrollLock: boolean; virtual;
      function CapsLock: boolean; virtual;
+     function GetKeyDesc(key: integer): string; virtual;
      procedure GetBuffer(var buffer: TKeyboardBuffer); virtual;
      procedure ClearBuffer; virtual;
   end;
@@ -65,6 +65,7 @@ const
   kCtrlY = 99;
   kAltS = 99;
   kCtrlF = 99;
+  kCtrlH = 99;
   kSpace = 32;
   kAltV = 99;
   kAltH = 99;
@@ -203,15 +204,11 @@ begin
   _keyBufTail := $20;
 end;
 
-constructor TKeyboardDriver.Create;
-begin
-  Init;
-  _shiftState := [];
-end;
-
 procedure TKeyboardDriver.Init;
 begin
+  inherited Init;
   FillChar(_buffer, SizeOf(_buffer), 0);
+  _shiftState := [];
   _bufferLength := 0;
   _keyPressed := false;
   _capsLock := _memShiftState and $0040 <> 0;
@@ -251,6 +248,11 @@ procedure TKeyboardDriver.ClearBuffer;
 begin
   FillChar(_buffer, SizeOf(_buffer), 0);
   _bufferLength := 0;
+end;
+
+function TKeyboardDriver.GetKeyDesc(key: integer): string;
+begin
+  GetKeyDesc := '';
 end;
 
 function TKeyboardDriver.NumLock: boolean;

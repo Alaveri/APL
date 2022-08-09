@@ -10,6 +10,7 @@ uses
   KeyDrv,
   Dos,
   Utils,
+  StrUtils,
   MouseDrv;
 
 type
@@ -35,17 +36,17 @@ var
 
 constructor TApplication.Create(newId: string; interfaceMem: longint);
 begin
-  InterfaceMemory := interfaceMem;
-  Id := newId;
   Init;
+  Id := NewLargeString(newId);
+  InterfaceMemory := interfaceMem;
 end;
 
 procedure TApplication.Init;
 begin
-  TObject.Init;
-  TypeName := 'TApplication';
+  inherited Init;
   ClrScr;
   MouseDriver := New(PMouseDriver, Create);
+{  Memory := new(PMemDrv, CreateReserved(InterfaceMemory));}
   WriteLn('Mouse initialized.');
 {  Keyboard.Create;}
   Closed := false;
@@ -75,8 +76,10 @@ end;
 destructor TApplication.Done;
 begin
   Dispose(MouseDriver, Done);
+  Dispose(Memory, Done);
 {  Keyboard.Done;}
   while KeyPressed do ReadKey;
+  DisposeLargeString(EmptyString);
   TObject.Done;
 end;
 

@@ -6,6 +6,8 @@ uses
   Strings;
 
 type
+  (** Pointer to a byte.*)
+  PByte = ^byte;
   TBit = (bit0, bit1, bit2, bit3, bit4, bit5, bit6, bit7);
   TBits = set of TBit;
   TErrorSeverity =
@@ -88,6 +90,8 @@ procedure CreateError(var error: TError; errorCode: TErrorCode; severity: TError
 procedure ClearError(var error: TError);
 procedure SwapL(var long1: longint; var long2: longint);
 procedure SwapW(var word1: word; var word2: word);
+procedure FillCharLarge(var ptr; size: longint; ch: byte);
+procedure MoveLarge(var source, dest; count: longint);
 
 implementation
 
@@ -325,6 +329,44 @@ begin
     end;
   end;
   ExtractFilePath := result;
+end;
+
+procedure FillCharLarge(var ptr; size: longint; ch: byte);
+var
+  filled: longint;
+  current: PByte;
+begin
+  filled := 0;
+  current := @ptr;
+  while filled < size do begin
+    if (filled + High(word) > size) then begin
+      FillChar(current^, size - filled, ch);
+      exit;
+    end;
+    FillChar(current^, High(word), ch);
+    Inc(current, High(word));
+  end;
+end;
+
+procedure MoveLarge(var source, dest; count: longint);
+var
+  moved: longint;
+  currentSource: PByte;
+  currentDest: PByte;
+begin
+  moved := 0;
+  currentSource := @source;
+  currentDest := @dest;
+  while moved < count do begin
+    if (moved + High(word) > count) then begin
+      Move(currentSource^, currentDest^, count - moved);
+      exit;
+    end;
+    Move(currentSource^, currentDest^, High(word));
+    Inc(currentSource, High(word));
+    Inc(currentDest, High(word));
+  end;
+
 end;
 
 end.
