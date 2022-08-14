@@ -13,8 +13,9 @@ uses
 type
   TSeekOrigin =
   (
-    soBeginning,
-    soEnd
+    soFromBeginning,
+    soFromEnd,
+    soFromPosition
   );
   TStreamStatus =
   (
@@ -26,15 +27,12 @@ type
   TStream = object(TObject)
   private
     _position: longint;
-    _error: TError;
     _status: TStreamStatus;
     _length: longint;
     _canRead, _canWrite, _canSeek: boolean;
     _closed: boolean;
-    _buffers: PReferenceList;
-    _currentBuffer: integer;
-    _currentBufferPos: integer;
   public
+    Error: TError;
     destructor Done; virtual;
     function Position: longint; virtual;
     function Length: longint; virtual;
@@ -43,14 +41,14 @@ type
     function CanRead: boolean; virtual;
     function CanWrite: boolean; virtual;
     function CanSeek: boolean; virtual;
-    function Read(var buffer; count: longint): longint; virtual;
-    function Write(var buffer; count: longint): longint; virtual;
+    function Read(buffer: PByte; count: longint): longint; virtual;
+    function Write(buffer: PByte; count: longint): longint; virtual;
+    function FillChar(count: longint; ch: char): longint; virtual;
     function Seek(offset: longint; origin: TSeekOrigin): longint; virtual;
     function ReadByte: byte; virtual;
     function WriteToStream(stream: TStream; count: longint): longint; virtual;
     function ReadFromStream(stream: TStream; count: longint): longint; virtual;
     procedure Init; virtual;
-    procedure GetLastError(var error: TError); virtual;
     procedure Close; virtual;
     procedure Flush; virtual;
     procedure SetLength(newLength: longint); virtual;
@@ -60,26 +58,23 @@ type
   PMemoryStream = ^TMemoryStream;
   TMemoryStream = object(TStream)
   private
+    _references: PReferenceList;
   public
-    constructor Create(size: longint; var error: TError);
+    constructor Create(size: longint);
     destructor Done; virtual;
-    function Read(var readBuffer; count: longint): longint; virtual;
-    function Write(var writeBuffer; count: longint): longint; virtual;
-    function Seek(offset: longint; origin: TSeekOrigin): longint; virtual;
+    function Read(buffer: PByte; count: longint): longint; virtual;
+    function Write(buffer: PByte; count: longint): longint; virtual;
+    function FillChar(count: longint; ch: char): longint; virtual;
     function ReadByte: byte; virtual;
     function WriteToStream(stream: TStream; count: longint): longint; virtual;
     function ReadFromStream(stream: TStream; count: longint): longint; virtual;
     function GetTypeName: string; virtual;
-    function Buffer: pointer;
     procedure Init; virtual;
     procedure SetLength(newLength: longint); virtual;
     procedure WriteByte; virtual;
   end;
 
 implementation
-
-const
-  MaxAlloc = 65528;
 
 destructor TStream.Done;
 begin
@@ -121,16 +116,34 @@ begin
   CanSeek := _canSeek;
 end;
 
-function TStream.Read(var buffer; count: longint): longint;
+function TStream.Read(buffer: PByte; count: longint): longint;
 begin
 end;
 
-function TStream.Write(var buffer; count: longint): longint;
+function TStream.Write(buffer: PByte; count: longint): longint;
+begin
+end;
+
+function TStream.FillChar(count: longint; ch: char): longint;
 begin
 end;
 
 function TStream.Seek(offset: longint; origin: TSeekOrigin): longint;
+var
+  newPos: longint;
 begin
+  case origin of
+    soFromBeginning: begin
+      newPos := offset;
+    end;
+    soFromEnd: begin
+      newPos := length - offset - 1;
+    end;
+    soFromPosition: begin
+      newPos := _position + offset;
+    end;
+  end;
+  _position := MinL(MaxL(0, newPos), length - 1);
 end;
 
 function TStream.ReadByte: byte;
@@ -148,28 +161,19 @@ end;
 procedure TStream.Init;
 begin
   inherited Init;
-  ClearError(_error);
-  _position := -1;
+  ClearError(Error);
+  _position := 0;
   _status := ssEndOfStream;
   _length := 0;
   _canRead := false;
   _canWrite := false;
   _canSeek := false;
   _closed := true;
-  _buffers := nil;
-  _currentBuffer := -1;
-  _currentBufferPos := -1;
 end;
 
 function TStream.GetTypeName;
 begin
   GetTypeName := 'TStream';
-end;
-
-
-procedure TStream.GetLastError(var error: TError);
-begin
-  error := _error;
 end;
 
 procedure TStream.Close;
@@ -190,61 +194,168 @@ procedure TStream.WriteByte;
 begin
 end;
 
-constructor TMemoryStream.Create(size: longint; var error: TError);
+constructor TMemoryStream.Create(size: longint);
 var
   index: integer;
   reference: PReference;
   allocated: longint;
-  maxAllocSize: longint;
-  newSize: longint;
+  MaxVarSizeSize: longint;
+  blocks: longint;
+  ptr: pointer;
+  blockSize: longint;
 begin
   Init;
-  _buffers := New(PReferenceList, Create);
   _status := ssOk;
-
+  ClearError(error);
   Memory^.BeginAllocTransaction;
+  blocks := size div MaxVarSize + 1;
   allocated := 0;
-  while (allocated < size) do
-  begin
-    newSize := MinL(MaxAlloc, size - allocated);
-    Memory^.Alloc(reference, newSize);
-    if (Memory^.Error.ErrorCode <> ecNone) then
-    begin
-      error := Memory^.Error;
-      ClearError(Memory^.Error);
+  for index := 0 to blocks - 1 do begin
+    blockSize := MaxVarSize;
+    if (size - allocated) < MaxVarSize then begin
+      blockSize := size - allocated;
+    end;
+    Memory^.Alloc(reference, blockSize);
+    Inc(_length, blockSize);
+    Inc(allocated, blockSize);
+    _references^.Add(reference);
+    if (Memory^.Error.ErrorCode <> ecNone) then begin
       Memory^.RollbackAllocTransaction;
+      error := Memory^.Error;
       exit;
     end;
-    _buffers^.Add(reference);
-    Inc(allocated, newSize);
   end;
   Memory^.CommitAllocTransaction;
+  for index := 0 to blocks - 1 do begin
+    reference :=_references^.GetItem(index);
+    ptr := Memory^.ReferencePointer(reference);
+    FillCharLarge(ptr^, reference^.Size, 0);
+  end;
 end;
 
 destructor TMemoryStream.Done;
 var
   index: integer;
+  reference: PReference;
 begin
-  index := 0;
-  while (index < _buffers^.Count) do
-  begin
-    Memory^.FreeReference(_buffers^.GetItem(index));
-    Inc(index);
+  for index := _references^.Count downto 0 do begin
+    reference := _references^.GetItem(index);
+    Memory^.DeAlloc(reference);
   end;
-  Dispose(_buffers, Done);
+  Dispose(_references, Done);
 end;
 
-function TMemoryStream.Read(var readBuffer; count: longint): longint;
+function TMemoryStream.Read(buffer: PByte; count: longint): longint;
+var
+  bytesRead: longint;
+  index: integer;
+  referencePos: longint;
+  reference: PReference;
+  readSize: longint;
+  ptr: PByte;
 begin
+  if (_position >= _length - 1) then begin
+    CreateError(Error, ecReadPastStreamEnd, esWarning);
+    exit;
+  end;
+
+  bytesRead := 0;
+  while (bytesRead < count) do begin
+    index := _position div MaxVarSize;
+    referencePos := _position mod MaxVarSize;
+    reference := _references^.GetItem(index);
+    readSize := MinL(reference^.Size - referencePos, count - bytesRead);
+    if (_position + readSize > _length - 1) then begin
+      CreateError(Error, ecReadPastStreamEnd, esWarning);
+      readSize := _length - _position;
+    end;
+    ptr := Memory^.ReferencePointer(reference);
+    Inc(ptr, referencePos);
+    Move(ptr^, buffer^, readSize);
+    Inc(buffer, readSize);
+    Inc(bytesRead, readSize);
+    Inc(_position, readSize);
+    if (_position > _length - 1) then begin
+      CreateError(Error, ecReadPastStreamEnd, esWarning);
+      break;
+    end;
+  end;
+  Read := bytesRead;
 end;
 
-function TMemoryStream.Write(var writeBuffer; count: longint): longint;
+function TMemoryStream.FillChar(count: longint; ch: char): longint;
+var
+  index: integer;
+  written: longint;
+  reference: PReference;
+  referencePos: longint;
+  writeSize: longint;
+  ptr: PByte;
 begin
+  if (_position >= _length - 1) then begin
+    CreateError(Error, ecWritePastStreamEnd, esWarning);
+    exit;
+  end;
 
+  written := 0;
+  while (written < count) do begin
+    index := _position div MaxVarSize;
+    referencePos := _position mod MaxVarSize;
+    reference := _references^.GetItem(index);
+    writeSize := MinL(reference^.Size - referencePos, count - written);
+    if (_position + writeSize > _length - 1) then begin
+      CreateError(Error, ecWritePastStreamEnd, esWarning);
+      writeSize := _length - _position;
+    end;
+    ptr := Memory^.ReferencePointer(reference);
+    Inc(ptr, referencePos);
+    System.FillChar(ch, ptr^, writeSize);
+    Inc(written, writeSize);
+    Inc(_position, writeSize);
+    if (_position > _length - 1) then begin
+      CreateError(Error, ecWritePastStreamEnd, esWarning);
+      break;
+    end;
+  end;
+  FillChar := written;
 end;
 
-function TMemoryStream.Seek(offset: longint; origin: TSeekOrigin): longint;
+function TMemoryStream.Write(buffer: PByte; count: longint): longint;
+var
+  index: integer;
+  written: longint;
+  reference: PReference;
+  referencePos: longint;
+  writeSize: longint;
+  ptr: PByte;
 begin
+  if (_position >= _length - 1) then begin
+    CreateError(Error, ecWritePastStreamEnd, esWarning);
+    exit;
+  end;
+
+  written := 0;
+  while (written < count) do begin
+    index := _position div MaxVarSize;
+    referencePos := _position mod MaxVarSize;
+    reference := _references^.GetItem(index);
+    writeSize := MinL(reference^.Size - referencePos, count - written);
+    if (_position + writeSize > _length - 1) then begin
+      CreateError(Error, ecWritePastStreamEnd, esWarning);
+      writeSize := _length - _position;
+    end;
+    ptr := Memory^.ReferencePointer(reference);
+    Inc(ptr, referencePos);
+    Move(buffer^, ptr^, writeSize);
+    Inc(buffer, writeSize);
+    Inc(written, writeSize);
+    Inc(_position, writeSize);
+    if (_position > _length - 1) then begin
+      CreateError(Error, ecWritePastStreamEnd, esWarning);
+      break;
+    end;
+  end;
+  Write := written;
 end;
 
 function TMemoryStream.ReadByte: byte;
@@ -259,23 +370,10 @@ function TMemoryStream.ReadFromStream(stream: TStream; count: longint): longint;
 begin
 end;
 
-function TMemoryStream.Buffer: pointer;
-var
-  bufferPos: longint;
-  bufferIndex: integer;
-begin
-  Buffer := nil;
-  if (_buffers^.Count = 0) then exit;
-  bufferIndex := _position div MaxAlloc;
-  bufferPos := _position mod MaxAlloc;
-  if (Memory^.CurrentReference <> _buffers^.GetItem(bufferIndex)) then
-    Memory^.SetCurrentReference(_buffers^.GetItem(bufferIndex));
-  Buffer := LinearToPointer(Memory^.CurrentReference^.Offset + bufferPos);
-end;
-
 procedure TMemoryStream.Init;
 begin
   inherited Init;
+  _references := New(PReferenceList, Create);
 end;
 
 procedure TMemoryStream.SetLength(newLength: longint);

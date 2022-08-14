@@ -36,9 +36,9 @@ var
 
 constructor TApplication.Create(newId: string; interfaceMem: longint);
 begin
+  InterfaceMemory := interfaceMem;
   Init;
   Id := NewLargeString(newId);
-  InterfaceMemory := interfaceMem;
 end;
 
 procedure TApplication.Init;
@@ -46,7 +46,7 @@ begin
   inherited Init;
   ClrScr;
   MouseDriver := New(PMouseDriver, Create);
-{  Memory := new(PMemDrv, CreateReserved(InterfaceMemory));}
+  Memory := new(PMemDrv, CreateReserved(InterfaceMemory));
   WriteLn('Mouse initialized.');
 {  Keyboard.Create;}
   Closed := false;
@@ -76,6 +76,7 @@ end;
 destructor TApplication.Done;
 begin
   Dispose(MouseDriver, Done);
+{  find out what isn't getting disposed}
   Dispose(Memory, Done);
 {  Keyboard.Done;}
   while KeyPressed do ReadKey;

@@ -22,6 +22,7 @@ type
     procedure Grow(dW, dH: integer); virtual;
     procedure Intersection(rect: TRect; var result: TRect); virtual;
     procedure Init; virtual;
+    function IsEmpty: boolean; virtual;
     function Right: integer; virtual;
     function Bottom: integer; virtual;
     function IntersectPoint(pX, pY: longint): boolean; virtual;
@@ -124,11 +125,16 @@ end;
 
 function TRect.IntersectRect(rect: TRect): boolean;
 begin
-  IntersectRect :=
-    (X >= rect.X) and
-    (X <= rect.Right) and
-    (Y >= rect.Y) and
-    (Y <= rect.Bottom);
+  IntersectRect := not
+    ((rect.Right < X) or
+     (rect.X > Right) or
+     (rect.Bottom < Y) or
+     (rect.Y > Bottom));
+end;
+
+function TRect.IsEmpty: boolean;
+begin
+  IsEmpty := (X = 0) and (Y = 0) and (Width = 0) and (Height = 0);
 end;
 
 procedure TRect.Intersection(rect: TRect; var result: TRect);

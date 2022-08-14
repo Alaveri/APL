@@ -11,7 +11,7 @@ function CopyLargeString(st: PChar): PChar;
 function PascalString(st: PChar): string;
 procedure AppendLargeStrings(var st1: PChar; st2: PChar);
 procedure AppendStringToLarge(var st1: PChar; st2: string);
-procedure DisposeLargeString(st: PChar);
+procedure DisposeLargeString(var st: PChar);
 
 var
   EmptyString: PChar;
@@ -54,10 +54,11 @@ begin
   st1 := result;
 end;
 
-procedure DisposeLargeString(st: PChar);
+procedure DisposeLargeString(var st: PChar);
 begin
   if (st = nil) then exit;
   FreeMem(st, StrLen(st) + 1);
+  st := nil;
 end;
 
 function CopyLargeString(st: PChar): PChar;

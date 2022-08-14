@@ -81,7 +81,13 @@ type
     * @returns a string representation of this object.
     *)
     function ToString: string; virtual;
+
+    (** Gets the name of this type.
+    * @returns the name of this type.
+    *)
     function GetTypeName: string; virtual;
+
+    (** Destroys the object and frees any memory it allocated. *)
     destructor Done; virtual;
   end;
 

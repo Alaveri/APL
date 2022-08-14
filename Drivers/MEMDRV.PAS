@@ -11,7 +11,7 @@ uses
   Dos;
 
 const
-  LargestVarSize = $FFF0;
+  MaxVarSize = $FFF0;
 
 type
   PReferenceList = ^TReferenceList;
@@ -72,8 +72,10 @@ type
     function XmsVersion: real;
     function References: PReferenceList;
     function BufferSize: longint;
+    function Buffer: PByte;
     function CurrentReference: PReference;
     function GetTypeName: string; virtual;
+    function ReferencePointer(reference: PReference): pointer;
     procedure InitXms;
     procedure Init; virtual;
     procedure SetCurrentReference(reference: PReference); virtual;
@@ -425,6 +427,11 @@ begin
   MaxAvail := result;
 end;
 
+function TMemDrv.Buffer: PByte;
+begin
+  Buffer := _buffer;
+end;
+
 function TMemDrv.LowerMaxAvail: longint;
 begin
   LowerMaxAvail := MaxAvail(false);
@@ -455,6 +462,19 @@ begin
   begin
     exit;
   end;
+end;
+
+function TMemDrv.ReferencePointer(reference: PReference): pointer;
+var
+  ptr: pointer;
+  offset: longint;
+begin
+  SetCurrentReference(reference);
+  ptr := Memory^.Buffer;
+  offset := Linear(ptr);
+  Inc(offset, reference^.Offset);
+  ptr := LinearToPointer(offset);
+  ReferencePointer := ptr;
 end;
 
 function TMemDrv.XmsAlloc(size: longint): word;
@@ -512,6 +532,7 @@ begin
     reference^.Size := size;
     Inc(_lowerAllocated, size);
     reference^.Xms := false;
+
   end
   else if (XmsEnabled) and (size <= xmsAvail) then
   begin
@@ -639,6 +660,7 @@ begin
   HugeGetMem(pointer(_buffer), _bufferSize);
   HeapError := @OnHeapError;
   XmsControl := nil;
+  Id := nil;
   InitXms;
 end;
 
