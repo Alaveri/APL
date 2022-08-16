@@ -59,31 +59,33 @@ type
   private
     _image: TMouseCursorImage;
     _width, _height: word;
-    _visible: boolean;
-    _x, _y: integer;
     _backData: PByte;
     _backBuffer: PByte;
   public
-    function Visible: boolean; virtual;
-    function Image: PMouseCursorImage;
+    Visible: boolean;
+    X, Y: integer;
     procedure Draw; virtual;
     procedure Init; virtual;
+    procedure StoreBackground(screenX, screenY: integer); virtual;
     destructor Done; virtual;
+    function Image: PMouseCursorImage;
     function Width: integer; virtual;
     function Height: integer; virtual;
     function GetTypeName: string; virtual;
-    procedure StoreBackground(X, Y: integer); virtual;
+    function BackBuffer: PByte; virtual;
+    function BackData: PByte; virtual;
   end;
   PFontData = ^TFontData;
   TFontData = array[0..255, 0..15] of byte;
   TRgbPalette = array[byte] of TRgbColor;
   PGraphicsMode = ^TGraphicsMode;
   TGraphicsMode = object(TPersistent)
+  private
   public
+    Description: PChar;
     Width, Height: integer;
     MaxX, MaxY: integer;
     Bpp: byte;
-    Description: PChar;
     HelpText: PChar;
     AdditionalData: integer;
     Pitch: word;
@@ -92,6 +94,7 @@ type
     constructor CreateAssign(mode: TGraphicsMode);
     procedure Assign(var source: TPersistent); virtual;
     procedure AssignTo(var dest: TPersistent); virtual;
+    procedure ScreenRect(rect: TRect);
     procedure Init; virtual;
     destructor Done; virtual;
   end;
@@ -158,6 +161,7 @@ type
     ForeColor: byte;
     BackColor: byte;
     XPos, YPos: integer;
+    Font: PFont;
     function GetTypeName: string; virtual;
     procedure Init; virtual;
     procedure Assign(var source: TPersistent); virtual;
@@ -172,8 +176,6 @@ type
     Modes: PGraphicsModeList;
     Mode: PGraphicsMode;
     Error: TError;
-    Font: PFont;
-    SystemFont: PFont;
     MouseCursor: PMouseCursor;
     function GetPixel(x, y: integer): byte; virtual;
     function GetColor(color: TStandardColor; intensity: byte): byte; virtual;
@@ -205,10 +207,8 @@ type
     procedure DrawImageStreamRect(rect: TRect; stream: PStream); virtual;
     procedure DrawImageStreamTransparent(x, y, width, height: integer; stream: PStream); virtual;
     procedure DrawImageStreamTransparentRect(rect: TRect; stream: PStream); virtual;
-    procedure DrawImageBuffer(x, y, width, height: integer; image, buffer: PByte); virtual;
-    procedure DrawImageBufferRect(rect: TRect; image, buffer: PByte); virtual;
-    procedure DrawImageBufferTransparent(x, y, width, height: integer; image, buffer: PByte); virtual;
-    procedure DrawImageBufferTransparentRect(rect: TRect; image, buffer: PByte); virtual;
+    procedure DrawImageBuffer(bufferPos: TPoint; imageSize, bufferSize: TSize; image, buffer: PByte); virtual;
+    procedure DrawImageBufferTransparent(bufferPos: TPoint; imageSize, bufferSize: TSize; image, buffer: PByte); virtual;
     procedure DrawText(x, y: integer; text: string); virtual;
     procedure DrawTextLarge(x, y: integer; text: PChar); virtual;
     procedure SetStandardPalette; virtual;
@@ -218,11 +218,23 @@ type
     procedure Init; virtual;
     procedure ShowMouseCursor; virtual;
     procedure HideMouseCursor; virtual;
-    procedure EraseMouseCursor(mouseState, oldMouseState: TMouseState); virtual;
+    procedure EraseMouseCursor(mouseState: TMouseState); virtual;
     procedure DrawMouseCursor(mouseState: TMouseState); virtual;
+    procedure MoveMouseCursor(mouseState, oldMouseState: TMouseState); virtual;
     procedure WaitForVSync; virtual;
     destructor Done; virtual;
   end;
+  PFontList = ^TFontList;
+  TFontList = Object(TObjectList)
+    function ToString: string; virtual;
+    function GetItem(index: integer): PFont;
+    function IndexOf(item: PFont): integer;
+    function GetFont(fontId: string): PFont;
+    function Add(item: PFont): integer;
+    procedure Init; virtual;
+    procedure Insert(index: integer; item: PFont);
+  end;
+
 
 var
   Graphics: PGraphicsDriver;
@@ -256,14 +268,12 @@ begin
   inherited Init;
   _oldMode := LastMode;
   ClearError(Error);
-  Modes := New(PGraphicsModeList, Create);
-  SystemFont := New(PSystemFont, CreateId('SystemFont'));
-  Font := SystemFont;
+  Modes := nil;
   Mode := nil;
+  MouseCursor := nil;
   State := New(PGraphicsState, Create);
   StateStack := New(PStack, Create);
   MoveTo(0, 0);
-  MouseCursor := nil;
 end;
 
 function TGraphicsDriver.ForeColor: byte;
@@ -397,22 +407,12 @@ begin
   DrawImageStreamTransparent(rect.X, rect.Y, rect.Width, rect.Height, stream);
 end;
 
-procedure TGraphicsDriver.DrawImageBuffer(x, y, width, height: integer; image, buffer: PByte);
+procedure TGraphicsDriver.DrawImageBuffer(bufferPos: TPoint; imageSize, bufferSize: TSize; image, buffer: PByte);
 begin
 end;
 
-procedure TGraphicsDriver.DrawImageBufferRect(rect: TRect; image, buffer: PByte);
+procedure TGraphicsDriver.DrawImageBufferTransparent(bufferPos: TPoint; imageSize, bufferSize: TSize; image, buffer: PByte);
 begin
-  DrawImageBuffer(rect.X, rect.Y, rect.Width, rect.Height, image, buffer);
-end;
-
-procedure TGraphicsDriver.DrawImageBufferTransparent(x, y, width, height: integer; image, buffer: PByte);
-begin
-end;
-
-procedure TGraphicsDriver.DrawImageBufferTransparentRect(rect: TRect; image, buffer: PByte);
-begin
-  DrawImageBufferTransparent(rect.X, rect.Y, rect.Width, rect.Height, image, buffer);
 end;
 
 procedure TGraphicsDriver.DrawText(x, y: integer; text: string);
@@ -578,12 +578,13 @@ end;
 destructor TGraphicsDriver.Done;
 begin
   TextMode(_oldMode);
+  if (Modes <> nil) then
+    Dispose(Modes, Done);
   if (MouseCursor <> nil) then begin
     Dispose(MouseCursor, Done);
-  end;  
-  Dispose(StateStack, Done);
+  end;
   Dispose(State, Done);
-  Dispose(SystemFont, Done);
+  Dispose(StateStack, Done);
   TObject.Done;
 end;
 
@@ -602,42 +603,58 @@ begin
   GetColor := 21 + ord(color) * 18 + intensity;
 end;
 
-procedure TGraphicsDriver.EraseMouseCursor(mouseState, oldMouseState: TMouseState);
+procedure TGraphicsDriver.MoveMouseCursor(mouseState, oldMouseState: TMouseState);
 var
   sourceRect, destRect, bufferRect, oldRect, newRect: TRect;
-  reference: PReference;
   ptr: PByte;
   x, y: longint;
+  imageRect: TRect;
+  pos: TPoint;
+  imageSize, bufferSize: TSize;
+  backBufferSize: integer;
 begin
-{  if (not _mouseCursor^.Visible) or not (mouseState.Visible) then exit;
-  if (_mouseCursor^._backData <> nil) and (_mouseCursor^._Visible) and (mouseState.Visible) then begin
-    oldRect.CreateDims(oldMouseState.X, oldMouseState.Y, _mouseCursor^.Width, _mousecursor^.Height);
-    newRect.CreateDims(mouseState.X, mouseState.Y, _mouseCursor^.Width, _mousecursor^.Height);
+  if (not MouseCursor^.Visible) or not (mouseState.Visible) then exit;
+  if (MouseCursor^._backData <> nil) and (MouseCursor^.Visible) and (mouseState.Visible) then begin
+    oldRect.CreateDims(oldMouseState.X, oldMouseState.Y, MouseCursor^.Width, Mousecursor^.Height);
+    newRect.CreateDims(mouseState.X, mouseState.Y, MouseCursor^.Width, Mousecursor^.Height);
     if (newRect.IntersectRect(oldRect)) then begin
       bufferRect.CreateCoords(MinL(newRect.X, oldRect.X), MinL(newRect.Y, oldRect.Y),
         MaxL(newRect.Right, oldRect.Right), MaxL(newRect.Bottom, oldRect.Bottom));
-      Memory^.Alloc(reference, bufferRect.Width * bufferRect.Height);
-      ptr := Memory^.ReferencePointer(reference);
+      ptr := MouseCursor^.BackBuffer;
+      backBufferSize := bufferRect.Width * bufferRect.Height;
+      GetMem(ptr, backBufferSize);
       GetImageRect(bufferRect, ptr);
-      destRect.CreateRect(oldRect);
-      destRect.Translate(-bufferRect.X, -bufferRect.Y);
-      sourceRect.CreateDims(0, 0, bufferRect.Width, bufferRect.Height);
-      Graphics^.DrawImageBuffer(sourceRect, destRect, _mouseCursor^._backData, ptr);
-      destRect.SetRect(newRect);
-      destRect.Translate(-bufferRect.X, -bufferRect.Y);
-      Graphics^.DrawImageBuffer(sourceRect, destRect, @_mouseCursor^._image, ptr);
-      Graphics^.DrawImageRect(bufferRect, ptr);
-      Memory^.Dealloc(reference);
+      imageRect.CreateDims(0, 0, MouseCursor^.Width, MouseCursor^.Height);
+      newRect.Translate(-bufferRect.X, -bufferRect.Y);
+      oldRect.Translate(-bufferRect.X, -bufferRect.Y);
+      pos.CreateCoords(oldRect.X, oldRect.Y);
+      imageSize.CreateDims(MouseCursor^.Width, MouseCursor^.Height);
+      bufferSize.CreateDims(bufferRect.Width, bufferRect.Height);
+      DrawImageBuffer(pos, imageSize, bufferSize, MouseCursor^._backData, ptr);
+      pos.SetCoords(newRect.X, newRect.Y);
+      DrawImageBufferTransparent(pos, imageSize, bufferSize, @MouseCursor^._image, ptr);
+      DrawImageRect(bufferRect, ptr);
+      FreeMem(ptr, backBufferSize);
+    end
+    else begin
+      DrawImageRect(oldRect, MouseCursor^._backData);
     end;
-  end;}
+    DrawMouseCursor(mouseState);
+  end;
+end;
+
+procedure TGraphicsDriver.EraseMouseCursor(mouseState: TMouseState);
+begin
+  if (MouseCursor^._backData <> nil) and (MouseCursor^.Visible) and (mouseState.Visible) then
+    DrawImage(mouseState.X, mouseState.Y, MouseCursor^.Width, Mousecursor^.Height, MouseCursor^._backData);
 end;
 
 procedure TGraphicsDriver.DrawMouseCursor(mouseState: TMouseState);
 begin
-  if (not MouseCursor^._Visible) or (not mouseState.Visible) then exit;
+  if (not MouseCursor^.Visible) or (not mouseState.Visible) then exit;
   MouseCursor^.StoreBackground(mouseState.X, mouseState.Y);
-  MouseCursor^._X := mouseState.X;
-  MouseCursor^._Y := mouseState.Y;
+  MouseCursor^.X := mouseState.X;
+  MouseCursor^.Y := mouseState.Y;
   MouseCursor^.Draw;
 end;
 
@@ -645,20 +662,16 @@ procedure TGraphicsDriver.ShowMouseCursor;
 var
   mouseState: TMouseState;
 begin
-  MouseCursor^._Visible := true;
-  MouseDriver^.State^.Visible := true;
-  MouseDriver^.GetMouseState(mouseState);
-  DrawMouseCursor(mouseState);
   MouseDriver^.ShowMouse;
+  MouseDriver^.GetMouseState(mouseState);
+  MouseCursor^.Visible := true;
+  DrawMouseCursor(mouseState);
 end;
 
 procedure TGraphicsDriver.HideMouseCursor;
-var
-  mouseState, oldMouseState: TMouseState;
 begin
-  EraseMouseCursor(MouseDriver^.State^, MouseDriver^.State^);
-  MouseCursor^._visible := false;
-  MouseDriver^.State^.Visible := false;
+  EraseMouseCursor(MouseDriver^.State^);
+  MouseCursor^.Visible := false;
   MouseDriver^.HideMouse;
 end;
 
@@ -710,10 +723,10 @@ begin
   MaxX := mode^.MaxX;
   MaxY := mode^.MaxY;
   Bpp := mode^.Bpp;
-  Description :=  CopyLargeString(mode^.Description);
   AdditionalData := mode^.AdditionalData;
-  HelpText := CopyLargeString(mode^.HelpText);
-  Id := CopyLargeString(mode^.Id);
+  CopyLargeString(Mode^.Description, Description);
+  CopyLargeString(Mode^.HelpText, HelpText);
+  CopyLargeString(Mode^.Id, Id);
   Pitch := mode^.Pitch;
   FrameBuffer := mode^.FrameBuffer;
 end;
@@ -728,12 +741,17 @@ begin
   mode^.MaxX := MaxX;
   mode^.MaxY := MaxY;
   mode^.Bpp := Bpp;
-  mode^.Description := CopyLargeString(Description);
   mode^.AdditionalData := AdditionalData;
-  mode^.HelpText := CopyLargeString(HelpText);
+  CopyLargeString(Description, Mode^.Description);
+  CopyLargeString(HelpText, Mode^.HelpText);
+  CopyLargeString(Id, Mode^.Id);
   mode^.Pitch := Pitch;
-  mode^.Id := CopyLargeString(Id);
   mode^.FrameBuffer := FrameBuffer;
+end;
+
+procedure TGraphicsMode.ScreenRect(rect: TRect);
+begin
+  rect.CreateCoords(0, 0, MaxX, MaxY);
 end;
 
 function TGraphicsModeList.GetTypeName: string;
@@ -785,11 +803,10 @@ var
   font: PFont;
 begin
   font := PFont(@source);
-  if (FontData <> nil) then begin
+  if (FontData <> nil) then
     FreeMem(FontData, FontDataSize);
-    GetMem(FontData, font^.FontDataSize);
-    Move(font^.FontData^, FontData^, font^.FontDataSize);
-  end;
+  GetMem(FontData, font^.FontDataSize);
+  Move(font^.FontData^, FontData^, font^.FontDataSize);
   FontDataSize := font^.FontDataSize;
   _maxWidth := font^._maxWidth;
   Version := font^.Version;
@@ -797,7 +814,7 @@ begin
   Transparent := font^.Transparent;
   Initialized := font^.Initialized;
   Height := font^.Height;
-  Id := CopyLargeString(font^.Id);
+  CopyLargeString(font^.Id, Id);
 end;
 
 procedure TFont.AssignTo(var dest: TPersistent);
@@ -817,6 +834,7 @@ begin
   font^.Transparent := Transparent;
   font^.Initialized := Initialized;
   font^.Height := Height;
+  CopyLargeString(id, font^.Id);
 end;
 
 procedure TFont.Init;
@@ -901,7 +919,7 @@ var
   fontPtr: pointer;
 begin
   TMonospaceFont.Init;
-  Id := NewLargeString('System');
+  NewLargeString('SystemFont', Id);
   FillChar(regs, SizeOf(regs), 0);
   regs.ax := $1130;
   regs.bh := $06;
@@ -940,30 +958,33 @@ begin
   BackColor := 0;
   XPos := 0;
   YPos := 0;
+  Font := nil;
 end;
 
-procedure TGraphicsState.Assign(var source: TPersistent); 
+procedure TGraphicsState.Assign(var source: TPersistent);
 var
-  mode: PGraphicsState;
+  state: PGraphicsState;
 begin
   TPersistent.Assign(source);
-  mode := PGraphicsState(@source);
-  mode^.ForeColor := ForeColor;
-  mode^.BackColor := BackColor;
-  mode^.XPos := XPos;
-  mode^.YPos := YPos;
+  state := PGraphicsState(@source);
+  state^.ForeColor := ForeColor;
+  state^.BackColor := BackColor;
+  state^.XPos := XPos;
+  state^.YPos := YPos;
+  state^.Font := Font;
 end;
 
 procedure TGraphicsState.AssignTo(var dest: TPersistent);
 var
-  mode: PGraphicsState;
+  state: PGraphicsState;
 begin
   TPersistent.AssignTo(dest);
-  mode := PGraphicsState(@dest);
-  ForeColor := mode^.ForeColor;
-  BackColor := mode^.BackColor;
-  XPos := mode^.XPos;
-  YPos := mode^.YPos;
+  state := PGraphicsState(@dest);
+  ForeColor := state^.ForeColor;
+  BackColor := state^.BackColor;
+  XPos := state^.XPos;
+  YPos := state^.YPos;
+  Font := state^.Font;
 end;
 
 function TGraphicsState.GetTypeName: string;
@@ -976,17 +997,12 @@ begin
   TBaseObject.Init;
   _width := 11;
   _height := 15;
-  _visible := true;
-  _y := 0;
-  _x := 0;
+  Visible := true;
+  Y := 0;
+  X := 0;
   _backData := nil;
   _backBuffer := nil;
   _image := DefaultMouseCursor;
-end;
-
-function TMouseCursor.Visible: boolean;
-begin
-  Visible := _visible;
 end;
 
 procedure TMouseCursor.Draw;
@@ -996,16 +1012,16 @@ var
   rect, mouseRect, clipRect: TRect;
   xPos, yPos, startX, startY: integer;
 begin
-  if not _visible then exit;
-  Graphics^.DrawImageTransparent(_x, _y, _width, _height, @_image);
+  if not Visible then exit;
+  Graphics^.DrawImageTransparent(X, Y, _width, _height, @_image);
 end;
 
-procedure TMouseCursor.StoreBackground(x, y: integer);
+procedure TMouseCursor.StoreBackground(screenX, screenY: integer);
 var
   rect: TRect;
 begin
   if (_backData = nil) then GetMem(_backData, Width * Height);
-  rect.CreateDims(x, y, Width, Height);
+  rect.CreateDims(screenX, screenY, Width, Height);
   Graphics^.GetImageRect(rect, _backData);
 end;
 
@@ -1028,12 +1044,60 @@ destructor TMouseCursor.Done;
 begin
   if (_backData <> nil) then
     FreeMem(_backData, _width * _height);
+  if (_backBuffer <> nil) then
+    FreeMem(_backBuffer, _width * _height * 2);
   TBaseObject.Done;
 end;
 
 function TMouseCursor.GetTypeName: string;
 begin
   GetTypeName := 'TMouseCursor';
+end;
+
+function TMouseCursor.BackBuffer: PByte;
+begin
+  BackBuffer := _backBuffer;
+end;
+
+function TMouseCursor.BackData: PByte;
+begin
+  BackData := _backData;
+end;
+
+function TFontList.ToString: string;
+begin
+  ToString := 'TFontList';
+end;
+
+function TFontList.GetItem(index: integer): PFont;
+begin
+  GetItem := PFont(inherited GetItem(index));
+end;
+
+function TFontList.IndexOf(item: PFont): integer;
+begin
+  IndexOf := inherited IndexOf(item);
+end;
+
+function TFontList.Add(item: PFont): integer;
+begin
+  Add := inherited Add(item);
+end;
+
+procedure TFontList.Init;
+begin
+  inherited init;
+end;
+
+function TFontList.GetFont(fontId: string): PFont;
+begin
+  GetFont := PFont(GetItemById(fontId));
+end;
+
+
+procedure TFontList.Insert(index: integer; item: PFont);
+begin
+  inherited Insert(index, item);
 end;
 
 end.

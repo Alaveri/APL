@@ -12,7 +12,8 @@ const
   ShowMouseCode = $01;
   HideMouseCode = $02;
   GetMouseStatusCode = $03;
-
+  SetCursorPositionCode = $04;
+  
 type
   TButtonState =
   (
@@ -50,6 +51,7 @@ type
     procedure GetMouseState(var currentState: TMouseState); virtual;
     procedure InitMouseCursor; virtual;
     procedure SetMouseResolution(width, height: word); virtual;
+    procedure SetMousePosition(x, y: word); virtual;
     destructor Done; virtual;
   end;
 
@@ -280,6 +282,16 @@ begin
     mov  cx, 0
     mov  dx, [height]
     int  33h
+  end;
+end;
+
+procedure TMouseDriver.SetMousePosition(x, y: word);
+begin
+  asm
+    mov ax, 4h
+    mov cx, [x]
+    mov dx, [y]
+    int 33h
   end;
 end;
 

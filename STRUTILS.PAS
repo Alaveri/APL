@@ -4,85 +4,108 @@ unit StrUtils;
 interface
 
 uses
-  Strings;
+  Strings,
+  Utils;
 
-function NewLargeString(st: string): PChar;
-function CopyLargeString(st: PChar): PChar;
-function PascalString(st: PChar): string;
-procedure AppendLargeStrings(var st1: PChar; st2: PChar);
-procedure AppendStringToLarge(var st1: PChar; st2: string);
-procedure DisposeLargeString(var st: PChar);
+function LargeShortCompare(shortString: string; largeString: PChar): boolean;
+function AppendShortToLarge(largeString: PChar; shortString: string): PChar;
+procedure CopyLargeString(source: PChar; var dest: PChar);
+procedure NewLargeString(source: string; var dest: PChar);
+procedure DisposeLargeString(var largeString: PChar);
 
-var
-  EmptyString: PChar;
 
 implementation
 
-function PascalString(st: PChar): string;
-begin
-  PascalString := '';
-  if (st = nil) then exit;
-  PascalString := StrPas(st);
-end;
-
-procedure AppendStringToLarge(var st1: PChar; st2: string);
-var
-  result: PChar;
-  st1Len, st2Len: word;
-  ptr: PChar;
-begin
-  st1Len := StrLen(st1);
-  GetMem(result, st1Len + Length(st2) + 1);
-  ptr := result;
-  Move(st1^, result^, st1Len);
-  Inc(ptr, st1Len);
-  Move(st2[1], ptr^, Length(st2));
-  FreeMem(st1, st1Len + 1);
-  st1 := result;
-end;
-
-procedure AppendLargeStrings(var st1: PChar; st2: PChar);
-var
-  result: PChar;
-  st1Len, st2Len: word;
-begin
-  st1Len := StrLen(st1);
-  st2Len := StrLen(st2);
-  GetMem(result, st1Len + st2Len + 1);
-  result := StrCat(st1, st2);
-  FreeMem(st1, st1Len + 1);
-  st1 := result;
-end;
-
-procedure DisposeLargeString(var st: PChar);
-begin
-  if (st = nil) then exit;
-  FreeMem(st, StrLen(st) + 1);
-  st := nil;
-end;
-
-function CopyLargeString(st: PChar): PChar;
+function AppendShortToLarge(largeString: PChar; shortString: string): PChar;
 var
   result: PChar;
   len: word;
+  ptr: PChar;
 begin
-  if (st = nil) then exit;
-  len := StrLen(st);
-  GetMem(result, len + 1);
-  StrCopy(result, st);
-  CopyLargeString := result;
+  if (largeString = nil) or (Length(shortString) = 0) then exit;
+  len := StrLen(largeString);;
+  GetMem(result, len + Length(shortString) + 1);
+  Move(largeString^, result^, len);
+  ptr := result;
+  Inc(ptr, len);
+  Move(shortString[1], ptr^, Length(shortString));
+  Inc(ptr, Length(shortString));
+  ptr^ := #0;
+  AppendShortToLarge := result;
 end;
 
-function NewLargeString(st: string): PChar;
+procedure AppendLargeStrings(var str1: PChar; str2: PChar);
 var
   result: PChar;
+  str1Len, str2Len: word;
 begin
-  GetMem(result, Length(st) + 1);
-  StrPCopy(result, st);
-  NewLargeString := result;
+  str1Len := StrLen(str1);
+  str2Len := StrLen(str2);
+  GetMem(result, str1Len + str2Len + 1);
+  result := StrCat(str1, str2);
+  FreeMem(str1, str1Len + 1);
+  str1 := result;
 end;
 
+procedure DisposeLargeString(var largeString: PChar);
+var
+  len: longint;
 begin
-  EmptyString := StrNew('');
+  if (largeString = nil) then exit;
+  len := StrLen(largeString) + 1;
+  FreeMem(largeString, len);
+  largeString := nil;
+end;
+
+procedure CopyLargeString(source: PChar; var dest: PChar);
+var
+  len: word;
+begin
+  DisposeLargeString(dest);
+  if (source = nil) then exit;
+  len := StrLen(source);
+  GetMem(dest, len + 1);
+  StrCopy(dest, source);
+end;
+
+procedure NewLargeString(source: string; var dest: PChar);
+begin
+  DisposeLargeString(dest);
+  GetMem(dest, Length(source) + 1);
+  StrPCopy(dest, source);
+end;
+
+function LargeShortCompare(shortString: string; largeString: PChar): boolean;
+var
+  index: word;
+  ptr: PChar;
+begin
+  LargeShortCompare := true;
+  if (largeString = nil) then begin
+    if (Length(shortString) > 0) then
+      LargeShortCompare := false;
+    exit;
+  end;
+  ptr := largeString;
+  index := 0;
+  while (index < High(word)) do begin
+    if (ptr^ = #0) then begin
+      if (index < Length(shortString) - 1) then
+        LargeShortCompare := false;
+      exit;
+    end;
+    if (index > Length(shortString) - 1) then begin
+      LargeShortCompare := false;
+      exit;
+    end;
+    if (ptr^ <> shortString[index + 1]) then begin
+      LargeShortCompare := false;
+      exit;
+    end;
+    Inc(ptr);
+    Inc(index);
+  end;
+end;
+
 
 end.

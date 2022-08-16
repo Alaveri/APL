@@ -7,6 +7,7 @@ uses
   Consts,
   Utils,
   Strings,
+  StrUtils,
   Objects;
 
 type
@@ -73,8 +74,9 @@ type
     procedure Init; virtual;
     function ToString: string; virtual;
     function GetItem(index: integer): PObject;
+    function GetItemById(idToFind: string): PObject;
     function IndexOf(item: PObject): integer;
-    function IndexOfId(idToFind: PChar): integer;
+    function IndexOfId(idToFind: string): integer; virtual;
     function Add(item: PObject): integer;
     function GetTypeName: string; virtual;
     procedure Insert(index: integer; item: PObject);
@@ -111,7 +113,7 @@ end;
 
 procedure TCollection.Init;
 begin
-  TObject.Init;
+  inherited Init;
   _count := 0;
   _buffer:= nil;
   _capacity := 0;
@@ -120,7 +122,7 @@ end;
 destructor TCollection.Done;
 begin
   if (_buffer <> nil) then FreeMem(_buffer, _capacity * SizeOf(Pointer));
-  TObject.Done;
+  inherited Done;
 end;
 
 function TCollection.GetTypeName;
@@ -445,7 +447,7 @@ begin;
       Dispose(item, Done);
     end;
   end;
-  TList.Done;
+  inherited Done;
 end;
 
 function TObjectList.ToString: string;
@@ -463,21 +465,29 @@ begin
   IndexOf := TList.IndexOf(item);
 end;
 
-function TObjectList.IndexOfId(idToFind: PChar): integer;
+function TObjectList.IndexOfId(idToFind: string): integer;
 var
-  index: integer;
-  currentId: PChar;
+  index, len: integer;
+  largeId: PChar;
 begin
   IndexOfId := -1;
   for index := 0 to _count - 1 do
   begin
-    currentId := GetItem(index)^.Id;
-    if (StrComp(currentId, idToFind) = 0) then
-    begin
+    largeId := GetItem(index)^.Id;
+    if LargeShortCompare(idToFind, largeId) then begin
       IndexOfId := index;
       break;
     end;
   end;
+end;
+
+function TObjectList.GetItemById(idToFind: string): PObject;
+var
+  index: integer;
+begin
+  GetItemById := nil;
+  index := IndexOfId(idToFind);
+  if (index >= 0) then GetItemById := GetItem(index);
 end;
 
 function TObjectList.Add(item: PObject): integer;

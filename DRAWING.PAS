@@ -10,6 +10,7 @@ type
   TRect = object(TBaseObject)
   public
     X, Y, Width, Height: longint;
+    constructor Create;
     constructor CreateDims(newX, newY, newWidth, newHeight: longint);
     constructor CreateCoords(newX, newY, newRight, newBottom: longint);
     constructor CreateRect(newRect: TRect);
@@ -18,7 +19,7 @@ type
     procedure SetRect(newRect: TRect); virtual;
     procedure SetRight(newRight: integer); virtual;
     procedure SetBottom(newBottom: integer); virtual;
-    procedure Translate(dL, dT: longint); virtual;
+    procedure Translate(dX, dY: longint); virtual;
     procedure Grow(dW, dH: integer); virtual;
     procedure Intersection(rect: TRect; var result: TRect); virtual;
     procedure Init; virtual;
@@ -28,8 +29,42 @@ type
     function IntersectPoint(pX, pY: longint): boolean; virtual;
     function IntersectRect(rect: TRect): boolean; virtual;
   end;
+  TPoint = object(TBaseObject)
+  public
+    X, Y: longint;
+    constructor Create;
+    constructor CreateCoords(newX, newY: longint);
+    constructor CreatePoint(point: TPoint);
+    procedure SetCoords(newX, newY: longint); virtual;
+    procedure SetPoint(point: TPoint); virtual;
+    procedure Translate(dX, dY: longint); virtual;
+    procedure Init; virtual;
+    function Equals(xPos, yPos: longint): boolean; virtual;
+    function EqualsPoint(point: TPoint): boolean; virtual;
+    function IntersectRect(rect: TRect): boolean; virtual;
+  end;
+  TLocation = TPoint;
+  TSize = object(TBaseObject)
+  public
+    Width, Height: longint;
+    constructor Create;
+    constructor CreateDims(newWidth, newHeight: longint);
+    constructor CreateSize(size: TSize);
+    procedure SetDims(newWidth, newHeight: longint); virtual;
+    procedure SetSize(size: TSize); virtual;
+    procedure Grow(dW, dH: longint); virtual;
+    procedure Init; virtual;
+  end;
 
 implementation
+
+constructor TRect.Create;
+begin
+  X := 0;
+  Y := 0;
+  Width := 0;
+  Height := 0;
+end;
 
 constructor TRect.CreateRect(newRect: TRect);
 begin
@@ -68,10 +103,10 @@ begin
   Height := newBottom - Y + 1;
 end;
 
-procedure TRect.Translate(dL, dT: longint);
+procedure TRect.Translate(dX, dY: longint);
 begin
-  Inc(X, dL);
-  Inc(Y, dT);
+  Inc(X, dX);
+  Inc(Y, dY);
 end;
 
 procedure TRect.SetRect(newRect: TRect);
@@ -142,6 +177,109 @@ begin
   result.Create;
   if (not IntersectRect(rect)) then exit;
   result.CreateCoords(MaxL(X, rect.X), MaxL(Y, rect.Y), MinL(Right, rect.Right), MinL(Bottom, rect.Bottom));
+end;
+
+constructor TPoint.Create;
+begin
+  Init;
+end;
+
+constructor TPoint.CreateCoords(newX, newY: longint);
+begin
+  Init;
+  SetCoords(newX, newY);
+end;
+
+constructor TPoint.CreatePoint(point: TPoint);
+begin
+  Init;
+  SetPoint(point);
+end;
+
+procedure TPoint.SetCoords(newX, newY: longint);
+begin
+  X := newX;
+  Y := newY;
+end;
+
+procedure TPoint.SetPoint(point: TPoint);
+begin
+  X := point.X;
+  Y := point.Y;
+end;
+
+procedure TPoint.Translate(dX, dY: longint);
+begin
+  Inc(X, dX);
+  Inc(Y, dY);
+end;
+
+procedure TPoint.Init;
+begin
+  inherited Init;
+  X := 0;
+  Y := 0;
+end;
+
+function TPoint.Equals(xPos, yPos: longint): boolean;
+begin
+  Equals := (xPos = X) and (yPos = Y);
+end;
+
+function TPoint.EqualsPoint(point: TPoint): boolean;
+begin
+  EqualsPoint := (point.X = X) and (point.Y = Y);
+end;
+
+function TPoint.IntersectRect(rect: TRect): boolean;
+begin
+  IntersectRect :=
+    (X >= rect.X) and
+    (Y >= rect.Y) and
+    (X <= rect.Right) and
+    (Y <= rect.Bottom);
+end;
+
+constructor TSize.Create;
+begin
+  Init;
+end;
+
+constructor TSize.CreateDims(newWidth, newHeight: longint);
+begin
+  Init;
+  SetDims(newWidth, newHeight);
+end;
+
+constructor TSize.CreateSize(size: TSize);
+begin
+  Init;
+  SetSize(size);
+end;
+
+procedure TSize.Init;
+begin
+  inherited Init;
+  Width := 0;
+  Height := 0;
+end;
+
+procedure TSize.SetDims(newWidth, newHeight: longint);
+begin
+  Width := newWidth;
+  Height := newHeight;
+end;
+
+procedure TSize.SetSize(size: TSize);
+begin
+  Width := size.Width;
+  Height := size.Height;
+end;
+
+procedure TSize.Grow(dW, dH: longint);
+begin
+  Inc(width, dW);
+  Inc(height, dH);
 end;
 
 end.

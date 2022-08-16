@@ -149,7 +149,7 @@ end;
 constructor TObject.CreateId(newId: string);
 begin
   Init;
-  Id := NewLargeString(newId);
+  NewLargeString(newId, Id);
 end;
 
 constructor TObject.Create;
@@ -165,7 +165,7 @@ end;
 procedure TObject.Init;
 begin
   inherited Init;
-  id := nil;
+  Id := nil;
 end;
 
 function TObject.ToString: string;
@@ -199,4 +199,4 @@ end;
 begin
   OnAllocationError := nil;
 
-end.
+end .

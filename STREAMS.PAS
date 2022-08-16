@@ -29,7 +29,6 @@ type
     _position: longint;
     _status: TStreamStatus;
     _length: longint;
-    _canRead, _canWrite, _canSeek: boolean;
     _closed: boolean;
   public
     Error: TError;
@@ -69,6 +68,9 @@ type
     function WriteToStream(stream: TStream; count: longint): longint; virtual;
     function ReadFromStream(stream: TStream; count: longint): longint; virtual;
     function GetTypeName: string; virtual;
+    function CanRead: boolean; virtual;
+    function CanWrite: boolean; virtual;
+    function CanSeek: boolean; virtual;
     procedure Init; virtual;
     procedure SetLength(newLength: longint); virtual;
     procedure WriteByte; virtual;
@@ -103,17 +105,17 @@ end;
 
 function TStream.CanRead: boolean;
 begin
-  CanRead := _canRead;
+  CanRead := true;
 end;
 
 function TStream.CanWrite: boolean;
 begin
-  CanWrite := _canWrite;
+  CanWrite := true;
 end;
 
 function TStream.CanSeek: boolean;
 begin
-  CanSeek := _canSeek;
+  CanSeek := true;
 end;
 
 function TStream.Read(buffer: PByte; count: longint): longint;
@@ -165,9 +167,6 @@ begin
   _position := 0;
   _status := ssEndOfStream;
   _length := 0;
-  _canRead := false;
-  _canWrite := false;
-  _canSeek := false;
   _closed := true;
 end;
 
@@ -238,7 +237,7 @@ var
   index: integer;
   reference: PReference;
 begin
-  for index := _references^.Count downto 0 do begin
+  for index := _references^.Count - 1 downto 0 do begin
     reference := _references^.GetItem(index);
     Memory^.DeAlloc(reference);
   end;
@@ -254,7 +253,7 @@ var
   readSize: longint;
   ptr: PByte;
 begin
-  if (_position >= _length - 1) then begin
+  if (_position >= _length) then begin
     CreateError(Error, ecReadPastStreamEnd, esWarning);
     exit;
   end;
@@ -265,9 +264,11 @@ begin
     referencePos := _position mod MaxVarSize;
     reference := _references^.GetItem(index);
     readSize := MinL(reference^.Size - referencePos, count - bytesRead);
-    if (_position + readSize > _length - 1) then begin
+    if (_position + readSize >= _length) then begin
       CreateError(Error, ecReadPastStreamEnd, esWarning);
       readSize := _length - _position;
+      Read := bytesRead + readSize;
+      exit;
     end;
     ptr := Memory^.ReferencePointer(reference);
     Inc(ptr, referencePos);
@@ -292,7 +293,7 @@ var
   writeSize: longint;
   ptr: PByte;
 begin
-  if (_position >= _length - 1) then begin
+  if (_position >= _length) then begin
     CreateError(Error, ecWritePastStreamEnd, esWarning);
     exit;
   end;
@@ -303,7 +304,7 @@ begin
     referencePos := _position mod MaxVarSize;
     reference := _references^.GetItem(index);
     writeSize := MinL(reference^.Size - referencePos, count - written);
-    if (_position + writeSize > _length - 1) then begin
+    if (_position + writeSize >= _length) then begin
       CreateError(Error, ecWritePastStreamEnd, esWarning);
       writeSize := _length - _position;
     end;
@@ -329,7 +330,7 @@ var
   writeSize: longint;
   ptr: PByte;
 begin
-  if (_position >= _length - 1) then begin
+  if (_position >= _length) then begin
     CreateError(Error, ecWritePastStreamEnd, esWarning);
     exit;
   end;
@@ -340,7 +341,7 @@ begin
     referencePos := _position mod MaxVarSize;
     reference := _references^.GetItem(index);
     writeSize := MinL(reference^.Size - referencePos, count - written);
-    if (_position + writeSize > _length - 1) then begin
+    if (_position + writeSize >= _length) then begin
       CreateError(Error, ecWritePastStreamEnd, esWarning);
       writeSize := _length - _position;
     end;
@@ -359,7 +360,24 @@ begin
 end;
 
 function TMemoryStream.ReadByte: byte;
+var
+  index, referencePos: longint;
+  reference: PReference;
+  ptr: PByte;
 begin
+  ReadByte := 0;
+  if (_position >= _length) then begin
+    CreateError(Error, ecReadPastStreamEnd, esWarning);
+    exit;
+  end;
+
+  index := _position div MaxVarSize;
+  referencePos := _position mod MaxVarSize;
+  reference := _references^.GetItem(index);
+  ptr := Memory^.ReferencePointer(reference);
+  Inc(ptr, referencePos);
+  Inc(_position);
+  ReadByte := ptr^;
 end;
 
 function TMemoryStream.WriteToStream(stream: TStream; count: longint): longint;
@@ -383,6 +401,22 @@ end;
 procedure TMemoryStream.WriteByte;
 begin
 end;
+
+function TMemoryStream.CanRead: boolean;
+begin
+  CanRead := true;
+end;
+
+function TMemoryStream.CanWrite: boolean;
+begin
+  CanWrite := true;
+end;
+
+function TMemoryStream.CanSeek: boolean;
+begin
+  CanSeek := true;
+end;
+
 
 function TMemoryStream.GetTypeName;
 begin

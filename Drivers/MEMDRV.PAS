@@ -136,8 +136,8 @@ end;
 
 constructor TMemDrv.CreateReserved(reserved: longint);
 begin
-  Init;
   _memReserved := reserved;
+  Init;
 end;
 
 function TMemDrv.References: PReferenceList;
@@ -643,6 +643,7 @@ var
   reference: PReference;
   size: word;
 begin
+  inherited Init;
   ClearError(error);
   { references are always sorted by Xms flag and Offset ascending }
   _references := New(PReferenceList, CreateSorted(ReferenceOffsetCompare));
@@ -657,10 +658,9 @@ begin
   _bufferSize := System.MaxAvail - _memReserved;
   _xmsSize := 0;
   _transactionReferences := nil;
-  HugeGetMem(pointer(_buffer), _bufferSize);
   HeapError := @OnHeapError;
+  HugeGetMem(pointer(_buffer), _bufferSize);
   XmsControl := nil;
-  Id := nil;
   InitXms;
 end;
 
