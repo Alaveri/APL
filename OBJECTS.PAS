@@ -107,6 +107,11 @@ type
   *)
   TPersistent = object(TObject)
   public
+    (** Creates a new object of type TPersistent and assigns it's values to the specified source
+    * @param source The source object to assign to this object.
+    *)
+    constructor CreateAssign(var source: TPersistent);
+
     (** Initializes this object.  Called by Create and CreateId. *)
     procedure Init; virtual;
 
@@ -176,6 +181,12 @@ end;
 destructor TObject.Done;
 begin
   DisposeLargeString(Id);
+end;
+
+constructor TPersistent.CreateAssign(var source: TPersistent);
+begin
+  Init;
+  Assign(source);
 end;
 
 procedure TPersistent.Init;

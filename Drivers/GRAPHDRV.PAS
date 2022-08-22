@@ -561,7 +561,7 @@ var
   newState: PGraphicsState;
 begin
   newState := New(PGraphicsState, Create);
-  newState^ := State^;
+  newState^.Assign(State^);
   StateStack^.Push(newState);
 end;
 
@@ -571,7 +571,7 @@ var
 begin
   oldState := PGraphicsState(StateStack^.Pop);
   if (oldState = nil) then exit;
-  State^ := oldState^;
+  State^.Assign(oldState^);
   Dispose(oldState, Done);
 end;
 
@@ -967,11 +967,11 @@ var
 begin
   TPersistent.Assign(source);
   state := PGraphicsState(@source);
-  state^.ForeColor := ForeColor;
-  state^.BackColor := BackColor;
-  state^.XPos := XPos;
-  state^.YPos := YPos;
-  state^.Font := Font;
+  ForeColor := state^.ForeColor;
+  BackColor := state^.BackColor;
+  XPos := state^.XPos;
+  YPos := state^.YPos;
+  Font := state^.Font;
 end;
 
 procedure TGraphicsState.AssignTo(var dest: TPersistent);
@@ -980,11 +980,11 @@ var
 begin
   TPersistent.AssignTo(dest);
   state := PGraphicsState(@dest);
-  ForeColor := state^.ForeColor;
-  BackColor := state^.BackColor;
-  XPos := state^.XPos;
-  YPos := state^.YPos;
-  Font := state^.Font;
+  state^.ForeColor := ForeColor;
+  state^.BackColor := BackColor;
+  state^.XPos := XPos;
+  state^.YPos := YPos;
+  state^.Font := Font;
 end;
 
 function TGraphicsState.GetTypeName: string;
