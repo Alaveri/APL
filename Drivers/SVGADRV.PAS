@@ -61,10 +61,10 @@ type
     procedure HLine(x, y, width: integer); virtual;
     procedure VLine(x, y, height: integer); virtual;
     procedure FillRect(rect: TRect); virtual;
-    procedure DrawImage(x, y, width, height: integer; image: PByte); virtual;
-    procedure DrawImageTransparent(x, y, width, height: integer; image: PByte); virtual;
-    procedure DrawImageStream(x, y, width, height: integer; stream: PStream); virtual;
-    procedure DrawImageStreamTransparent(x, y, width, height: integer; stream: PStream); virtual;
+    procedure DrawImage(x, y, width, height: longint; image: PByte); virtual;
+    procedure DrawImageTransparent(x, y, width, height: longint; image: PByte); virtual;
+    procedure DrawImageStream(x, y, width, height: longint; stream: PStream); virtual;
+    procedure DrawImageStreamTransparent(x, y, width, height: longint; stream: PStream); virtual;
     procedure DrawImageBuffer(bufferPos: TPoint; imageSize, bufferSize: TSize; image, buffer: PByte); virtual;
     procedure DrawImageBufferTransparent(bufferPos: TPoint; imageSize, bufferSize: TSize; image, buffer: PByte); virtual;
     procedure WaitForVSync; virtual;
@@ -395,14 +395,19 @@ end;
 
 procedure TSVgaDriver.HLine(x, y, width: integer);
 var
-  offset: longint;
+  lineWidth, xOffset, offset: longint;
   ptr: PByte;
   index: word;
   partialWidth: word;
   bank: word;
 begin
-  x := MaxL(x, 0);
-  width := MinL(width, Mode^.MaxX - X + 1);
+  xOffset := 0;
+  if (x < 0) then begin
+    xOffset := Abs(x);
+  end;
+  Inc(x, xOffset);
+  lineWidth := width - xOffset;
+  lineWidth := MinL(lineWidth, Mode^.MaxX - x);
   if (y < 0) or (y > Mode^.MaxY) then exit;
   offset := x + longint(y) * Mode^.Pitch;
   bank := offset shr 16;
@@ -410,15 +415,15 @@ begin
   ptr := Mode^.FrameBuffer;
   Inc(ptr, offset);
   SetBank(bank);
-  if (offset + width > _granularity) then begin
+  if (offset + lineWidth > _granularity) then begin
     partialWidth := _granularity - offset + 1;
     FillChar(ptr^, partialWidth, ForeColor);
     SetBank(bank + 1);
     ptr := Mode^.FrameBuffer;
-    FillChar(ptr^, width - partialWidth, ForeColor);
+    FillChar(ptr^, lineWidth - partialWidth, ForeColor);
   end
   else
-    FillChar(ptr^, width, ForeColor);
+    FillChar(ptr^, lineWidth, ForeColor);
 end;
 
 procedure TSVgaDriver.VLine(x, y, height: integer);
@@ -428,7 +433,8 @@ var
   ptr: PByte;
   bank: word;
 begin
-  for index := y to y + height - 1 do begin
+  if (x < 0) or (x > Mode^.MaxX) then exit;
+  for index := (MaxL(y, 0)) to MinL(y + height - 1, Mode^.MaxY) do begin
     offset := x + longint(index) * Mode^.Pitch;
     bank := offset shr 16;
     SetBank(bank);
@@ -448,7 +454,7 @@ begin
   end;
 end;
 
-procedure TSVgaDriver.DrawImage(x, y, width, height: integer; image: PByte);
+procedure TSVgaDriver.DrawImage(x, y, width, height: longint ; image: PByte);
 var
   yIndex, sx, sy: integer;
   lineWidth, partialWidth: integer;
@@ -480,7 +486,7 @@ begin
     imagePtr := image;
     Inc(imagePtr, longint(yIndex) * width + xOffset);
 
-    offset := sx + longint(sy) * Mode^.Pitch + xOffset;
+    offset := sx + longint(sy) * Mode^.Pitch;
     bank := offset shr 16;
     offset := offset and _granularity;
     if (bank <> _currentBank) then SetBank(bank);
@@ -502,7 +508,7 @@ begin
   end;
 end;
 
-procedure TSVgaDriver.DrawImageTransparent(x, y, width, height: integer; image: PByte);
+procedure TSVgaDriver.DrawImageTransparent(x, y, width, height: longint; image: PByte);
 var
   xIndex, yIndex, sx, sy: integer;
   lineWidth, partialWidth: integer;
@@ -518,10 +524,13 @@ begin
   if (x < 0) then begin
     xOffset := Abs(x);
   end;
+
   lineWidth := width - xOffset;
   lineWidth := MinL(lineWidth, Mode^.MaxX - x);
   imagePtr := image;
+
   for yIndex := 0 to height - 1 do begin
+    sx := x + xOffset;
     if (sy < 0) then begin
       Inc(sy);
       continue;
@@ -534,14 +543,12 @@ begin
     imageLineOffset := longint(yIndex) * width + xOffset;
     Inc(imagePtr, imageLineOffset);
 
-    offset := longint(sy) * Mode^.Pitch + x + xOffset;
+    offset := sx + longint(sy) * Mode^.Pitch;
     bank := offset shr 16;
     offset := offset and _granularity;
     if (bank <> _currentBank) then SetBank(bank);
     screenPtr := Mode^.FrameBuffer;
     Inc(screenPtr, offset);
-
-    sx := x + xOffset;
     lineRight := sx + lineWidth - 1;
 
     while (sx <= lineRight) do begin
@@ -560,7 +567,7 @@ begin
   end;
 end;
 
-procedure TSVgaDriver.DrawImageStream(x, y, width, height: integer; stream: PStream);
+procedure TSVgaDriver.DrawImageStream(x, y, width, height: longint; stream: PStream);
 var
   yIndex, sx, sy: integer;
   lineWidth, partialWidth: integer;
@@ -594,7 +601,7 @@ begin
     stream^.Seek(position + longint(yIndex) * width + xOffset, soFromBeginning);
     if (not NoError(stream^.Error)) then exit;
 
-    offset := sx + longint(sy) * Mode^.Pitch + xOffset;
+    offset := sx + longint(sy) * Mode^.Pitch;
     bank := offset shr 16;
     offset := offset and _granularity;
     if (bank <> _currentBank) then SetBank(bank);
@@ -620,7 +627,7 @@ begin
   end;
 end;
 
-procedure TSVgaDriver.DrawImageStreamTransparent(x, y, width, height: integer; stream: PStream);
+procedure TSVgaDriver.DrawImageStreamTransparent(x, y, width, height: longint; stream: PStream);
 var
   xIndex, yIndex, sx, sy: integer;
   lineWidth, partialWidth: integer;
@@ -785,21 +792,23 @@ begin
   if (x < 0) then begin
     xOffset := Abs(x);
   end;
-  lineWidth := width - xOffset;
-  lineWidth := MinL(lineWidth, Mode^.Width - x);
-  bufferPtr := buffer;
   sx := x + xOffset;
+  lineWidth := width - xOffset;
+  lineWidth := MinL(lineWidth, Mode^.Width - sx);
   for yIndex := 0 to height - 1 do begin
-    if (sy < 0) then begin
+    bufferPtr := buffer;
+    Inc(bufferPtr, longint(yIndex) * width + xOffset);
+
+    if (sy < 0) or (sy > Mode^.MaxY) then begin
+      FillChar(bufferPtr, width, 0);
       Inc(sy);
       continue;
     end;
-    if (sy > Mode^.MaxY) then begin
-      break;
-    end;
 
-    bufferPtr := buffer;
-    Inc(bufferPtr, longint(yIndex) * width + xOffset);
+    if (xOffset > 0) then begin
+      FillChar(buffer^, xOffset, 0);
+      Inc(buffer, xOffset);
+    end;
 
     offset := sx + longint(sy) * Mode^.Pitch;
     screenPtr := Mode^.FrameBuffer;
@@ -815,9 +824,14 @@ begin
       SetBank(bank + 1);
       screenPtr := Mode^.FrameBuffer;
       Move(screenPtr^, bufferPtr^, lineWidth - partialWidth);
+      Inc(bufferPtr, lineWidth - partialWidth);
     end
     else begin
       Move(screenPtr^, bufferPtr^, lineWidth);
+      Inc(bufferPtr, lineWidth);
+    end;
+    if (xOffset > 0) then begin
+      FillChar(buffer^, width - lineWidth, 0);
     end;
     Inc(sy);
   end;
@@ -829,54 +843,58 @@ var
   lineWidth, partialWidth: integer;
   xOffset: integer;
   screenPtr: PByte;
+  position: longint;
   offset: longint;
   bank: word;
-  position: longint;
-  streamOffset: longint;
 begin
   sy := y;
   xOffset := 0;
   if (x < 0) then begin
     xOffset := Abs(x);
   end;
-  lineWidth := width - xOffset;
-  lineWidth := MinL(lineWidth, Mode^.Width - x);
-  position := Stream^.Position;
   sx := x + xOffset;
+  lineWidth := width - xOffset;
+  lineWidth := MinL(lineWidth, Mode^.Width - sx);
+  position := stream^.Position;
   for yIndex := 0 to height - 1 do begin
-    if (sy < 0) then begin
+    stream^.Seek(position + longint(yIndex) * width, soFromBeginning);
+
+    if (sy < 0) or (sy > Mode^.MaxY) then begin
+      stream^.FillChar(width, #0);
       Inc(sy);
       continue;
     end;
-    if (sy > Mode^.MaxY) then begin
-      break;
+
+    if (xOffset > 0) then begin
+      stream^.FillChar(xOffset, #0);
+      if (not NoError(stream^.Error)) then exit;
     end;
 
-    streamOffset := sx + longint(yIndex) * width + xOffset + position;
-    stream^.Seek(streamOffset, soFromBeginning);
-    if not NoError(stream^.Error) then exit;
-
     offset := sx + longint(sy) * Mode^.Pitch;
+    screenPtr := Mode^.FrameBuffer;
     bank := offset shr 16;
     offset := offset and _granularity;
-    screenPtr := Mode^.FrameBuffer;
     Inc(screenPtr, offset);
     if (_currentBank <> bank) then SetBank(bank);
 
     if (offset + lineWidth > _granularity) then begin
       partialWidth := _granularity - offset + 1;
-      Stream^.Write(screenPtr, partialWidth);
-      if not NoError(stream^.Error) then exit;
-      Stream^.Seek(partialWidth, soFromPosition);
-      if not NoError(stream^.Error) then exit;
+      stream^.Write(screenPtr, partialWidth);
+      if (not NoError(stream^.Error)) then exit;
+      stream^.Seek(partialWidth, soFromPosition);
       SetBank(bank + 1);
       screenPtr := Mode^.FrameBuffer;
-      Stream^.Write(screenPtr, lineWidth - partialWidth);
-      if not NoError(stream^.Error) then exit;
+      stream^.Write(screenPtr, lineWidth - partialWidth);
+      if (not NoError(stream^.Error)) then exit;
+      stream^.Seek(lineWidth - partialWidth, soFromPosition);
     end
     else begin
-      Stream^.Write(screenPtr, lineWidth);
-      if not NoError(stream^.Error) then exit;
+      stream^.Write(screenPtr, lineWidth);
+      if (not NoError(stream^.Error)) then exit;
+    end;
+    if (sx + lineWidth > Mode^.MaxX) then begin
+      stream^.FillChar(width - lineWidth, #0);
+      if (not NoError(stream^.Error)) then exit;
     end;
     Inc(sy);
   end;

@@ -17,6 +17,7 @@ type
   PApplication = ^TApplication;
   TApplication = object(TObject)
   private
+    _memPtr: pointer;
   public
     Closed: boolean;
     InterfaceMemory: longint;
@@ -43,6 +44,7 @@ end;
 
 procedure TApplication.Init;
 begin
+  Mark(_memPtr);
   inherited Init;
   ClrScr;
   MouseDriver := New(PMouseDriver, Create);
@@ -79,6 +81,7 @@ begin
 {  Keyboard.Done;}
   while KeyPressed do ReadKey;
   TObject.Done;
+  Release(_memPtr);
 end;
 
 end.

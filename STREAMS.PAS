@@ -26,14 +26,13 @@ type
   PStream = ^TStream;
   TStream = object(TObject)
   private
-    _position: longint;
     _status: TStreamStatus;
     _length: longint;
     _closed: boolean;
   public
+    Position: longint;
     Error: TError;
     destructor Done; virtual;
-    function Position: longint; virtual;
     function Length: longint; virtual;
     function Status: TStreamStatus; virtual;
     function EndOfStream: boolean; virtual;
@@ -83,11 +82,6 @@ begin
   Close;
 end;
 
-function TStream.Position: longint;
-begin
-  Position := _position;
-end;
-
 function TStream.Length: longint;
 begin
   Length := _length;
@@ -100,7 +94,7 @@ end;
 
 function TStream.EndOfStream: boolean;
 begin
-  EndOfStream := _position > _length;
+  EndOfStream := Position > _length;
 end;
 
 function TStream.CanRead: boolean;
@@ -142,10 +136,10 @@ begin
       newPos := length - offset - 1;
     end;
     soFromPosition: begin
-      newPos := _position + offset;
+      newPos := Position + offset;
     end;
   end;
-  _position := MinL(MaxL(0, newPos), length - 1);
+  Position := MinL(MaxL(0, newPos), length);
 end;
 
 function TStream.ReadByte: byte;
@@ -164,7 +158,7 @@ procedure TStream.Init;
 begin
   inherited Init;
   ClearError(Error);
-  _position := 0;
+  Position := 0;
   _status := ssEndOfStream;
   _length := 0;
   _closed := true;
@@ -253,20 +247,20 @@ var
   readSize: longint;
   ptr: PByte;
 begin
-  if (_position >= _length) then begin
+  if (Position >= _length) then begin
     CreateError(Error, ecReadPastStreamEnd, esWarning);
     exit;
   end;
 
   bytesRead := 0;
   while (bytesRead < count) do begin
-    index := _position div MaxVarSize;
-    referencePos := _position mod MaxVarSize;
+    index := Position div MaxVarSize;
+    referencePos := Position mod MaxVarSize;
     reference := _references^.GetItem(index);
     readSize := MinL(reference^.Size - referencePos, count - bytesRead);
-    if (_position + readSize >= _length) then begin
+    if (Position + readSize > _length) then begin
       CreateError(Error, ecReadPastStreamEnd, esWarning);
-      readSize := _length - _position;
+      readSize := _length - Position;
       Read := bytesRead + readSize;
       exit;
     end;
@@ -275,8 +269,8 @@ begin
     Move(ptr^, buffer^, readSize);
     Inc(buffer, readSize);
     Inc(bytesRead, readSize);
-    Inc(_position, readSize);
-    if (_position > _length - 1) then begin
+    Inc(Position, readSize);
+    if (Position > _length) then begin
       CreateError(Error, ecReadPastStreamEnd, esWarning);
       break;
     end;
@@ -293,27 +287,27 @@ var
   writeSize: longint;
   ptr: PByte;
 begin
-  if (_position >= _length) then begin
+  if (Position >= _length) then begin
     CreateError(Error, ecWritePastStreamEnd, esWarning);
     exit;
   end;
 
   written := 0;
   while (written < count) do begin
-    index := _position div MaxVarSize;
-    referencePos := _position mod MaxVarSize;
+    index := Position div MaxVarSize;
+    referencePos := Position mod MaxVarSize;
     reference := _references^.GetItem(index);
     writeSize := MinL(reference^.Size - referencePos, count - written);
-    if (_position + writeSize >= _length) then begin
+    if (Position + writeSize >= _length) then begin
       CreateError(Error, ecWritePastStreamEnd, esWarning);
-      writeSize := _length - _position;
+      writeSize := _length - Position;
     end;
     ptr := Memory^.ReferencePointer(reference);
     Inc(ptr, referencePos);
     System.FillChar(ch, ptr^, writeSize);
     Inc(written, writeSize);
-    Inc(_position, writeSize);
-    if (_position > _length - 1) then begin
+    Inc(Position, writeSize);
+    if (Position > _length) then begin
       CreateError(Error, ecWritePastStreamEnd, esWarning);
       break;
     end;
@@ -330,28 +324,28 @@ var
   writeSize: longint;
   ptr: PByte;
 begin
-  if (_position >= _length) then begin
+  if (Position >= _length) then begin
     CreateError(Error, ecWritePastStreamEnd, esWarning);
     exit;
   end;
 
   written := 0;
   while (written < count) do begin
-    index := _position div MaxVarSize;
-    referencePos := _position mod MaxVarSize;
+    index := Position div MaxVarSize;
+    referencePos := Position mod MaxVarSize;
     reference := _references^.GetItem(index);
     writeSize := MinL(reference^.Size - referencePos, count - written);
-    if (_position + writeSize >= _length) then begin
+    if (Position + writeSize > _length) then begin
       CreateError(Error, ecWritePastStreamEnd, esWarning);
-      writeSize := _length - _position;
+      writeSize := _length - Position;
     end;
     ptr := Memory^.ReferencePointer(reference);
     Inc(ptr, referencePos);
     Move(buffer^, ptr^, writeSize);
     Inc(buffer, writeSize);
     Inc(written, writeSize);
-    Inc(_position, writeSize);
-    if (_position > _length - 1) then begin
+    Inc(Position, writeSize);
+    if (Position > _length) then begin
       CreateError(Error, ecWritePastStreamEnd, esWarning);
       break;
     end;
@@ -366,17 +360,17 @@ var
   ptr: PByte;
 begin
   ReadByte := 0;
-  if (_position >= _length) then begin
+  if (Position >= _length) then begin
     CreateError(Error, ecReadPastStreamEnd, esWarning);
     exit;
   end;
 
-  index := _position div MaxVarSize;
-  referencePos := _position mod MaxVarSize;
+  index := Position div MaxVarSize;
+  referencePos := Position mod MaxVarSize;
   reference := _references^.GetItem(index);
   ptr := Memory^.ReferencePointer(reference);
   Inc(ptr, referencePos);
-  Inc(_position);
+  Inc(Position);
   ReadByte := ptr^;
 end;
 

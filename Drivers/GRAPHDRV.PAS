@@ -197,15 +197,15 @@ type
     procedure Line(x1, y1, x2, y2: integer); virtual;
     procedure HLine(x, y, width: integer); virtual;
     procedure VLine(x, y, height: integer); virtual;
-    procedure Rectangle(x1, y1, width, height: integer); virtual;
+    procedure Rectangle(rect: TRect); virtual;
     procedure FillRect(rect: TRect); virtual;
-    procedure DrawImage(x, y, width, height: integer; image: PByte); virtual;
-    procedure DrawImageTransparent(x, y, width, height: integer; image: PByte); virtual;
+    procedure DrawImage(x, y, width, height: longint; image: PByte); virtual;
+    procedure DrawImageTransparent(x, y, width, height: longint; image: PByte); virtual;
     procedure DrawImageTransparentRect(rect: TRect; image: PByte); virtual;
     procedure DrawImageRect(rect: TRect; image: PByte); virtual;
-    procedure DrawImageStream(x, y, width, height: integer; stream: PStream); virtual;
+    procedure DrawImageStream(x, y, width, height: longint; stream: PStream); virtual;
     procedure DrawImageStreamRect(rect: TRect; stream: PStream); virtual;
-    procedure DrawImageStreamTransparent(x, y, width, height: integer; stream: PStream); virtual;
+    procedure DrawImageStreamTransparent(x, y, width, height: longint; stream: PStream); virtual;
     procedure DrawImageStreamTransparentRect(rect: TRect; stream: PStream); virtual;
     procedure DrawImageBuffer(bufferPos: TPoint; imageSize, bufferSize: TSize; image, buffer: PByte); virtual;
     procedure DrawImageBufferTransparent(bufferPos: TPoint; imageSize, bufferSize: TSize; image, buffer: PByte); virtual;
@@ -333,12 +333,12 @@ procedure TGraphicsDriver.Line(x1, y1, x2, y2: integer);
 begin
 end;
 
-procedure TGraphicsDriver.Rectangle(x1, y1, width, height: integer);
+procedure TGraphicsDriver.Rectangle(rect: TRect);
 begin
-  HLine(x1, y1, width);
-  HLine(x1, height - 1, width);
-  VLine(x1, y1, height);
-  VLine(width - 1, y1, height);
+  HLine(rect.X, rect.Y, rect.Width);
+  HLine(rect.X, rect.Bottom, rect.Width);
+  VLine(rect.X, rect.Y, rect.Height);
+  VLine(rect.Right, rect.Y, rect.Height);
 end;
 
 procedure TGraphicsDriver.HLine(x, y, width: integer);
@@ -371,11 +371,11 @@ begin
   GetImageStream(rect.X, rect.Y, rect.Width, rect.Height, stream);
 end;
 
-procedure TGraphicsDriver.DrawImage(x, y, width, height: integer; image: PByte);
+procedure TGraphicsDriver.DrawImage(x, y, width, height: longint; image: PByte);
 begin
 end;
 
-procedure TGraphicsDriver.DrawImageTransparent(x, y, width, height: integer; image: PByte);
+procedure TGraphicsDriver.DrawImageTransparent(x, y, width, height: longint; image: PByte);
 begin
 end;
 
@@ -389,7 +389,7 @@ begin
   DrawImage(rect.X, rect.Y, rect.Width, rect.Height, image);
 end;
 
-procedure TGraphicsDriver.DrawImageStream(x, y, width, height: integer; stream: PStream);
+procedure TGraphicsDriver.DrawImageStream(x, y, width, height: longint; stream: PStream);
 begin
 end;
 
@@ -398,7 +398,7 @@ begin
   DrawImageStream(rect.X, rect.Y, rect.Width, rect.Height, stream);
 end;
 
-procedure TGraphicsDriver.DrawImageStreamTransparent(x, y, width, height: integer; stream: PStream);
+procedure TGraphicsDriver.DrawImageStreamTransparent(x, y, width, height: longint; stream: PStream);
 begin
 end;
 

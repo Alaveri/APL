@@ -1,3 +1,4 @@
+{TODO: make MaxAvail and MemAvail into variables}
 {$I COMPILER.INC}
 unit MemDrv;
 
@@ -346,10 +347,10 @@ begin
         DestOffset[LoWord] := Seg(offset);
       end;
       MoveReference(current, xmsMoveRecord);
+      if (error.ErrorCode <> 0) then exit;
       Dec(_lowerAllocated, current^.Size);
       reference^.Xms := true;
       current^.Offset := 0;
-      if (error.ErrorCode <> 0) then exit;
       Inc(index);
     end;
   end;
@@ -376,7 +377,7 @@ begin
   _currentReference := reference;
 end;
 
-function TMemDrv.MaxAvail(Xms: boolean): longint;
+function TMemDrv.MaxAvail(xms: boolean): longint;
 var
   index: integer;
   result: longint;
@@ -392,7 +393,7 @@ begin
   result := 0;
   if (xms) then avail := _xmsSize else avail := _bufferSize;
   { get only references with Xms flag that matches the Xms parameter }
-  filtered := _references^.Where(IsXms, Xms);
+  filtered := _references^.Where(IsXms, xms);
   if (filtered^.Count = 0) then
   begin
     MaxAvail := avail;
@@ -415,7 +416,7 @@ begin
       next := filtered^.GetItem(index + 1);
       blockSize := next^.Offset - (offset + size);
     end
-    { no reference atfer the current, so return size between reference and max }
+    { no reference after the current, so return size between reference and max }
     else
     begin
       blockSize := avail - (offset + size);
@@ -458,10 +459,6 @@ begin
   _currentReference := reference;
   if (not reference^.Xms) then exit;
   MoveToConventional(reference);
-  if (error.ErrorCode <> ecNone) then
-  begin
-    exit;
-  end;
 end;
 
 function TMemDrv.ReferencePointer(reference: PReference): pointer;
@@ -532,9 +529,8 @@ begin
     reference^.Size := size;
     Inc(_lowerAllocated, size);
     reference^.Xms := false;
-
   end
-  else if (XmsEnabled) and (size <= xmsAvail) then
+  else if (XmsEnabled and (size <= xmsAvail)) then
   begin
     reference^.Offset := GetNextOffset(size, true);
     reference^.Size := size;
