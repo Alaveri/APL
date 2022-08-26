@@ -6,6 +6,7 @@ interface
 uses
   Objects,
   DateTime,
+  Dos,
   Utils;
 
 type
@@ -153,22 +154,21 @@ const
 implementation
 
 uses
-  Dos,
-  DosConst,
-  Crt;
+  DosConst;
 
 var
   _savedInterruptVector: pointer;
-  _keyBufHead: byte absolute $0040:$001A;
-  _keyBufTail: byte absolute $0040:$001C;
+  _keyBufHead: PByte;
+  _keyBufTail: PByte;
   _shiftState: TShiftState;
   _capsLock: boolean;
   _numLock: boolean;
   _scrollLock: boolean;
   _insertMode: boolean;
-  _memShiftState: byte absolute $0040:$0017;
+  _memShiftState: PByte;
   _buffer: TKeyboardBuffer;
   _bufferLength: byte;
+
 
 procedure AddToBuffer(key: word);
 begin
@@ -257,8 +257,8 @@ begin
   Write('Key Down: ', down, '    ');}
 
   { clear bios keyboard buffer }
-  _keyBufHead := $20;
-  _keyBufTail := $20;
+  _keyBufHead^ := $20;
+  _keyBufTail^ := $20;
 end;
 
 procedure TKeyboardDriver.Init;
@@ -268,8 +268,8 @@ begin
   _shiftState := [];
   _bufferLength := 0;
   _keyPressed := false;
-  _capsLock := _memShiftState and $0040 <> 0;
-  _numLock := _memShiftState and $0020 <> 0;
+  _capsLock := _memShiftState^ and $0040 <> 0;
+  _numLock := _memShiftState^ and $0020 <> 0;
   _insertMode := true;
   GetIntVec($09, _savedInterruptVector);
   SetIntVec($09, @KeyboardHandler);
@@ -334,4 +334,8 @@ end;
 
 
 begin
+  _keyBufHead := Ptr($0040, $001A);
+  _keyBufTail :=  Ptr($0040, $001C);
+  _memShiftState := Ptr($0040, $0017);
+
 end.

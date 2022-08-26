@@ -7,15 +7,23 @@ uses
  Objects,
  Svga8Drv,
  Vga8Drv,
+ EgaDrv,
+ HercDrv,
+ CgaDrv,
  GraphDrv;
 
 type
   TGraphDrivers =
   (
     gdVga256,
-    gdSVga256
+    gdSVga256,
+    gdEga,
+    gdCga,
+    gdHercules
   );
+
   PGraphicsFactory = ^TGraphicsFactory;
+
   TGraphicsFactory = object(TBaseObject)
   public
     procedure Init; virtual;
@@ -32,14 +40,11 @@ end;
 constructor TGraphicsFactory.CreateGraphicsDriver(driverId: TGraphDrivers; var driver: PGraphicsDriver);
 begin
   case driverId of
-    gdVga256:
-    begin
-      driver := New(PVga8Driver, Create);
-    end;
-    gdSVga256:
-    begin
-      driver := New(PSVga8Driver, Create);
-    end;
+    gdHercules: driver := new(PHerculesDriver, Create);
+    gdCga: driver := New(PCgaDriver, Create);
+    gdEga: driver := New(PEgaDriver, Create);
+    gdVga256: driver := New(PVga8Driver, Create);
+    gdSVga256: driver := New(PSVga8Driver, Create);
   end;
 end;
 

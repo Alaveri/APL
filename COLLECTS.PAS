@@ -15,16 +15,15 @@ type
   TCollection = object(TObject)
   private
     _buffer: pointer;
-    _count: integer;
     _capacity: integer;
   public
+    Count: integer;
     { Constructors/Destructors and Initialization }
     constructor CreateCapacity(initialCapacity: integer);
     destructor Done; virtual;
     procedure Init; virtual;
 
     { Properties }
-    function Count: integer; virtual;
     function Capacity: integer; virtual;
 
     { Modification Functions }
@@ -114,7 +113,7 @@ end;
 procedure TCollection.Init;
 begin
   inherited Init;
-  _count := 0;
+  Count := 0;
   _buffer:= nil;
   _capacity := 0;
 end;
@@ -157,13 +156,8 @@ begin
   end;
   _buffer := newBuffer;
   _capacity := cap;
-  if _count > _capacity then
-    _count := _capacity;
-end;
-
-function TCollection.Count: integer;
-begin
-  Count := _count;
+  if Count > _capacity then
+    Count := _capacity;
 end;
 
 function TCollection.Capacity: integer;
@@ -177,14 +171,14 @@ var
   itemLoc: PPointer;
   index: integer;
 begin
-  if (_count + 1 > _capacity) then
+  if (Count + 1 > _capacity) then
   begin
     newCap := _capacity * 2;
     SetCapacity(newCap);
   end;
-  index := _count;
+  index := Count;
   itemLoc := pointer(LongInt(_buffer) + 4 * index);
-  Inc(_count);
+  Inc(Count);
   itemLoc^ := item;
 end;
 
@@ -194,18 +188,18 @@ var
   itemLoc: pointer;
   locIndex: LongInt;
 begin
-  for locIndex := index to _count - 1  do
+  for locIndex := index to Count - 1  do
   begin
     itemLoc := pointer(LongInt(_buffer) + locIndex * 4);
     Move(pointer(LongInt(itemLoc) + 4)^, itemLoc^, 4);
   end;
-  Dec(_count);
+  Dec(Count);
 end;
 
 procedure TCollection.Clear;
 begin
   FreeMem(_buffer, _capacity *  SizeOf(pointer));
-  _count := 0;
+  Count := 0;
   _buffer := nil;
   _capacity := 0;
   SetCapacity(DefaultListCapacity);
@@ -255,7 +249,7 @@ var
   itemLoc: pointer;
   result: pointer;
 begin
-  if (index < 0) or (index > _count) then
+  if (index < 0) or (index > Count) then
   begin
     GetItem := nil;
     Exit;
@@ -272,20 +266,20 @@ var
   index: integer;
 begin
   if (_capacity = 0) then SetCapacity(DefaultListCapacity);
-  if (_count + 1 > _capacity) then
+  if (Count + 1 > _capacity) then
   begin
     newCap := _capacity * 2;
     SetCapacity(newCap);
   end;
-  index := _count;
+  index := Count;
   if (_sorted) then
   begin
     index := GetSortedIndex(item);
   end;
-  if (index = _count) then
+  if (index = Count) then
   begin
     itemLoc := pointer(LongInt(_buffer) + 4 * index);
-    Inc(_count);
+    Inc(Count);
     itemLoc^ := item;
   end
   else
@@ -299,11 +293,11 @@ var
   itemLoc: PPointer;
 begin
   IndexOf := -1;
-  if (_count = 0) then
+  if (Count = 0) then
     Exit;
   index := 0;
   repeat
-    if (index > _count) then
+    if (index > Count) then
       break;
     itemLoc := pointer(LongInt(_buffer) + 4 * index);
     current := itemLoc^;
@@ -347,8 +341,8 @@ procedure TList.Sort(comparer: TComparer);
       QuickSort(low, highIndex);
   end;
 begin
-  if (_count = 0) then exit;
-  QuickSort(0, _count - 1);
+  if (Count = 0) then exit;
+  QuickSort(0, Count - 1);
 end;
 
 function TList.GetSortedIndex(item: pointer): integer;
@@ -358,15 +352,15 @@ var
   item2: pointer;
 begin
   GetSortedIndex := 0;
-  if (_count = 0) then exit;
-  if (_count = 1) then
+  if (Count = 0) then exit;
+  if (Count = 1) then
   begin
     if (TComparer(_comparer)(item, GetItem(0)) < 0) then
       GetSortedIndex := 0
     else
       GetSortedIndex := 1;
   end;
-  upper := _count;
+  upper := Count;
   lower := 0;
   repeat
     middle := (upper + lower) div 2;
@@ -392,17 +386,17 @@ var
   locIndex: integer;
 begin
   if (_capacity = 0) then SetCapacity(DefaultListCapacity);
-  if (_count + 1 > _capacity) then
+  if (Count + 1 > _capacity) then
   begin
     newCap := _capacity * 2;
     SetCapacity(newCap);
   end;
-  for locIndex := _count - 1 downto index do
+  for locIndex := Count - 1 downto index do
   begin
     itemLoc := pointer(LongInt(_buffer) + locIndex * 4);
     Move(itemLoc^, pointer(LongInt(itemLoc) + 4)^, 4);
   end;
-  Inc(_count);
+  Inc(Count);
   itemLoc^ := item;
 end;
 
@@ -414,8 +408,8 @@ var
 begin
   result := New(PList, Create);
   Where := result;
-  if (_count = 0) then exit;
-  for index := 0 to _count - 1 do
+  if (Count = 0) then exit;
+  for index := 0 to Count - 1 do
   begin
     item := GetItem(index);
     if predicate(item, value) then
@@ -441,7 +435,7 @@ var
 begin;
   if DisposeObjects then
   begin
-    for index := 0 to _count - 1 do
+    for index := 0 to Count - 1 do
     begin;
       item := GetItem(index);
       Dispose(item, Done);
@@ -471,7 +465,7 @@ var
   largeId: PChar;
 begin
   IndexOfId := -1;
-  for index := 0 to _count - 1 do
+  for index := 0 to Count - 1 do
   begin
     largeId := GetItem(index)^.Id;
     if LargeShortCompare(idToFind, largeId) then begin
@@ -504,7 +498,7 @@ procedure TObjectList.Delete(index: integer);
 var
   obj: PObject;
 begin
-  if (_count = 0) then exit;
+  if (Count = 0) then exit;
   obj := GetItem(index);
   if (DisposeObjects) then
     Dispose(obj);
@@ -516,9 +510,9 @@ var
   index: integer;
   item: PObject;
 begin
-  if (DisposeObjects) and (_count > 0) then
+  if (DisposeObjects) and (Count > 0) then
   begin
-    for index := 0 to _count - 1 do
+    for index := 0 to Count - 1 do
     begin
     Dispose(GetItem(index), Done);
     end;
@@ -545,9 +539,9 @@ end;
 function TStack.Pop: PObject;
 begin
   Pop := nil;
-  if (_count = 0) then exit;
-  Pop := GetItem(_count - 1);
-  Delete(_count - 1);
+  if (Count = 0) then exit;
+  Pop := GetItem(Count - 1);
+  Delete(Count - 1);
 end;
 
 procedure TStringList.Init;

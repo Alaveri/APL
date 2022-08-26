@@ -135,9 +135,6 @@ var
 
 implementation
 
-uses
-  Crt;
-
 constructor TBaseObject.Create;
 begin
   Init;

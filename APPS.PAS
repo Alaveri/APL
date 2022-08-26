@@ -4,13 +4,13 @@ unit Apps;
 interface
 
 uses
-  Crt,
   Objects,
   MemDrv,
   KeyDrv,
   Dos,
   Utils,
   StrUtils,
+  Crt,
   MouseDrv;
 
 type

@@ -4,10 +4,8 @@ unit GraphDrv;
 interface
 
 uses
-  Crt,
   Objects,
   Utils,
-  Dos,
   Drawing,
   Collects,
   Consts,
@@ -15,6 +13,7 @@ uses
   StrUtils,
   MemDrv,
   Strings,
+  Dos,
   Streams;
 
 const
@@ -31,6 +30,7 @@ type
     scWhite,
     scRed,
     scGreen,
+
     scBlue,
     scCyan,
     scYellow,
@@ -266,7 +266,12 @@ var
   oldMode: byte;
 begin
   inherited Init;
-  _oldMode := LastMode;
+  asm
+    mov ah, 0Fh
+    int 10h
+    mov [oldMode], al
+  end;
+  _oldMode := oldMode;
   ClearError(Error);
   Modes := nil;
   Mode := nil;
@@ -314,7 +319,7 @@ procedure TGraphicsDriver.SetMode(newMode: PGraphicsMode);
 begin
   if (MouseCursor <> nil) then Dispose(MouseCursor, Done);
   MouseCursor := New(PMouseCursor, Create);
-  MouseDriver^.SetMouseResolution(Mode^.Width, Mode^.Height);  
+  MouseDriver^.SetMouseResolution(Mode^.Width, Mode^.Height);
 end;
 
 procedure TGraphicsDriver.SetPixel(x, y: integer);
@@ -576,8 +581,15 @@ begin
 end;
 
 destructor TGraphicsDriver.Done;
+var
+  oldMode: byte;
 begin
-  TextMode(_oldMode);
+  oldMode := _oldMode;
+  asm
+    mov ah, 0
+    mov al, [oldMode]
+    int 10h
+  end;
   if (Modes <> nil) then
     Dispose(Modes, Done);
   if (MouseCursor <> nil) then begin
