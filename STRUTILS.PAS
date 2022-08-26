@@ -7,10 +7,10 @@ uses
   Strings,
   Utils;
 
+function NewLargeString(source: string): PChar;
 function LargeShortCompare(shortString: string; largeString: PChar): boolean;
 function AppendShortToLarge(largeString: PChar; shortString: string): PChar;
-procedure CopyLargeString(source: PChar; var dest: PChar);
-procedure NewLargeString(source: string; var dest: PChar);
+function CopyLargeString(source: PChar): PChar;
 procedure DisposeLargeString(var largeString: PChar);
 
 
@@ -57,22 +57,26 @@ begin
   largeString := nil;
 end;
 
-procedure CopyLargeString(source: PChar; var dest: PChar);
+function CopyLargeString(source: PChar): PChar;
 var
   len: word;
+  dest: PChar;
 begin
-  DisposeLargeString(dest);
+  dest := nil;
   if (source = nil) then exit;
   len := StrLen(source);
   GetMem(dest, len + 1);
   StrCopy(dest, source);
+  CopyLargeString := dest;
 end;
 
-procedure NewLargeString(source: string; var dest: PChar);
+function NewLargeString(source: string): PChar;
+var
+  dest: PChar;
 begin
-  DisposeLargeString(dest);
   GetMem(dest, Length(source) + 1);
   StrPCopy(dest, source);
+  NewLargeString := dest;
 end;
 
 function LargeShortCompare(shortString: string; largeString: PChar): boolean;

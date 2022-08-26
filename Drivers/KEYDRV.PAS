@@ -38,37 +38,117 @@ type
   end;
 
 const
+  kyEsc: word = 0;
+  kyF1: word = 0;
+  kyF2: word = 0;
+  kyF3: word = 0;
+  kyF4: word = 0;
+  kyF5: word = 0;
+  kyF6: word = 0;
+  kyF7: word = 0;
+  kyF8: word = 0;
+  kyF9: word = 0;
+  kyF10: word = 0;
+  kyF11: word = 0;
+  kyF12: word = 0;
+  kyPrtSc: word = 0;
+  kyScrollLock: word = 0;
+  kyPause: word = 0;
+  kyBackApos: word = 0;
+  ky1: word = 0;
+  ky2: word = 0;
+  ky3: word = 0;
+  ky4: word = 0;
+  ky5: word = 0;
+  ky6: word = 0;
+  ky7: word = 0;
+  ky8: word = 0;
+  ky9: word = 0;
+  ky0: word = 0;
+  kyDash: word = 0;
+  kyPlus: word = 0;
+  kyBackSpace: word = 0;
+  kyInsert: word = 0;
+  kyHome: word = 0;
+  kyPageUp: word = 0;
+  kyNumLock: word = 0;
+  kyPadSlash: word = 0;
+  kyPadAsterisk: word = 0;
+  kyPadMinus: word = 0;
+  kyTab: word = 0;
+  kyQ: word = 0;
+  kyW: word = 0;
+  kyE: word = 0;
+  kyR: word = 0;
+  kyT: word = 0;
+  kyY: word = 0;
+  kyU: word = 0;
+  kyI: word = 0;
+  kyO: word = 0;
+  kyP: word = 0;
+  kyOpenBracket: word = 0;
+  kyCloseBracket: word = 0;
+  kyBackSlash: word = 0;
+  kyDel: word = 0;
+  kyEnd: word = 0;
+  kyPageDown: word = 0;
+  kyPad7: word = 0;
+  kyPad8: word = 0;
+  kyPad9: word = 0;
+  kyPadPlus: word = 0;
+  kyCapsLock: word = 0;
+  kyA: word = 0;
+  kyS: word = 0;
+  kyD: word = 0;
+  kyF: word = 0;
+  kyG: word = 0;
+  kyH: word = 0;
+  kyJ: word = 0;
+  kyK: word = 0;
+  kyL: word = 0;
+  kySemiColon: word = 0;
+  kyApost: word = 0;
+  kyEnter: word = 0;
+  kyPad4: word = 0;
+  kyPad5: word = 0;
+  kyPad6: word = 0;
+  kyLeftShift: word = 0;
+  kyZ: word = 0;
+  kyX: word = 0;
+  kyC: word = 0;
+  kyV: word = 0;
+  kyB: word = 0;
+  kyN: word = 0;
+  kyM: word = 0;
+  kyComma: word = 0;
+  kyPeriod: word = 0;
+  kySlash: word = 0;
+  kyRightShift: word = 0;
+  kyUp: word = 0;
+  kyPad1: word = 0;
+  kyPad2: word = 0;
+  kyPad3: word = 0;
+  kyPadEnter: word = 0;
+  kyLeftCtrl: word = 0;
+  kyLeftAlt: word = 0;
+  kySpace: word = 0;
+  kyRightAlt: word = 0;
+  kyRightCtrl: word = 0;
+  kyLeft: word = 0;
+  kyDown: word = 0;
+  kyRight: word = 0;
+  kyPad0: word = 0;
+  kyPadPeriod: word = 0;
+
+  kyShift: word = $100;
+  kyCtrl: word = $200;
+  kyAlt: word = $400;
+
   kAlpha: set of char = ['A'..'Z', 'a'..'z'];
   kNumeric: set of char = ['0'..'9'];
   kAlphaNumeric: set of char = ['A'..'Z', 'a'..'z', '0'..'9'];
   kPuncuation: set of char = ['!'..'/', ':'..'@', '['..'`', '{'..'~'];
-  kLeft = 99;
-  kRight = 99;
-  kUp = 99;
-  kDown = 99;
-  kCtrlRight = 99;
-  kCtrlLeft = 99;
-  kPageUp = 99;
-  kPageDown = 99;
-  kDel = 99;
-  kBackSpace = 99;
-  kHome = 99;
-  kEnd = 99;
-  kAltF = 99;
-  kAltO = 99;
-  kCtrlN = 99;
-  kCtrlO = 99;
-  kCtrlS = 99;
-  kAltX = 99;
-  kAltE = 99;
-  kCtrlZ = 99;
-  kCtrlY = 99;
-  kAltS = 99;
-  kCtrlF = 99;
-  kCtrlH = 99;
-  kSpace = 32;
-  kAltV = 99;
-  kAltH = 99;
+
 
 implementation
 
@@ -76,29 +156,6 @@ uses
   Dos,
   DosConst,
   Crt;
-
-const
-  kcLeftShift = $2A;
-  kcRightShift = $36;
-  kcControl = $29;
-  kcAlt = $56;
-  kcCapsLock = $3A;
-  kcNumLock = $45;
-  kcKeypad0 = $52;
-  kcScrollLock = 99;
-  kShiftKeys: set of byte =
-  [
-    kcLeftShift,
-    kcRightShift,
-    kcAlt,
-    kcControl,
-    kcNumLock,
-    kcScrollLock,
-    kcCapsLock
-  ];
-
-  {cursor movement keys}
-  { printscr/break }
 
 var
   _savedInterruptVector: pointer;
@@ -138,33 +195,33 @@ begin
     data := data and $7F;
   if (down) then
   begin
-    case data of
+{    case data of
       kcLeftShift, kcRightShift: Include(_shiftState, ssShift);
       kcControl: Include(_shiftState, ssControl);
       kcAlt: Include(_shiftState, ssAlt);
       kcCapsLock: _capsLock := true;
       kcNumLock: _numLock := true;
       kcKeypad0: if (_numLock) then _insertMode := not _insertMode;
-    end;
+    end;}
   end
   else
   begin
-    case data of
+{    case data of
       kcLeftShift, kcRightShift: Exclude(_shiftState, ssShift);
       kcControl: Exclude(_shiftState, ssControl);
       kcAlt: Exclude(_shiftState, ssAlt);
       kcCapsLock: _capsLock := false;
       kcNumLock: _numLock := false;
-    end;
+    end;}
   end;
 
-  if (_bufferLength < Hi(_bufferLength))
+{  if (_bufferLength < Hi(_bufferLength))
      and not (data in kShiftKeys)
      and not ((not _numLock) and (data = kcKeypad0))
     then
   begin
     AddToBuffer((byte(_shiftState) shl 8) or data);
-  end;
+  end;}
 
   asm
     { send EOI to XT keyboard }

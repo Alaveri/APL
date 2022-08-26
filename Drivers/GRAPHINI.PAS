@@ -5,7 +5,8 @@ interface
 
 uses
  Objects,
- SvgaDrv,
+ Svga8Drv,
+ Vga8Drv,
  GraphDrv;
 
 type
@@ -33,10 +34,11 @@ begin
   case driverId of
     gdVga256:
     begin
+      driver := New(PVga8Driver, Create);
     end;
     gdSVga256:
     begin
-      driver := New(PSVgaDriver, Create);
+      driver := New(PSVga8Driver, Create);
     end;
   end;
 end;

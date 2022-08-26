@@ -154,7 +154,7 @@ end;
 constructor TObject.CreateId(newId: string);
 begin
   Init;
-  NewLargeString(newId, Id);
+  Id := NewLargeString(newId);
 end;
 
 constructor TObject.Create;

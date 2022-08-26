@@ -1,5 +1,5 @@
 {$I COMPILER.INC}
-unit SVgaDrv;
+unit SVga8Drv;
 
 interface
 
@@ -12,23 +12,8 @@ uses
   Drawing;
 
 type
-  PVbeInfo = ^TVbeInfo;
-  TVbeInfo = record
-    VbeSignature: array[0..3] of char;
-    VbeVersion: word;
-    OemStringPtr: pointer;
-    Capabilities: longint;
-    VideoModes: pointer;
-    TotalMemory: word;
-    SoftwareRevision: word;
-    Vendor: longint;
-    ProductName: pointer;
-    ProductRevision: pointer;
-    Reserved: array[0..221] of byte;
-    OemData: array[0..255] of byte
-  end;
-  PSVgaMode = ^TSvgaMode;
-  TSvgaMode = object(TGraphicsMode)
+  PSVga8Mode = ^TSvga8Mode;
+  TSvga8Mode = object(TGraphicsMode)
   private
     Attributes: word;
     Granularity: word;
@@ -38,10 +23,10 @@ type
     procedure Assign(var source: TPersistent); virtual;
     procedure AssignTo(var dest: TPersistent); virtual;
   end;
-  PSVgaDriver = ^TSVgaDriver;
-  TSVgaDriver = object(TGraphicsDriver)
+  PSVga8Driver = ^TSVga8Driver;
+  TSVga8Driver = object(TGraphicsDriver)
   private
-    _svgaDriver: integer;
+    _SVga8Driver: integer;
     _currentBank: integer;
     _granularity: longint;
     _winFunc: pointer;
@@ -78,8 +63,27 @@ uses
   Globals,
   Dos;
 
+
 type
+  PVbeInfo = ^TVbeInfo;
   PVbeMode = ^TVbeMode;
+
+
+  TVbeInfo = record
+    VbeSignature: array[0..3] of char;
+    VbeVersion: word;
+    OemStringPtr: pointer;
+    Capabilities: longint;
+    VideoModes: pointer;
+    TotalMemory: word;
+    SoftwareRevision: word;
+    Vendor: longint;
+    ProductName: pointer;
+    ProductRevision: pointer;
+    Reserved: array[0..221] of byte;
+    OemData: array[0..255] of byte
+  end;
+
   TVbeMode = record
     Attributes: word; {depricated; bit 7 indicates linear fram buffer support}
     WindowA: byte; {depricated}
@@ -117,7 +121,7 @@ type
   end;
 
 
-procedure TSvgaMode.Init;
+procedure TSvga8Mode.Init;
 begin
   inherited Init;
   Granularity := 0;
@@ -125,31 +129,31 @@ begin
   WinFuncPtr := nil;
 end;
 
-procedure TSvgaMode.Assign(var source: TPersistent);
+procedure TSVga8Mode.Assign(var source: TPersistent);
 var
-  mode: PSVgaMode;
+  mode: PSVga8Mode;
 begin
   TGraphicsMode.Assign(source);
-  mode := PSVgaMode(@source);
+  mode := PSVga8Mode(@source);
   Attributes := mode^.Attributes;
   Granularity := mode^.Granularity;
   WinFuncPtr := mode^.WinFuncPtr;
 end;
 
-procedure TSvgaMode.AssignTo(var dest: TPersistent);
+procedure TSVga8Mode.AssignTo(var dest: TPersistent);
 var
-  mode: PSVgaMode;
+  mode: PSVga8Mode;
 begin
   TGraphicsMode.AssignTo(dest);
-  mode := PSVgaMode(@dest);
+  mode := PSVga8Mode(@dest);
   mode^.Attributes := Attributes;
   mode^.Granularity := Granularity;
   mode^.WinFuncPtr := WinFuncPtr;
 end;
 
-procedure TSVgaDriver.Init;
+procedure TSVga8Driver.Init;
 var
-  newMode: PSvgaMode;
+  newMode: PSVga8Mode;
   oldMode: byte;
   info: TVbeInfo;
   segm, offs, modeCount: word;
@@ -195,7 +199,7 @@ begin
   modePtr := info.VideoModes;
   index := 0;
   while modePtr^ <> $FFFF do begin
-    newMode := New(PSVgaMode, Create);
+    newMode := New(PSVga8Mode, Create);
     vbeModeIndex := modePtr^;
     segm := Seg(modeInfo);
     offs := Ofs(modeInfo);
@@ -208,12 +212,12 @@ begin
         int  10h
       end;
       vbeMode := modeInfo;
-      NewLargeString('SVga'
+      Id := NewLargeString('SVga'
         + IntToStr(vbeMode.Width)
         + 'x'
         + IntToStr(vbeMode.Height)
         + 'x'
-        + IntToStr(vbeMode.Bpp), Id);
+        + IntToStr(vbeMode.Bpp));
       case vbeMode.Bpp of
           4: colors := '16';
           8: colors := '256';
@@ -227,7 +231,7 @@ begin
         + IntToStr(vbeMode.Height)
         + ' '
         + colors;
-      NewLargeString(desc, Description);
+      Description := NewLargeString(desc);
       AdditionalData := vbeModeIndex;
       Width := vbeMode.Width;
       Height := vbeMode.Height;
@@ -238,7 +242,7 @@ begin
       Attributes := vbeMode.Attributes;
       Granularity := vbeMode.Granularity;
       WinFuncPtr := vbeMode.WinFuncPtr;
-      NewLargeString('Requires a VESA compliant Super VGA card.', HelpText);
+      HelpText := NewLargeString('Requires a VESA compliant Super VGA card.');
       FrameBuffer := Ptr($A000,$0000);
     end;
     Inc(modePtr);
@@ -247,7 +251,7 @@ begin
   end;
 end;
 
-function TSVgaDriver.GetPixel(x, y: integer): byte;
+function TSVga8Driver.GetPixel(x, y: integer): byte;
 var
   offset: longint;
   ptr: PByte;
@@ -259,12 +263,12 @@ begin
   GetPixel := ptr^;
 end;
 
-procedure TSVgaDriver.SetMode(newMode: PGraphicsMode);
+procedure TSVga8Driver.SetMode(newMode: PGraphicsMode);
 var
   selectedMode: word;
-  svgaMode: PSVgaMode;
+  svgaMode: PSVga8Mode;
 begin
-  svgaMode := PSVgaMode(pointer(newMode));
+  svgaMode := PSVga8Mode(pointer(newMode));
   selectedMode := newMode^.AdditionalData;
   if (bit7 in TBits(Lo(SvgaMode^.Attributes))) then begin
     selectedMode := selectedMode or $4000;
@@ -287,7 +291,7 @@ begin
   inherited SetMode(newMode);
 end;
 
-procedure TSVgaDriver.SetBank(bank: word);
+procedure TSVga8Driver.SetBank(bank: word);
 var
   winFunc: pointer;
 begin
@@ -308,7 +312,7 @@ begin
   end;
 end;
 
-procedure TSVgaDriver.SetPixel(x, y: integer);
+procedure TSVga8Driver.SetPixel(x, y: integer);
 var
   offset: longint;
   ptr: PByte;
@@ -320,7 +324,7 @@ begin
   ptr^ := State^.ForeColor;
 end;
 
-procedure TSVgaDriver.DrawText(x, y: integer; text: string);
+procedure TSVga8Driver.DrawText(x, y: integer; text: string);
 var
   charIndex, xIndex, yIndex, sx, sy, chWidth, MaxX, MaxY: integer;
   ch: char;
@@ -377,23 +381,23 @@ begin
 end;
 
 
-procedure TSVgaDriver.DrawTextLarge(x, y: integer; text: PChar);
+procedure TSVga8Driver.DrawTextLarge(x, y: integer; text: PChar);
 begin
 end;
 
-procedure TSVgaDriver.MoveTo(x, y: integer);
+procedure TSVga8Driver.MoveTo(x, y: integer);
 begin
 end;
 
-procedure TSVgaDriver.LineTo(x, y: integer);
+procedure TSVga8Driver.LineTo(x, y: integer);
 begin
 end;
 
-procedure TSVgaDriver.Line(x1, y1, x2, y2: integer);
+procedure TSVga8Driver.Line(x1, y1, x2, y2: integer);
 begin
 end;
 
-procedure TSVgaDriver.HLine(x, y, width: integer);
+procedure TSVga8Driver.HLine(x, y, width: integer);
 var
   lineWidth, xOffset, offset: longint;
   ptr: PByte;
@@ -426,7 +430,7 @@ begin
     FillChar(ptr^, lineWidth, ForeColor);
 end;
 
-procedure TSVgaDriver.VLine(x, y, height: integer);
+procedure TSVga8Driver.VLine(x, y, height: integer);
 var
   index: integer;
   offset: longint;
@@ -444,7 +448,7 @@ begin
   end;
 end;
 
-procedure TSVgaDriver.FillRect(rect: TRect);
+procedure TSVga8Driver.FillRect(rect: TRect);
 var
   index: word;
 begin
@@ -454,7 +458,7 @@ begin
   end;
 end;
 
-procedure TSVgaDriver.DrawImage(x, y, width, height: longint ; image: PByte);
+procedure TSVga8Driver.DrawImage(x, y, width, height: longint ; image: PByte);
 var
   yIndex, sx, sy: integer;
   lineWidth, partialWidth: integer;
@@ -508,7 +512,7 @@ begin
   end;
 end;
 
-procedure TSVgaDriver.DrawImageTransparent(x, y, width, height: longint; image: PByte);
+procedure TSVga8Driver.DrawImageTransparent(x, y, width, height: longint; image: PByte);
 var
   xIndex, yIndex, sx, sy: integer;
   lineWidth, partialWidth: integer;
@@ -567,7 +571,7 @@ begin
   end;
 end;
 
-procedure TSVgaDriver.DrawImageStream(x, y, width, height: longint; stream: PStream);
+procedure TSVga8Driver.DrawImageStream(x, y, width, height: longint; stream: PStream);
 var
   yIndex, sx, sy: integer;
   lineWidth, partialWidth: integer;
@@ -627,7 +631,7 @@ begin
   end;
 end;
 
-procedure TSVgaDriver.DrawImageStreamTransparent(x, y, width, height: longint; stream: PStream);
+procedure TSVga8Driver.DrawImageStreamTransparent(x, y, width, height: longint; stream: PStream);
 var
   xIndex, yIndex, sx, sy: integer;
   lineWidth, partialWidth: integer;
@@ -689,7 +693,7 @@ begin
   end;
 end;
 
-procedure TSVgaDriver.DrawImageBuffer(bufferPos: TPoint; imageSize, bufferSize: TSize; image, buffer: PByte);
+procedure TSVga8Driver.DrawImageBuffer(bufferPos: TPoint; imageSize, bufferSize: TSize; image, buffer: PByte);
 var
   yIndex, sx, sy: integer;
   lineWidth: integer;
@@ -728,7 +732,7 @@ begin
   end;
 end;
 
-procedure TSVgaDriver.DrawImageBufferTransparent(bufferPos: TPoint; imageSize, bufferSize: TSize; image, buffer: PByte);
+procedure TSVga8Driver.DrawImageBufferTransparent(bufferPos: TPoint; imageSize, bufferSize: TSize; image, buffer: PByte);
 var
   xIndex, yIndex, sx, sy: integer;
   lineWidth: integer;
@@ -778,7 +782,7 @@ begin
   end;
 end;
 
-procedure TSVgaDriver.GetImage(x, y, width, height: longint; buffer: PByte);
+procedure TSVga8Driver.GetImage(x, y, width, height: longint; buffer: PByte);
 var
   yIndex, sx, sy: integer;
   lineWidth, partialWidth: integer;
@@ -837,7 +841,7 @@ begin
   end;
 end;
 
-procedure TSVgaDriver.GetImageStream(x, y, width, height: longint; stream: PStream);
+procedure TSVga8Driver.GetImageStream(x, y, width, height: longint; stream: PStream);
 var
   yIndex, sx, sy: integer;
   lineWidth, partialWidth: integer;
@@ -900,14 +904,14 @@ begin
   end;
 end;
 
-procedure TSvgaDriver.WaitForVSync;
+procedure TSVga8Driver.WaitForVSync;
 begin
   while (Port[$3DA] and 8) = 8 do;
   while (Port[$3DA] and 8) <> 8 do;
 end;
 
 
-destructor TSVgaDriver.Done;
+destructor TSVga8Driver.Done;
 begin
   TGraphicsDriver.Done;
 end;

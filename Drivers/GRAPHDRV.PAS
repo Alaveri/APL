@@ -705,7 +705,7 @@ destructor TGraphicsMode.Done;
 begin
   DisposeLargeString(HelpText);
   DisposeLargeString(Description);
-  TObject.Done;
+  inherited Done;
 end;
 
 function TGraphicsMode.GetTypeName: string;
@@ -724,9 +724,9 @@ begin
   MaxY := mode^.MaxY;
   Bpp := mode^.Bpp;
   AdditionalData := mode^.AdditionalData;
-  CopyLargeString(Mode^.Description, Description);
-  CopyLargeString(Mode^.HelpText, HelpText);
-  CopyLargeString(Mode^.Id, Id);
+  Description := CopyLargeString(mode^.Description);
+  HelpText:= CopyLargeString(mode^.HelpText);
+  Id := CopyLargeString(mode^.Id);
   Pitch := mode^.Pitch;
   FrameBuffer := mode^.FrameBuffer;
 end;
@@ -742,9 +742,9 @@ begin
   mode^.MaxY := MaxY;
   mode^.Bpp := Bpp;
   mode^.AdditionalData := AdditionalData;
-  CopyLargeString(Description, Mode^.Description);
-  CopyLargeString(HelpText, Mode^.HelpText);
-  CopyLargeString(Id, Mode^.Id);
+  mode^.Description := CopyLargeString(Description);
+  mode^.HelpText := CopyLargeString(HelpText);
+  mode^.Id := CopyLargeString(Id);
   mode^.Pitch := Pitch;
   mode^.FrameBuffer := FrameBuffer;
 end;
@@ -814,7 +814,7 @@ begin
   Transparent := font^.Transparent;
   Initialized := font^.Initialized;
   Height := font^.Height;
-  CopyLargeString(font^.Id, Id);
+  Id := CopyLargeString(font^.Id);
 end;
 
 procedure TFont.AssignTo(var dest: TPersistent);
@@ -834,7 +834,7 @@ begin
   font^.Transparent := Transparent;
   font^.Initialized := Initialized;
   font^.Height := Height;
-  CopyLargeString(id, font^.Id);
+  font^.Id := CopyLargeString(id);
 end;
 
 procedure TFont.Init;
@@ -919,7 +919,7 @@ var
   fontPtr: pointer;
 begin
   TMonospaceFont.Init;
-  NewLargeString('SystemFont', Id);
+  Id := NewLargeString('SystemFont');
   FillChar(regs, SizeOf(regs), 0);
   regs.ax := $1130;
   regs.bh := $06;

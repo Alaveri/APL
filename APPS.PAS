@@ -39,14 +39,13 @@ constructor TApplication.Create(newId: string; interfaceMem: longint);
 begin
   InterfaceMemory := interfaceMem;
   Init;
-  NewLargeString(newId, Id);
+  Id := NewLargeString(newId);
 end;
 
 procedure TApplication.Init;
 begin
   Mark(_memPtr);
   inherited Init;
-  ClrScr;
   MouseDriver := New(PMouseDriver, Create);
   WriteLn('Mouse initialized.');
 {  Keyboard.Create;}
