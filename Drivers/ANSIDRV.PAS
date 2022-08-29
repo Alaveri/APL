@@ -5,7 +5,7 @@ interface
 uses
   Objects,
   Collects,
-  Utils,
+  Common,
   Drawing,
   DosConst,
   Strings,

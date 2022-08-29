@@ -2,7 +2,7 @@ unit ImgFile;
 
 interface
 uses
-  Utils;
+  Common;
 
 const
   ImgFileVersion: real = 1.0;

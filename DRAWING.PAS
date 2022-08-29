@@ -4,7 +4,7 @@ interface
 
 uses
   Objects,
-  Utils;
+  Common;
 
 type
   TRect = object(TBaseObject)

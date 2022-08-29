@@ -1,4 +1,8 @@
-{$I COMPILER.INC}
+{$IFDEF debug}
+  {$A-,B-,D+,E+,F+,G+,I+,L+,N+,M 16384 0 655360,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
+{$ELSE}
+  {$A-,B-,D-,E+,F+,G+,I-,L-,N+,M 16384 0 655360,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
+{$ENDIF}
 unit TextIni;
 
 interface
@@ -7,14 +11,12 @@ uses
  Objects,
  TextDrv,
  DirTxDrv;
- 
+
 type
   TTextDrivers =
   (
     tdDirect,
-    tdAnsi,
-    tdCrt,
-    tdSvga
+    tdAnsi
   );
   PTextDriverFactory = ^TTextDriverFactory;
   TTextDriverFactory = object(TBaseObject)
@@ -35,13 +37,7 @@ begin
     tdDirect: begin
       driver := New(PDirectTextDriver, Create);
     end;
-    tdSvga: begin
-      driver := New(PSVgaTextDriver, Create);
-    end;
     tdAnsi: begin
-    end;
-    tdCrt: begin
-      driver := New(PCrtTextDriver, Create);
     end;
   end;
 end;

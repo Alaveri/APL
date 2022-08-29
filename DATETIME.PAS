@@ -1,11 +1,15 @@
-{$I COMPILER.INC}
+{$IFDEF debug}
+  {$A-,B-,D+,E+,F+,G+,I+,L+,N+,M 16384 0 655360,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
+{$ELSE}
+  {$A-,B-,D-,E+,F+,G+,I-,L-,N+,M 16384 0 655360,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
+{$ENDIF}
 unit DateTime;
 
 interface
 
 uses
   Dos,
-  Utils,
+  Common,
   Objects;
 
 type
@@ -22,13 +26,13 @@ type
   TWeekDays = set of TWeekDay;
   TDateTime = object(TBaseObject)
   private
-    _ticks: real; { 100th of second ticks since midnight 1/1/0001 }
+    _ticks: int64; { 100th of second ticks since midnight 1/1/0001 }
     _second, _minute, _hour, _hundredthSecond: byte;
     _month, _day: byte;
     _year: word;
   public
     constructor Create;
-    constructor CreateTicks(newTicks: real);
+    constructor CreateTicks(newTicks: comp);
     constructor CreateDateTime(newYear, newMonth, newDay, newHour, newMinute, newSecond, newHundredthSecond: word);
     constructor CreateDate(newYear, newMonth, newDay: word);
     constructor CreateTime(newHour, newMinute, newSecond, newHundredthSecond: word);
@@ -38,7 +42,7 @@ type
     procedure SetDate(newYear, newMonth, newDay: word); virtual;
     procedure SetTime(newHour, newMinute, newSecond, newHundredthSecond: word); virtual;
     procedure SetDateTime(newYear, newMonth, newDay, newHour, newMinute, newSecond, newHundredthSecond: word); virtual;
-    procedure SetTicks(newTicks: real); virtual;
+    procedure SetTicks(newTicks: comp); virtual;
     function Ticks: real; virtual;
     function Day: byte; virtual;
     function Month: byte; virtual;
@@ -81,7 +85,7 @@ begin
   _year := 0;
 end;
 
-constructor TDateTime.CreateTicks(newTicks: real);
+constructor TDateTime.CreateTicks(newTicks: comp);
 begin
   SetTicks(newTicks);
 end;
@@ -186,7 +190,7 @@ begin
   _year := newYear;
 end;
 
-procedure TDateTime.SetTicks(newTicks: real);
+procedure TDateTime.SetTicks(newTicks: int64);
 var
   index: integer;
   currentTicks: real;

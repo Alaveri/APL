@@ -45,7 +45,7 @@ const
 
 { Add-in for blinking }
 
-  Blink         = 128;  
+  Blink         = 128;
 
 implementation
 

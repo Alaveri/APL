@@ -1,4 +1,8 @@
-{$I COMPILER.INC}
+{$IFDEF debug}
+  {$A-,B-,D+,E+,F+,G+,I+,L+,N+,M 16384 0 655360,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
+{$ELSE}
+  {$A-,B-,D-,E+,F+,G+,I-,L-,N+,M 16384 0 655360,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
+{$ENDIF}
 unit Apps;
 
 interface
@@ -8,9 +12,8 @@ uses
   MemDrv,
   KeyDrv,
   Dos,
-  Utils,
+  Common,
   StrUtils,
-  Crt,
   MouseDrv;
 
 type
@@ -44,7 +47,6 @@ end;
 
 procedure TApplication.Init;
 begin
-  Mark(_memPtr);
   inherited Init;
   MouseDriver := New(PMouseDriver, Create);
   WriteLn('Mouse initialized.');
@@ -78,9 +80,7 @@ begin
   Dispose(MouseDriver, Done);
 {  find out what isn't getting disposed}
 {  Keyboard.Done;}
-  while KeyPressed do ReadKey;
   TObject.Done;
-  Release(_memPtr);
 end;
 
 end.

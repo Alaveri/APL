@@ -1,11 +1,15 @@
-{$I COMPILER.INC}
+{$IFDEF debug}
+  {$A-,B-,D+,E+,F+,G+,I+,L+,N+,M 16384 0 655360,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
+{$ELSE}
+  {$A-,B-,D-,E+,F+,G+,I-,L-,N+,M 16384 0 655360,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
+{$ENDIF}
 unit GraphDrv;
 
 interface
 
 uses
   Objects,
-  Utils,
+  Common,
   Drawing,
   Collects,
   Consts,
@@ -30,7 +34,6 @@ type
     scWhite,
     scRed,
     scGreen,
-
     scBlue,
     scCyan,
     scYellow,
@@ -770,7 +773,6 @@ function TGraphicsModeList.GetTypeName: string;
 begin
   GetTypeName := 'TGraphicsModeList';
 end;
-
 
 function TGraphicsModeList.GetItem(index: integer): PGraphicsMode;
 begin

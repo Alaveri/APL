@@ -1,4 +1,9 @@
-unit Utils;
+{$IFDEF debug}
+  {$A-,B-,D+,E+,F+,G+,I+,L+,N+,M 16384 0 655360,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
+{$ELSE}
+  {$A-,B-,D-,E+,F+,G+,I-,L-,N+,M 16384 0 655360,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
+{$ENDIF}
+unit Common;
 
 interface
 
@@ -6,10 +11,15 @@ uses
   Strings;
 
 type
-  (** Pointer to a byte.*)
+  { Pointer to a byte. }
   PByte = ^byte;
+
+  Int64 = comp;
+
   TBit = (bit0, bit1, bit2, bit3, bit4, bit5, bit6, bit7);
+
   TBits = set of TBit;
+
   TErrorSeverity =
   (
     esNone,
@@ -18,13 +28,17 @@ type
     esError,
     esFatal
   );
+
   THexString = string[9];
+
   TErrorCode = word;
+
   TError = record
     ErrorCode: TErrorCode;
     Severity: TErrorSeverity;
     ErrorMessage: string;
   end;
+
   TLongLowHigh = record
     Low: word;
     High: word;

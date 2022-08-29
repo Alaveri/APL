@@ -5,7 +5,7 @@ interface
 uses
   Objects,
   GraphDrv,
-  Utils,
+  Common,
   StrUtils,
   Streams,
   Drawing;

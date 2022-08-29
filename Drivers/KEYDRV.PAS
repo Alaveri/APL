@@ -1,4 +1,8 @@
-{$I COMPILER.INC}
+{$IFDEF debug}
+  {$A-,B-,D+,E+,F+,G+,I+,L+,N+,M 16384 0 655360,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
+{$ELSE}
+  {$A-,B-,D-,E+,F+,G+,I-,L-,N+,M 16384 0 655360,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
+{$ENDIF}
 unit KeyDrv;
 
 interface
@@ -7,7 +11,8 @@ uses
   Objects,
   DateTime,
   Dos,
-  Utils;
+  Consts,
+  Common;
 
 type
   TShiftStates =
@@ -39,107 +44,107 @@ type
   end;
 
 const
-  kyEsc: word = 0;
-  kyF1: word = 0;
-  kyF2: word = 0;
-  kyF3: word = 0;
-  kyF4: word = 0;
-  kyF5: word = 0;
-  kyF6: word = 0;
-  kyF7: word = 0;
-  kyF8: word = 0;
-  kyF9: word = 0;
-  kyF10: word = 0;
-  kyF11: word = 0;
-  kyF12: word = 0;
-  kyPrtSc: word = 0;
-  kyScrollLock: word = 0;
-  kyPause: word = 0;
-  kyBackApos: word = 0;
-  ky1: word = 0;
-  ky2: word = 0;
-  ky3: word = 0;
-  ky4: word = 0;
-  ky5: word = 0;
-  ky6: word = 0;
-  ky7: word = 0;
-  ky8: word = 0;
-  ky9: word = 0;
-  ky0: word = 0;
-  kyDash: word = 0;
-  kyPlus: word = 0;
-  kyBackSpace: word = 0;
-  kyInsert: word = 0;
-  kyHome: word = 0;
-  kyPageUp: word = 0;
-  kyNumLock: word = 0;
-  kyPadSlash: word = 0;
-  kyPadAsterisk: word = 0;
-  kyPadMinus: word = 0;
-  kyTab: word = 0;
-  kyQ: word = 0;
-  kyW: word = 0;
-  kyE: word = 0;
-  kyR: word = 0;
-  kyT: word = 0;
-  kyY: word = 0;
-  kyU: word = 0;
-  kyI: word = 0;
-  kyO: word = 0;
-  kyP: word = 0;
-  kyOpenBracket: word = 0;
-  kyCloseBracket: word = 0;
-  kyBackSlash: word = 0;
-  kyDel: word = 0;
-  kyEnd: word = 0;
-  kyPageDown: word = 0;
-  kyPad7: word = 0;
-  kyPad8: word = 0;
-  kyPad9: word = 0;
-  kyPadPlus: word = 0;
-  kyCapsLock: word = 0;
-  kyA: word = 0;
-  kyS: word = 0;
-  kyD: word = 0;
-  kyF: word = 0;
-  kyG: word = 0;
-  kyH: word = 0;
-  kyJ: word = 0;
-  kyK: word = 0;
-  kyL: word = 0;
-  kySemiColon: word = 0;
-  kyApost: word = 0;
-  kyEnter: word = 0;
-  kyPad4: word = 0;
-  kyPad5: word = 0;
-  kyPad6: word = 0;
-  kyLeftShift: word = 0;
-  kyZ: word = 0;
-  kyX: word = 0;
-  kyC: word = 0;
-  kyV: word = 0;
-  kyB: word = 0;
-  kyN: word = 0;
-  kyM: word = 0;
-  kyComma: word = 0;
-  kyPeriod: word = 0;
-  kySlash: word = 0;
-  kyRightShift: word = 0;
-  kyUp: word = 0;
-  kyPad1: word = 0;
-  kyPad2: word = 0;
-  kyPad3: word = 0;
-  kyPadEnter: word = 0;
-  kyLeftCtrl: word = 0;
-  kyLeftAlt: word = 0;
-  kySpace: word = 0;
-  kyRightAlt: word = 0;
-  kyRightCtrl: word = 0;
-  kyLeft: word = 0;
-  kyDown: word = 0;
-  kyRight: word = 0;
-  kyPad0: word = 0;
-  kyPadPeriod: word = 0;
+  kyEsc: word = 27;
+  kyF1: word = 128;
+  kyF2: word = 129;
+  kyF3: word = 130;
+  kyF4: word = 131;
+  kyF5: word = 132;
+  kyF6: word = 133;
+  kyF7: word = 134;
+  kyF8: word = 135;
+  kyF9: word = 136;
+  kyF10: word = 136;
+  kyF11: word = 138;
+  kyF12: word = 139;
+  kyPrtSc: word = 140;
+  kyScrollLock: word = 141;
+  kyPause: word = 142;
+  kyBackApos: word = 96;
+  ky1: word = 49;
+  ky2: word = 50;
+  ky3: word = 51;
+  ky4: word = 52;
+  ky5: word = 53;
+  ky6: word = 54;
+  ky7: word = 55;
+  ky8: word = 56;
+  ky9: word = 57;
+  ky0: word = 58;
+  kyDash: word = 45;
+  kyPlus: word = 61;
+  kyBackSpace: word = 8;
+  kyInsert: word = 143;
+  kyHome: word = 144;
+  kyPageUp: word = 145;
+  kyNumLock: word = 146;
+  kyPadSlash: word = 147;
+  kyPadAsterisk: word = 148;
+  kyPadMinus: word = 149;
+  kyTab: word = 9;
+  kyQ: word = 81;
+  kyW: word = 87;
+  kyE: word = 69;
+  kyR: word = 82;
+  kyT: word = 84;
+  kyY: word = 89;
+  kyU: word = 85;
+  kyI: word = 73;
+  kyO: word = 79;
+  kyP: word = 80;
+  kyOpenBracket: word = 91;
+  kyCloseBracket: word = 93;
+  kyBackSlash: word = 92;
+  kyDel: word = 127;
+  kyEnd: word = 150;
+  kyPageDown: word = 151;
+  kyPad7: word = 152;
+  kyPad8: word = 153;
+  kyPad9: word = 154;
+  kyPadPlus: word = 155;
+  kyCapsLock: word = 156;
+  kyA: word = 65;
+  kyS: word = 83;
+  kyD: word = 68;
+  kyF: word = 70;
+  kyG: word = 71;
+  kyH: word = 72;
+  kyJ: word = 74;
+  kyK: word = 75;
+  kyL: word = 76;
+  kySemiColon: word = 59;
+  kyApost: word = 39;
+  kyEnter: word = 13;
+  kyPad4: word = 157;
+  kyPad5: word = 158;
+  kyPad6: word = 159;
+  kyLeftShift: word = 160;
+  kyZ: word = 90;
+  kyX: word = 88;
+  kyC: word = 67;
+  kyV: word = 86;
+  kyB: word = 66;
+  kyN: word = 78;
+  kyM: word = 77;
+  kyComma: word = 44;
+  kyPeriod: word = 46;
+  kySlash: word = 47;
+  kyRightShift: word = 161;
+  kyUp: word = 162;
+  kyPad1: word = 163;
+  kyPad2: word = 164;
+  kyPad3: word = 165;
+  kyPadEnter: word = 166;
+  kyLeftCtrl: word = 167;
+  kyLeftAlt: word = 168;
+  kySpace: word = 32;
+  kyRightAlt: word = 169;
+  kyRightCtrl: word = 170;
+  kyLeft: word = 171;
+  kyDown: word = 172;
+  kyRight: word = 173;
+  kyPad0: word = 174;
+  kyPadPeriod: word = 175;
 
   kyShift: word = $100;
   kyCtrl: word = $200;
@@ -150,9 +155,12 @@ const
   kAlphaNumeric: set of char = ['A'..'Z', 'a'..'z', '0'..'9'];
   kPuncuation: set of char = ['!'..'/', ':'..'@', '['..'`', '{'..'~'];
 
+function KeyToAscii(key: word): byte;
+function KeyToChar(key: word): char;
+function KeyToString(key: word): string;
+function KeyToShortcut(key: word): string;
 
 implementation
-
 uses
   DosConst;
 
@@ -169,6 +177,121 @@ var
   _buffer: TKeyboardBuffer;
   _bufferLength: byte;
 
+
+function KeyToAscii(key: word): byte;
+var
+  shift: boolean;
+  ch: byte;
+begin
+  shift := key and kyShift > 0;
+  case Lo(Key) of
+    0..127: begin
+      ch := Lo(key);
+      if (shift) then begin
+        case key of
+          44, 46..47: Inc(ch, 16);
+          45: ch := 95;
+          49: ch := 33;
+          50: ch := 64;
+          51..53, 57: Dec(ch, 16);
+          54: ch := 94;
+          55: ch := 38;
+          56: ch := 42;
+          59: ch := 58;
+          61: ch := 43;
+          91..93: Inc(ch, 32);
+          97..133: Dec(ch, 32);
+          96: ch := 126;
+        end;
+      end;
+    end;
+  end;
+  KeyToAscii := ch;
+end;
+
+function KeyToChar(key: word): char;
+begin
+  KeyToChar := Chr(KeyToAscii(key));
+end;
+
+function KeyToString(key: word): string;
+var
+  result: string;
+const
+  Desc: array[140..175] of string5 =
+  (
+    'PrtSc',
+    'ScrLk',
+    'Pause',
+    'Ins',
+    'Home',
+    'PgUp',
+    'NumLk',
+    '/',
+    '*',
+    '-',
+    'End',
+    'PgDn',
+    '7',
+    '8',
+    '9',
+    '+',
+    'Caps',
+    '4',
+    '5',
+    '6',
+    '',
+    '',
+    'Up',
+    '1',
+    '2',
+    '3',
+    'Enter',
+    '',
+    '',
+    '',
+    '',
+    'Left',
+    'Down',
+    'Right',
+    '0',
+    '.'
+  );
+var
+  ch: byte;
+begin
+  ch := Lo(key);
+  result := '';
+  case ch of
+    8: result := 'BkSp';
+    9: result := 'Tab';
+    13: result := 'Enter';
+    27: result := 'Esc';
+    32: result := 'Space';
+    127: result := 'Del';
+    140..175: result := Desc[ch];
+    39, 44..47, 59, 65..93, 96: result := Chr(KeyToAscii(key));
+    128..139: result := 'F' + IntToStr(ch - 127);
+  end;
+  KeyToString := result;
+end;
+
+function KeyToShortcut(key: word): string;
+var
+  result: string;
+  ch: byte;
+begin
+  result := KeyToString(key);
+
+  if (key and kyShift) > 0 then
+    result := 'Shift+' + result;
+  if (key and kyAlt) > 0 then
+    result := 'Alt+' + result;
+  if (key and kyCtrl) > 0 then
+    result := 'Ctrl+' + result;
+
+  KeyToShortcut := result;
+end;
 
 procedure AddToBuffer(key: word);
 begin
