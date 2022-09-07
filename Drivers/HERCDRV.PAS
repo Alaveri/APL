@@ -6,7 +6,6 @@ uses
   Objects,
   GraphDrv,
   Common,
-  StrUtils,
   Streams,
   Drawing;
 

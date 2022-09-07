@@ -26,7 +26,7 @@ type
   );
   TButtonStates = set of TButtonState;
   PMouseState = ^TMouseState;
-  TMouseState = object(TPersistent)
+  TMouseState = object(TAssignable)
   private
   public
     X, Y: integer;
@@ -35,18 +35,17 @@ type
     procedure Init; virtual;
     function Moved(state: TMouseState): boolean; virtual;
     function Equals(state: TMouseState): boolean;
-    procedure Assign(var source: TPersistent); virtual;
-    procedure AssignTo(var dest: TPersistent); virtual;
-    function GetTypeName: string; virtual;
+    procedure Assign(var source: TAssignable); virtual;
+    function GetTypeName: ShortString; virtual;
     destructor Done; virtual;
   end;
   PMouseDriver = ^TMouseDriver;
-  TMouseDriver = object(TObject)
+  TMouseDriver = object(TBaseObject)
   private
   public
     State: PMouseState;
     StateStack: PStack;
-    function GetTypeName: string; virtual;
+    function GetTypeName: ShortString; virtual;
     procedure Init; virtual;
     procedure ShowMouse; virtual;
     procedure HideMouse; virtual;
@@ -56,7 +55,7 @@ type
     procedure InitMouseCursor; virtual;
     procedure SetMouseResolution(width, height: word); virtual;
     procedure SetMousePosition(x, y: word); virtual;
-    destructor Done; virtual;
+    destructor Destroy; virtual;
   end;
 
 var
@@ -155,7 +154,7 @@ destructor TMouseState.Done;
 begin
 end;
 
-procedure TMouseState.Assign(var source: TPersistent);
+procedure TMouseState.Assign(var source: TAssignable);
 var
   state: PMouseState;
 begin
@@ -166,18 +165,7 @@ begin
   Visible := state^.Visible;
 end;
 
-procedure TMouseState.AssignTo(var dest: TPersistent);
-var
-  state: PMouseState;
-begin
-  state := PMouseState(@dest);
-  state^.X := X;
-  state^.Y := Y;
-  state^.ButtonState := ButtonState;
-  state^.Visible := Visible;
-end;
-
-function TMouseState.GetTypeName: string;
+function TMouseState.GetTypeName: ShortString;
 begin
   GetTypeName := 'TMouseState';
 end;
@@ -193,6 +181,10 @@ begin
 end;
 
 procedure TMouseDriver.InitMouseCursor;
+{$ifdef fpc}
+begin
+end;
+{$else}
 var
   reg: Registers;
 begin
@@ -204,15 +196,20 @@ begin
   reg.DX := Ofs(MouseCursor);
   Intr($33, reg);
 end;
+{$endif}
 
-destructor TMouseDriver.Done;
+destructor TMouseDriver.Destroy;
 begin
-  Dispose(StateStack, Done);
-  Dispose(State, Done);
-  TBaseObject.Done;
+  Dispose(StateStack, Destroy);
+  Dispose(State, Destroy);
+  TBaseObject.Destroy;
 end;
 
 procedure TMouseDriver.Init;
+{$ifdef fpc}
+begin
+end;
+{$else}
 var
   reg: Registers;
   success: boolean;
@@ -226,13 +223,18 @@ begin
   if success then InitMouseCursor;
   StateStack := New(PStack, Create);
 end;
+{$endif}
 
-function TMouseDriver.GetTypeName: string;
+function TMouseDriver.GetTypeName: ShortString;
 begin
   GetTypeName := 'TMouseDriver';
 end;
 
 procedure TMouseDriver.ShowMouse;
+{$ifdef fpc}
+begin
+end;
+{$else}
 var
   reg: Registers;
 begin;
@@ -241,8 +243,13 @@ begin;
   Intr(MouseInterrupt, reg);
   State^.Visible := true;
 end;
+{$endif}
 
 procedure TMouseDriver.HideMouse;
+{$ifdef fpc}
+begin
+end;
+{$else}
 var
   reg: Registers;
 begin;
@@ -251,6 +258,7 @@ begin;
   Intr(MouseInterrupt, reg);
   State^.Visible := false;
 end;
+{$endif}
 
 procedure TMouseDriver.PushState;
 var
@@ -274,6 +282,10 @@ begin
 end;
 
 procedure TMouseDriver.SetMouseResolution(width, height: word);
+{$ifdef fpc}
+begin
+end;
+{$else}
 begin
   Dec(width, 1);
   Dec(height, 1);
@@ -288,8 +300,13 @@ begin
     int  33h
   end;
 end;
+{$endif}
 
 procedure TMouseDriver.SetMousePosition(x, y: word);
+{$ifdef fpc}
+begin
+end;
+{$else}
 begin
   asm
     mov ax, 4h
@@ -298,8 +315,14 @@ begin
     int 33h
   end;
 end;
+{$endif}
 
 procedure TMouseDriver.GetMouseState(var currentState: TMouseState);
+{$ifdef fpc}
+begin
+end;
+
+{$else}
 var
   reg: Registers;
 begin
@@ -318,5 +341,6 @@ begin
   State^.Y := currentState.Y;
   State^.ButtonState := currentState.ButtonState;
 end;
+{$endif}
 
 end.

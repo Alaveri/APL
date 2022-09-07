@@ -13,11 +13,8 @@ uses
 type
   { Pointer to a byte. }
   PByte = ^byte;
-
   Int64 = comp;
-
   TBit = (bit0, bit1, bit2, bit3, bit4, bit5, bit6, bit7);
-
   TBits = set of TBit;
 
   TErrorSeverity =
@@ -33,7 +30,7 @@ type
 
   TErrorCode = word;
 
-  TError = record
+  TErr = record
     ErrorCode: TErrorCode;
     Severity: TErrorSeverity;
     ErrorMessage: string;
@@ -97,11 +94,11 @@ function MinL(long1, long2: longint): longint;
 function FileExists(const name: string): boolean;
 function GetExtension(const name: string): string;
 function UpperCase(const name: string): string;
-function NoError(var error: TError): boolean;
+function NoError(var error: TErr): boolean;
 function ExtractFilePath(filename: string): string;
 function Equal(var var1, var2; size: word): boolean;
-procedure CreateError(var error: TError; errorCode: TErrorCode; severity: TErrorSeverity);
-procedure ClearError(var error: TError);
+procedure CreateError(var error: TErr; errorCode: TErrorCode; severity: TErrorSeverity);
+procedure ClearError(var error: TErr);
 procedure SwapL(var long1: longint; var long2: longint);
 procedure SwapW(var word1: word; var word2: word);
 procedure FillCharLarge(var ptr; size: longint; ch: byte);
@@ -112,7 +109,7 @@ implementation
 uses
   Objects;
 
-function NoError(var error: TError): boolean;
+function NoError(var error: TErr): boolean;
 begin
   NoError := error.ErrorCode = ecNone;
 end;
@@ -234,14 +231,14 @@ begin
   {$I+}
 end;
 
-procedure CreateError(var error: TError; errorCode: TErrorCode; severity: TErrorSeverity);
+procedure CreateError(var error: TErr; errorCode: TErrorCode; severity: TErrorSeverity);
 begin
   error.ErrorCode := errorCode;
   error.ErrorMessage := ErrorMessage(error.ErrorCode);
   error.Severity := severity;
 end;
 
-procedure ClearError(var error: TError);
+procedure ClearError(var error: TErr);
 begin
   FillChar(error, SizeOf(error), 0);
 end;
@@ -293,20 +290,20 @@ end;
 
 function IntToStr(num: longint): string;
 var
-  result: string;
+  dest: string;
 begin
-   Str(num, result);
-   IntToStr := result;
+   Str(num, dest);
+   IntToStr := dest;
 end;
 
 
 function IntToHex(num: longint): THexString;
 var
   digit, numPos: byte;
-  result: THexString;
+  hex: THexString;
   width: byte;
 begin
-  FillChar(result, SizeOf(result), ord('0'));
+  FillChar(hex, SizeOf(hex), ord('0'));
   result[1] := '$';
   if (num >= High(word)) then
     width := 8
@@ -323,13 +320,13 @@ begin
     Dec(numPos);
     num := num div 16;
   end;
-  IntToHex := result;
+  IntToHex := hex;
 end;
 
 function ExtractFilePath(filename: string): string;
 var
   index: integer;
-  result: string;
+  path: string;
 begin
   ExtractFilePath := '';
   if (Length(fileName) = 0) then exit;
@@ -338,11 +335,11 @@ begin
   begin
     if (filename[index] = '\') then
     begin
-      result := Copy(filename, 1, index);
+      path := Copy(filename, 1, index);
       break;
     end;
   end;
-  ExtractFilePath := result;
+  ExtractFilePath := path;
 end;
 
 procedure FillCharLarge(var ptr; size: longint; ch: byte);

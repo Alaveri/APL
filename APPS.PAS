@@ -13,7 +13,6 @@ uses
   KeyDrv,
   Dos,
   Common,
-  StrUtils,
   MouseDrv;
 
 type

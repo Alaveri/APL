@@ -1,9 +1,11 @@
 {TODO: make MaxAvail and MemAvail into variables}
-{$IFDEF debug}
+{$ifndef fpc}
+{$ifdef debug}
   {$A-,B-,D+,E+,F+,G+,I+,L+,N+,M 16384 0 655360,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
-{$ELSE}
+{$else}
   {$A-,B-,D-,E+,F+,G+,I-,L-,N+,M 16384 0 655360,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
-{$ENDIF}
+{$endif}
+{$endif}
 unit MemDrv;
 
 interface
@@ -25,7 +27,7 @@ type
     function GetItem(index: integer): PReference;
     function IndexOf(item: PReference): integer;
     function Add(item: PReference): integer;
-    function GetTypeName: string; virtual;
+    function GetTypeName: ShortString; virtual;
     procedure Insert(index: integer; item: PReference);
   end;
   TReferenceType =
@@ -43,7 +45,7 @@ type
     Offset: word;
   end;
   PMemDrv = ^TMemDrv;
-  TMemDrv = object(TObject)
+  TMemDrv = object(TBaseObject)
   private
     _references: PReferenceList;
     _currentReference: PReference;
@@ -65,7 +67,7 @@ type
     procedure MoveReference(reference: PReference; var moveRecord); virtual;
     procedure MoveToConventional(reference: PReference); virtual;
   public
-    Error: TError;
+    Error: TErr;
     constructor CreateReserved(reserved: longint);
     destructor Done; virtual;
     function XmsSupported: boolean;
@@ -79,7 +81,7 @@ type
     function BufferSize: longint;
     function Buffer: PByte;
     function CurrentReference: PReference;
-    function GetTypeName: string; virtual;
+    function GetTypeName: ShortString; virtual;
     function ReferencePointer(reference: PReference): pointer;
     procedure InitXms;
     procedure Init; virtual;
@@ -113,28 +115,37 @@ type
 
 var
   XmsControl: pointer;
-
+{$ifdef fpc}
+function ReferenceOffsetCompare(item1, item2: pointer): integer;
+{$else}
 function ReferenceOffsetCompare(item1, item2: pointer): integer; far;
+{$endif}
 var
   ref1, ref2: TReference;
-  result: integer;
 begin
   ref1 := PReference(item1)^;
   ref2 := PReference(item2)^;
-  result := 0;
+  ReferenceOffsetCompare := 0;
   if (ref1.Offset < ref2.Offset) then
-    result := -1
+    ReferenceOffsetCompare := -1
   else if (ref1.Offset > ref2.Offset) then
-    result := 1;
-  ReferenceOffsetCompare := result;
+    ReferenceOffsetCompare := 1;
 end;
 
+{$ifdef fpc}
+function OnHeapError(size: word): integer;
+{$else}
 function OnHeapError(size: word): integer; far;
+{$endif}
 begin
   OnHeapError := 1;
 end;
 
+{$ifdef fpc}
+function IsXms(item: pointer; var value): boolean;
+{$else}
 function IsXms(item: pointer; var value): boolean; far;
+{$endif}
 begin
   IsXms   := PReference(item)^.Xms = boolean(value);
 end;
@@ -161,6 +172,11 @@ begin
 end;
 
 function TMemDrv.XmsSupported: boolean;
+{$ifdef fpc}
+begin
+  XmsSupported := true;
+end;
+{$else}
 var
   reg: Registers;
   result: byte;
@@ -172,8 +188,14 @@ begin
   end;
   XmsSupported := result = $80;
 end;
+{$endif}
 
 procedure TMemDrv.InitXms;
+{$ifdef fpc}
+begin
+end;
+
+{$else}
 var
   version: word;
   revision: word;
@@ -235,6 +257,7 @@ begin
     {$ENDIF}
   end;
 end;
+{$endif}
 
 function TMemDrv.GetNextOffset(size: longint; xms: boolean): longint;
 var
@@ -246,7 +269,7 @@ var
 begin
   offset := 0;
   GetNextOffset := 0;
-  filtered := _references^.Where(IsXms, xms);
+  filtered := _references^.Where(@IsXms, xms);
   if (filtered^.Count = 0) then exit;
   count := filtered^.Count;
   for index := 0 to count - 1 do
@@ -257,11 +280,17 @@ begin
     if (offset + size < reference^.Offset) then break;
     Inc(offset, reference^.Size);
   end;
-  Dispose(filtered, Done);
+  Dispose(filtered, Destroy);
   GetNextOffset := offset;
 end;
 
 function TMemDrv.GetXmsControlFunction: pointer;
+{$ifdef fpc}
+begin
+  GetXmsControlFunction := nil;
+end;
+
+{$else}
 var
   result: pointer;
 begin
@@ -275,6 +304,7 @@ begin
   end;
   GetXmsControlFunction := result;
 end;
+{$endif}
 
 function TMemDrv.CurrentReference: PReference;
 begin
@@ -282,6 +312,10 @@ begin
 end;
 
 procedure TMemDrv.MoveReference(reference: PReference; var moveRecord);
+{$ifdef fpc}
+begin
+end;
+{$else}
 var
   success: boolean;
   xmsError: byte;
@@ -309,6 +343,7 @@ begin
     CreateError(error, ecXmsError, esError);
   end;
 end;
+{$endif}
 
 procedure TMemDrv.MoveToConventional(reference: PReference);
 var
@@ -382,6 +417,11 @@ begin
 end;
 
 function TMemDrv.MaxAvail(xms: boolean): longint;
+{$ifdef fpc}
+begin
+
+end;
+{$else}
 var
   index: integer;
   result: longint;
@@ -431,6 +471,7 @@ begin
   dispose(filtered, done);
   MaxAvail := result;
 end;
+{$endif}
 
 function TMemDrv.Buffer: PByte;
 begin

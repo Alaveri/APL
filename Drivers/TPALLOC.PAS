@@ -24,6 +24,7 @@
  * Contributor(s):
  *
  * ***** END LICENSE BLOCK ***** *)
+{$ifndef fpc}
 {$S-,R-,I-,V-,B-,F-}
 {won't work under Windows}
 {$IFDEF Windows}
@@ -44,9 +45,11 @@
 {$IFDEF Ver55}
   {$UNDEF Heap6}
 {$ENDIF}
+{$endif}
 unit TpAlloc;
   {-Routines for allocating/deallocating blocks of memory larger than 64K}
 interface
+{$ifndef fpc}
 type
   SegOfs =                   {structure of a pointer}
     record
@@ -78,7 +81,11 @@ function Normalized(P : Pointer) : Pointer;
     $01/$DA/                 {add dx,bx ;add BX to segment}
     $25/$0F/$00);            {and ax,$F ;mask out unwanted bits in offset}
   {=============================================================}
+
+{$endif}
 implementation
+
+{$ifndef fpc}
 type
   FreeListRecPtr = ^FreeListRec;
   FreeListRec =              {structure of a free list entry}
@@ -457,4 +464,5 @@ ExitPoint:
     end;
   end;
 {$ENDIF}
+{$endif}
 end.

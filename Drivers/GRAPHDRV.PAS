@@ -1,8 +1,10 @@
-{$IFDEF debug}
+{$ifndef fpc}
+{$ifdef debug}
   {$A-,B-,D+,E+,F+,G+,I+,L+,N+,M 16384 0 655360,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
-{$ELSE}
+{$else}
   {$A-,B-,D-,E+,F+,G+,I-,L-,N+,M 16384 0 655360,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
-{$ENDIF}
+{$endif}
+{$endif}
 unit GraphDrv;
 
 interface
@@ -14,7 +16,6 @@ uses
   Collects,
   Consts,
   MouseDrv,
-  StrUtils,
   MemDrv,
   Strings,
   Dos,

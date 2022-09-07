@@ -1,8 +1,11 @@
-{$IFDEF debug}
+{$ifndef fpc}
+{$ifdef debug}
   {$A-,B-,D+,E+,F+,G+,I+,L+,N+,M 16384 0 655360,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
-{$ELSE}
+{$else}
   {$A-,B-,D-,E+,F+,G+,I-,L-,N+,M 16384 0 655360,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
-{$ENDIF}
+{$endif}
+{$endif}
+
 unit Collects;
 
 interface
@@ -11,20 +14,20 @@ uses
   Consts,
   Common,
   Strings,
-  StrUtils,
   Objects;
 
 type
+  TPredicate = function(item: pointer; var value): boolean;
 
-  TCollection = object(TObject)
+  TCollection = object(TBaseObject)
   private
-    _buffer: pointer;
-    _capacity: integer;
+    fBuffer: pointer;
+    fCapacity: integer;
   public
     Count: integer;
     { Constructors/Destructors and Initialization }
     constructor CreateCapacity(initialCapacity: integer);
-    destructor Done; virtual;
+    destructor Destroy; virtual;
     procedure Init; virtual;
 
     { Properties }
@@ -36,8 +39,8 @@ type
     procedure Clear; virtual;
 
     { Misc Functions }
-    function ToString: string; virtual;
-    function GetTypeName: string; virtual;
+    function ToString: ShortString; virtual;
+    function GetTypeName: ShortString; virtual;
     procedure SetCapacity(cap: integer);
   end;
   PList = ^TList;
@@ -66,44 +69,43 @@ type
 
     { Misc Functions }
     function Where(predicate: TPredicate; var value): PList;
-    function GetTypeName: string; virtual;
+    function GetTypeName: ShortString; virtual;
   end;
-  PObjectList = ^TObjectList;
-  TObjectList = object(TList)
+  PNamedObjectList = ^TNamedObjectList;
+  TNamedObjectList = object(TList)
   private
   public
     DisposeObjects: boolean;
-    destructor Done; virtual;
+    destructor Destroy; virtual;
     procedure Init; virtual;
-    function ToString: string; virtual;
-    function GetItem(index: integer): PObject;
-    function GetItemById(idToFind: string): PObject;
-    function IndexOf(item: PObject): integer;
-    function IndexOfId(idToFind: string): integer; virtual;
-    function Add(item: PObject): integer;
-    function GetTypeName: string; virtual;
-    procedure Insert(index: integer; item: PObject);
-    procedure Delete(index: integer);
+    function ToString: ShortString; virtual;
+    function GetItem(const index: integer): PNamedObject;
+    function GetItemByName(const aName: ShortString): PNamedObject;
+    function IndexOfName(const aName: ShortString): integer; virtual;
+    function Add(const item: PNamedObject): integer;
+    function GetTypeName: ShortString; virtual;
+    procedure Insert(const index: integer; const item: PNamedObject);
+    procedure Delete(const index: integer);
     procedure Clear; virtual;
   end;
   PStack = ^TStack;
-  TStack = object(TObjectList)
+  TStack = object(TNamedObjectList)
   private
   public
     procedure Init; virtual;
-    function Push(obj: PObject): integer;
-    function Pop: PObject;
-    function GetTypeName: string; virtual;
+    function Push(obj: PNamedObject): integer;
+    function Pop: PNamedObject;
+    function GetTypeName: ShortString; virtual;
   end;
-  PStringList = ^TStringList;
-  TStringList = object(TList)
+  PWideStringList = ^TWideStringList;
+  TWideStringList = object(TList)
     procedure Init; virtual;
-    function ToString: string; virtual;
-    function GetItem(index: integer): PChar;
-    function IndexOf(item: PChar): integer;
-    function Add(item: PChar): integer;
-    procedure Insert(index: integer; item: PChar);
-    function GetTypeName: string; virtual;
+    function ToString: ShortString; virtual;
+    function GetItem(index: integer): PWideString;
+    function IndexOf(item: PWideString): integer;
+    function Add(item: PWideString): integer;
+    procedure Insert(index: integer; item: PWideString);
+    function GetTypeName: ShortString; virtual;
   end;
 
 implementation
@@ -118,17 +120,17 @@ procedure TCollection.Init;
 begin
   inherited Init;
   Count := 0;
-  _buffer:= nil;
-  _capacity := 0;
+  fBuffer:= nil;
+  fCapacity := 0;
 end;
 
-destructor TCollection.Done;
+destructor TCollection.Destroy;
 begin
-  if (_buffer <> nil) then FreeMem(_buffer, _capacity * SizeOf(Pointer));
-  inherited Done;
+  if (fBuffer <> nil) then FreeMem(fBuffer, fCapacity * SizeOf(Pointer));
+  inherited Destroy;
 end;
 
-function TCollection.GetTypeName;
+function TCollection.GetTypeName: ShortString;
 begin
   GetTypeName := 'TCollection';
 end;
@@ -138,9 +140,9 @@ var
   newBuffer: pointer;
   max: word;
   dataSize: word;
-  error: TError;
+  error: TErr;
 begin
-  if (_capacity = cap) then exit;
+  if (fCapacity = cap) then exit;
   dataSize := cap * SizeOf(Pointer);
   GetMem(newBuffer, dataSize);
   if (newBuffer = nil) then
@@ -150,23 +152,23 @@ begin
     exit;
   end;
   FillChar(newBuffer^, dataSize, 0);
-  if (_capacity > 0) and (_buffer <> nil) then
+  if (fCapacity > 0) and (fBuffer <> nil) then
   begin
-    if (cap > _capacity) then
-      Move(_buffer^, newBuffer^, _capacity * SizeOf(pointer))
+    if (cap > fCapacity) then
+      Move(fBuffer^, newBuffer^, fCapacity * SizeOf(pointer))
     else
-      Move(_buffer^, NewBuffer^, cap * SizeOf(pointer));
-    FreeMem(_buffer, _capacity * SizeOf(pointer));
+      Move(fBuffer^, NewBuffer^, cap * SizeOf(pointer));
+    FreeMem(fBuffer, fCapacity * SizeOf(pointer));
   end;
-  _buffer := newBuffer;
-  _capacity := cap;
-  if Count > _capacity then
-    Count := _capacity;
+  fBuffer := newBuffer;
+  fCapacity := cap;
+  if Count > fCapacity then
+    Count := fCapacity;
 end;
 
 function TCollection.Capacity: integer;
 begin
-  Capacity := _capacity;
+  Capacity := fCapacity;
 end;
 
 function TCollection.Add(item: pointer): integer;
@@ -175,13 +177,13 @@ var
   itemLoc: PPointer;
   index: integer;
 begin
-  if (Count + 1 > _capacity) then
+  if (Count + 1 > fCapacity) then
   begin
-    newCap := _capacity * 2;
+    newCap := fCapacity * 2;
     SetCapacity(newCap);
   end;
   index := Count;
-  itemLoc := pointer(LongInt(_buffer) + 4 * index);
+  itemLoc := pointer(LongInt(fBuffer) + 4 * index);
   Inc(Count);
   itemLoc^ := item;
 end;
@@ -194,7 +196,7 @@ var
 begin
   for locIndex := index to Count - 1  do
   begin
-    itemLoc := pointer(LongInt(_buffer) + locIndex * 4);
+    itemLoc := pointer(LongInt(fBuffer) + locIndex * 4);
     Move(pointer(LongInt(itemLoc) + 4)^, itemLoc^, 4);
   end;
   Dec(Count);
@@ -202,14 +204,14 @@ end;
 
 procedure TCollection.Clear;
 begin
-  FreeMem(_buffer, _capacity *  SizeOf(pointer));
+  FreeMem(fBuffer, fCapacity *  SizeOf(pointer));
   Count := 0;
-  _buffer := nil;
-  _capacity := 0;
+  fBuffer := nil;
+  fCapacity := 0;
   SetCapacity(DefaultListCapacity);
 end;
 
-function TCollection.ToString: string;
+function TCollection.ToString: ShortString;
 begin
   ToString := 'TCollection';
 end;
@@ -229,7 +231,7 @@ begin
   _comparer := nil;
 end;
 
-function TList.GetTypeName;
+function TList.GetTypeName: ShortString;
 begin
   GetTypeName := 'TList';
 end;
@@ -244,22 +246,22 @@ procedure TList.SetItem(index: integer; item: pointer);
 var
   itemLoc: pointer;
 begin
-  itemLoc := Pointer(LongInt(_buffer) + 4 * index);
+  itemLoc := Pointer(LongInt(fBuffer) + 4 * index);
   Move(itemLoc^, item, 4);
 end;
 
 function TList.GetItem(index: integer): pointer;
 var
   itemLoc: pointer;
-  result: pointer;
+  ptr: pointer;
 begin
   if (index < 0) or (index > Count) then
   begin
     GetItem := nil;
     Exit;
   end;
-  itemLoc := Pointer(LongInt(_buffer) + 4 * index);
-  Move(itemLoc^, result, 4);
+  itemLoc := Pointer(LongInt(fBuffer) + 4 * index);
+  Move(itemLoc^, ptr, 4);
   GetItem := result;
 end;
 
@@ -269,10 +271,10 @@ var
   itemLoc: PPointer;
   index: integer;
 begin
-  if (_capacity = 0) then SetCapacity(DefaultListCapacity);
-  if (Count + 1 > _capacity) then
+  if (fCapacity = 0) then SetCapacity(DefaultListCapacity);
+  if (Count + 1 > fCapacity) then
   begin
-    newCap := _capacity * 2;
+    newCap := fCapacity * 2;
     SetCapacity(newCap);
   end;
   index := Count;
@@ -282,7 +284,7 @@ begin
   end;
   if (index = Count) then
   begin
-    itemLoc := pointer(LongInt(_buffer) + 4 * index);
+    itemLoc := pointer(LongInt(fBuffer) + 4 * index);
     Inc(Count);
     itemLoc^ := item;
   end
@@ -303,7 +305,7 @@ begin
   repeat
     if (index > Count) then
       break;
-    itemLoc := pointer(LongInt(_buffer) + 4 * index);
+    itemLoc := pointer(LongInt(fBuffer) + 4 * index);
     current := itemLoc^;
     if (item = current) then
     begin
@@ -389,16 +391,21 @@ var
   itemLoc: PPointer;
   locIndex: integer;
 begin
-  if (_capacity = 0) then SetCapacity(DefaultListCapacity);
-  if (Count + 1 > _capacity) then
+  if (fCapacity = 0) then SetCapacity(DefaultListCapacity);
+  if (Count + 1 > fCapacity) then
   begin
-    newCap := _capacity * 2;
+    newCap := fCapacity * 2;
     SetCapacity(newCap);
   end;
   for locIndex := Count - 1 downto index do
   begin
-    itemLoc := pointer(LongInt(_buffer) + locIndex * 4);
+    {$ifdef fpc}
+    itemLoc := pointer(Cardinal(fBuffer) + locIndex * 4);
+    Move(itemLoc^, pointer(Cardinal(itemLoc) + 4)^, 4);
+    {$else}
+    itemLoc := pointer(LongInt(fBuffer) + locIndex * 4);
     Move(itemLoc^, pointer(LongInt(itemLoc) + 4)^, 4);
+    {$endif}
   end;
   Inc(Count);
   itemLoc^ := item;
@@ -406,7 +413,7 @@ end;
 
 function TList.Where(predicate: TPredicate; var value): PList;
 var
-  result: PList;
+  list: PList;
   index: integer;
   item: pointer;
 begin
@@ -421,86 +428,79 @@ begin
   end;
 end;
 
-procedure TObjectList.Init;
+procedure TNamedObjectList.Init;
 begin
   TList.Init;
   DisposeObjects := true;
 end;
 
-function TObjectList.GetTypeName;
+function TNamedObjectList.GetTypeName: ShortString;
 begin
-  GetTypeName := 'TObjectList';
+  GetTypeName := 'TNamedObjectList';
 end;
 
-destructor TObjectList.Done;
+destructor TNamedObjectList.Destroy;
 var
   index: integer;
-  item: PObject;
+  item: PNamedObject;
 begin;
   if DisposeObjects then
   begin
     for index := 0 to Count - 1 do
     begin;
       item := GetItem(index);
-      Dispose(item, Done);
+      Dispose(item, Destroy);
     end;
   end;
-  inherited Done;
+  inherited Destroy;
 end;
 
-function TObjectList.ToString: string;
+function TNamedObjectList.ToString: ShortString;
 begin
-  ToString := 'TObjectList';
+  ToString := 'TNamedObjectList';
 end;
 
-function TObjectList.GetItem(index: integer): PObject;
+function TNamedObjectList.GetItem(const index: integer): PNamedObject;
 begin
   GetItem := TList.GetItem(index);
 end;
 
-function TObjectList.IndexOf(item: PObject): integer;
-begin
-  IndexOf := TList.IndexOf(item);
-end;
-
-function TObjectList.IndexOfId(idToFind: string): integer;
+function TNamedObjectList.IndexOfName(const aName: ShortString): integer;
 var
-  index, len: integer;
-  largeId: PChar;
+  index: integer;
 begin
-  IndexOfId := -1;
+  IndexOfName := -1;
   for index := 0 to Count - 1 do
   begin
-    largeId := GetItem(index)^.Id;
-    if LargeShortCompare(idToFind, largeId) then begin
-      IndexOfId := index;
+    if  (aName = GetItem(index)^.Name) then begin
+      IndexOfName := index;
       break;
     end;
   end;
 end;
 
-function TObjectList.GetItemById(idToFind: string): PObject;
+function TNamedObjectList.GetItemByName(const aName: ShortString): PNamedObject;
 var
   index: integer;
 begin
-  GetItemById := nil;
-  index := IndexOfId(idToFind);
-  if (index >= 0) then GetItemById := GetItem(index);
+  GetItemByName := nil;
+  index := IndexOfName(aName);
+  if (index >= 0) then GetItemByName := GetItem(index);
 end;
 
-function TObjectList.Add(item: PObject): integer;
+function TNamedObjectList.Add(const item: PNamedObject): integer;
 begin
   Add := TList.Add(item);
 end;
 
-procedure TObjectList.Insert(index: integer; item: PObject);
+procedure TNamedObjectList.Insert(const index: integer; const item: PNamedObject);
 begin
   TList.Insert(index, item);
 end;
 
-procedure TObjectList.Delete(index: integer);
+procedure TNamedObjectList.Delete(const index: integer);
 var
-  obj: PObject;
+  obj: PNamedObject;
 begin
   if (Count = 0) then exit;
   obj := GetItem(index);
@@ -509,16 +509,16 @@ begin
   TList.Delete(index);
 end;
 
-procedure TObjectList.Clear;
+procedure TNamedObjectList.Clear;
 var
   index: integer;
-  item: PObject;
+  item: PNamedObject;
 begin
   if (DisposeObjects) and (Count > 0) then
   begin
     for index := 0 to Count - 1 do
     begin
-    Dispose(GetItem(index), Done);
+    Dispose(GetItem(index), Destroy);
     end;
   end;
   TList.Clear;
@@ -526,21 +526,21 @@ end;
 
 procedure TStack.Init;
 begin
-  TObjectList.Init;
+  TNamedObjectList.Init;
   DisposeObjects := false;
 end;
 
-function TStack.GetTypeName;
+function TStack.GetTypeName: ShortString;
 begin
   GetTypeName := 'TStack';
 end;
 
-function TStack.Push(obj: PObject): integer;
+function TStack.Push(obj: PNamedObject): integer;
 begin
   Push := Add(obj);
 end;
 
-function TStack.Pop: PObject;
+function TStack.Pop: PNamedObject;
 begin
   Pop := nil;
   if (Count = 0) then exit;
@@ -548,38 +548,38 @@ begin
   Delete(Count - 1);
 end;
 
-procedure TStringList.Init;
+procedure TWideStringList.Init;
 begin
   TList.Init;
 end;
 
-function TStringList.GetTypeName;
+function TWideStringList.GetTypeName: ShortString;
 begin
-  GetTypeName := 'TStringList';
+  GetTypeName := 'TWideStringList';
 end;
 
 
-function TStringList.ToString: string;
+function TWideStringList.ToString: ShortString;
 begin
   ToString := GetTypeName;
 end;
 
-function TStringList.GetItem(index: integer): PChar;
+function TWideStringList.GetItem(index: integer): PWideString;
 begin
   GetItem := TList.GetItem(index);
 end;
 
-function TStringList.IndexOf(item: PChar): integer;
+function TWideStringList.IndexOf(item: PWideString): integer;
 begin
   IndexOf := TList.IndexOf(item);
 end;
 
-function TStringList.Add(item: PChar): integer;
+function TWideStringList.Add(item: PWideString): integer;
 begin
   TList.Add(item);
 end;
 
-procedure TStringList.Insert(index: integer; item: PChar);
+procedure TWideStringList.Insert(index: integer; item: PWideString);
 begin
   TList.Insert(index, item);
 end;
