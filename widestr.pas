@@ -1,6 +1,10 @@
 unit WideStr;
 
-{$mode ObjFPC}{$H+}
+{$ifdef fpc}
+{$mode ObjFPC}
+{$H+}
+{$endif}
+
 
 interface
 
