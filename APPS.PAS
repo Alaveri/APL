@@ -1,7 +1,7 @@
 {$IFDEF debug}
   {$A-,B-,D+,E+,F+,G+,I+,L+,N+,M 16384 0 655360,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,E+,F+,G+,I-,L-,N+,M 16384 0 655360,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,E+,F+,G+,I+,L-,N+,M 16384 0 655360,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit Apps;
 
@@ -10,10 +10,10 @@ interface
 uses
   Objects,
   MemDrv,
-  KeyDrv,
   Dos,
   Common,
   StrUtils,
+  KeyDrv,
   MouseDrv;
 
 type
@@ -35,8 +35,6 @@ type
 
 implementation
 
-var
-  Keyboard: TKeyboardDriver;
 
 constructor TApplication.Create(newId: string; interfaceMem: longint);
 begin
@@ -50,7 +48,7 @@ begin
   inherited Init;
   MouseDriver := New(PMouseDriver, Create);
   WriteLn('Mouse initialized.');
-{  Keyboard.Create;}
+  Keyboard.Create;
   Closed := false;
 end;
 
@@ -79,7 +77,7 @@ destructor TApplication.Done;
 begin
   Dispose(MouseDriver, Done);
 {  find out what isn't getting disposed}
-{  Keyboard.Done;}
+  Keyboard.Done;
   TObject.Done;
 end;
 

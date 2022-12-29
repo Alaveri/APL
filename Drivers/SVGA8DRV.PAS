@@ -1,7 +1,7 @@
 {$IFDEF debug}
   {$A-,B-,D+,E+,F+,G+,I+,L+,N+,M 16384 0 655360,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,E+,F+,G+,I-,L-,N+,M 16384 0 655360,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,E+,F+,G+,I+,L-,N+,M 16384 0 655360,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit SVga8Drv;
 
@@ -64,7 +64,6 @@ type
 implementation
 
 uses
-  Globals,
   Dos;
 
 
@@ -301,16 +300,15 @@ var
 begin
   if (bank = _currentBank) then exit;
   _currentBank := bank;
-  bank := bank shl _bankShift;
   winFunc := _winFunc;
   asm
-    mov  ax, 4f05h
-    mov  bx, 0
+    mov  bh, 0
+    mov  bl, 0
     mov  dx, [bank]
     call [winFunc]
 
-    mov  ax, 4f05h
-    mov  bx, 1
+    mov  bh, 0
+    mov  bl, 1
     mov  dx, [bank]
     call [winFunc]
   end;
@@ -365,6 +363,7 @@ begin
       Inc(ptr, offset and _granularity);
 
       for xIndex := 0 to chWidth - 1 do begin
+        SetBank(offset shr 16);
         tx := sx + xIndex;
         if (tx > maxX) then break;
         if (fontData^[chVal, yIndex] and (128 shr xIndex) > 0) then begin
@@ -374,9 +373,6 @@ begin
           color := sBackColor;
         Inc(ptr);
         Inc(offset);
-        if (offset shr 16 <> _currentBank) then begin
-          SetBank(offset shr 16);
-        end;
         ptr^ := color;
       end;
       Inc(sy);
@@ -401,7 +397,7 @@ procedure TSVga8Driver.Line(x1, y1, x2, y2: integer);
 begin
 end;
 
-procedure TSVga8Driver.HLine(x, y, width: integer);
+(*procedure TSVga8Driver.HLine(x, y, width: integer);
 var
   lineWidth, xOffset, offset: longint;
   ptr: PByte;
@@ -415,7 +411,7 @@ begin
   end;
   Inc(x, xOffset);
   lineWidth := width - xOffset;
-  lineWidth := MinL(lineWidth, Mode^.MaxX - x);
+  lineWidth := MinL(lineWidth, Mode^.Width - x);
   if (y < 0) or (y > Mode^.MaxY) then exit;
   offset := x + longint(y) * Mode^.Pitch;
   bank := offset shr 16;
@@ -424,6 +420,38 @@ begin
   Inc(ptr, offset);
   SetBank(bank);
   if (offset + lineWidth > _granularity) then begin
+    partialWidth := _granularity - offset + 1;
+    FillChar(ptr^, partialWidth, ForeColor);
+    SetBank(bank + 1);
+    ptr := Mode^.FrameBuffer;
+    FillChar(ptr^, lineWidth - partialWidth, ForeColor);
+  end
+  else
+    FillChar(ptr^, lineWidth, ForeColor);
+end;*)
+
+procedure TSVga8Driver.HLine(x, y, width: integer);
+var
+  ptr: PByte;
+  xOffset: longint;
+  bank: word;
+  lineWidth: longint;
+  partialWidth: longint;
+  offset: longint;
+begin
+  xOffset := 0;
+  if (x < 0) then
+    xOffset := Abs(x);
+  Inc(x, xOffset);
+  lineWidth := width - xOffset;
+  lineWidth := MinL(lineWidth, Mode^.Width - x);
+  offset := longint(y) * Mode^.Pitch + x;
+  bank := offset shr 16;
+  offset := offset and _granularity;
+  ptr := Mode^.FrameBuffer;
+  Inc(ptr, offset);
+  SetBank(bank);
+  if (lineWidth + offset > _granularity) then begin
     partialWidth := _granularity - offset + 1;
     FillChar(ptr^, partialWidth, ForeColor);
     SetBank(bank + 1);

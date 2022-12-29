@@ -1,7 +1,7 @@
 {$IFDEF debug}
   {$A-,B-,D+,E+,F+,G+,I+,L+,N+,M 16384 0 655360,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,E+,F+,G+,I-,L-,N+,M 16384 0 655360,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,E+,F+,G+,I+,L-,N+,M 16384 0 655360,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit GraphIni;
 
@@ -31,7 +31,7 @@ type
   TGraphicsFactory = object(TBaseObject)
   public
     procedure Init; virtual;
-    constructor CreateGraphicsDriver(driverId: TGraphDrivers; var driver: PGraphicsDriver);
+    constructor CreateGraphicsDriver(driverId: TGraphDrivers);
   end;
 
 implementation
@@ -41,14 +41,14 @@ begin
   inherited Init;
 end;
 
-constructor TGraphicsFactory.CreateGraphicsDriver(driverId: TGraphDrivers; var driver: PGraphicsDriver);
+constructor TGraphicsFactory.CreateGraphicsDriver(driverId: TGraphDrivers);
 begin
   case driverId of
-    gdHercules: driver := new(PHerculesDriver, Create);
-    gdCga: driver := New(PCgaDriver, Create);
-    gdEga: driver := New(PEgaDriver, Create);
-    gdVga256: driver := New(PVga8Driver, Create);
-    gdSVga256: driver := New(PSVga8Driver, Create);
+    gdHercules: Graphics := New(PHerculesDriver, Create);
+    gdCga: Graphics := New(PCgaDriver, Create);
+    gdEga: Graphics := New(PEgaDriver, Create);
+    gdVga256: Graphics := New(PVga8Driver, Create);
+    gdSVga256: Graphics := New(PSVga8Driver, Create);
   end;
 end;
 

@@ -1,0 +1,71 @@
+INTRODUCTION                            
+============
+
+PIBLZW.ARC contains two Turbo Pascal v4.0 programs which implement 
+the Lempel-Zev-Welch (LZW) compression technique:
+
+   PIBCOMPR.PAS  --- Compresses files using LSZ
+   PIBDCOMP.PAS  --- Decompress files compressed with PIBCOMPR.PAS
+
+In addition to those two files, PIBLZW.ARC should also contain these
+files:
+
+   PIBLZW.DEF    --- Common global declarations for PIBCOMPR/PIBDCOMP
+   PIBLSZ.INC    --- Common routines for PIBCOMPR/PIBDCOMP        
+   README.1ST    --- This file you're reading now.
+
+The LZW technique is well explained in the following reference:
+
+   "A Technique for High Performance Data Compression",              
+    Terry A. Welch, IEEE Computer,                                     
+    vol. 17, no. 6 (June 1984), pp. 8-19.                              
+  
+Variants of LZW compression are used in the popular Unix and VMS COMPRESS
+utilities and the MS DOS "ARC" utilities, among others.  
+
+PIBCOMPR.PAS and PIBDCOMP.PAS are not meant to be highly efficient
+production codes.  These programs are designed to illustrate the basic 
+LZW technique using Turbo Pascal, following the Welch reference above.
+Once you understand the basic algorithm, you should be able to understand
+the variable bit size and adaptive compression variants of LZW which
+are used by more sophisticated programs.  
+
+Also note that these routines as they stand cannot be used to extract
+files from MS-DOS ".ARC" files.
+
+
+RESTRICTIONS ON USE                     
+===================
+
+You may use these programs for any purpose whatsover; I am contributing
+them to the public domain.  If you do adapt these routines for use in 
+your own programs, I'd appreciate your mentioning that.
+
+
+ADDRESSES FOR ELECTRONIC LETTER BOMBS
+=====================================
+
+You may leave me messages on the following BBSs:
+
+      Gene Plantz's BBS                (312) 882 4145
+      Northwestern Univerity OPUS BBS  (312) 491 3892
+
+Gene's BBS is registration only ($25 a year) and well worth it.
+The Northwestern University BBS is run by my colleague Roger Safian.
+You can use the OPUS/FIDONET remote mail/networking facility to send me
+messages from another OPUS local to your dialing area.  The net address
+of Roger's OPUS BBS system is 115/419.
+
+For all three BBS systems, my user name is PHILIP BURNS.
+
+CompuServe users can reach me at:
+
+       72437,62
+
+University users can reach me at:
+
+      PIB@NUACC.BITNET         (BITNET)
+      PIB@NUACC.ACNS.NWU.EDU   (ARPANET)
+
+-- Phil "Pib" Burns
+   April 30, 1988. 

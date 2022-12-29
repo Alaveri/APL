@@ -1,7 +1,7 @@
 {$IFDEF debug}
   {$A-,B-,D+,E+,F+,G+,I+,L+,N+,M 16384 0 655360,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,E+,F+,G+,I-,L-,N+,M 16384 0 655360,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,E+,F+,G+,I+,L-,N+,M 16384 0 655360,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit GraphDrv;
 
@@ -605,7 +605,7 @@ end;
 
 function TGraphicsDriver.GetTypeName: string;
 begin
-  GetTypeName := 'TGraphicsDriver';
+  GetTypeName := 'TGraphics^Driver';
 end;
 
 function TGraphicsDriver.GetColor(color: TStandardColor; intensity: byte): byte;
@@ -725,7 +725,7 @@ end;
 
 function TGraphicsMode.GetTypeName: string;
 begin
-  GetTypeName := 'TGraphicsMode';
+  GetTypeName := 'TGraphics^Mode';
 end;
 
 procedure TGraphicsMode.Assign(var source: TPersistent);
@@ -771,7 +771,7 @@ end;
 
 function TGraphicsModeList.GetTypeName: string;
 begin
-  GetTypeName := 'TGraphicsModeList';
+  GetTypeName := 'TGraphics^ModeList';
 end;
 
 function TGraphicsModeList.GetItem(index: integer): PGraphicsMode;
@@ -1003,7 +1003,7 @@ end;
 
 function TGraphicsState.GetTypeName: string;
 begin
-  GetTypeName := 'TGraphicsState';
+  GetTypeName := 'TGraphics^State';
 end;
 
 procedure TMouseCursor.Init;

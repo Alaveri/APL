@@ -1,7 +1,7 @@
 {$IFDEF debug}
   {$A-,B-,D+,E+,F+,G+,I+,L+,N+,M 16384 0 655360,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,E+,F+,G+,I-,L-,N+,M 16384 0 655360,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,E+,F+,G+,I+,L-,N+,M 16384 0 655360,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit Common;
 
@@ -58,7 +58,7 @@ const
   ecFileInvalid = 107;
   ecMouseError = 108;
 
-  { Graphics errors }
+  { Graphics^ errors }
   ecGraphicsNotSupported = 201;
   ecGraphicsDriverError = 202;
   ecGraphicsModeNotFound = 203;
@@ -80,6 +80,11 @@ const
   ecStreamWriteNotSupported = 404;
   ecStreamReadNotSupported = 405;
   ecStreamNotOpen = 406;
+  ecStreamCloseError = 407;
+  ecStreamOpenError = 408;
+  ecStreamReadError = 409;
+  ecStreamWriteError = 410;
+  ecStreamSeekError = 411;
 
   { Text errors }
   ecTextDriverNotSupported = 501;
@@ -175,7 +180,7 @@ begin
   else if (errorCode = ecFileInvalid) then
     ErrorMessage := 'File is invalid'
   else if (errorCode = ecGraphicsNotSupported) then
-    ErrorMessage := 'Graphics mode not supported'
+    ErrorMessage := 'Graphics^ mode not supported'
   else if (errorCode = ecTextDriverNotSupported) then
     ErrorMessage := 'Text driver not supported'
   else if (errorCode = ecTextDriverError) then
@@ -191,7 +196,7 @@ begin
   else if (errorCode = ecInvalidAllocSize) then
     ErrorMessage := 'Invalid allocation size'
   else if (errorCode = ecGraphicsDriverError) then
-    ErrorMessage := 'Graphics mode not supported'
+    ErrorMessage := 'Graphics^ mode not supported'
   else if (errorCode = ecStreamSeekNotSupported) then
     ErrorMessage := 'Stream does not support seeking'
   else if (errorCode = ecStreamWriteNotSupported) then
@@ -210,8 +215,18 @@ begin
     ErrorMessage := 'XMS memory could not be initialized'
   else if (errorCode = ecXmsNotSupported) then
     ErrorMessage := 'XMS memory is not supported'
+  else if (errorCode = ecStreamCloseError) then
+    ErrorMessage := 'Error closing stream'
+  else if (errorCode = ecStreamOpenError) then
+    ErrorMessage := 'Error opening stream'
+  else if (errorCode = ecStreamReadError) then
+    ErrorMessage := 'Error reading stream'
+  else if (errorCode = ecStreamWriteError) then
+    ErrorMessage := 'Error writing stream'
+  else if (errorCode = ecStreamSeekError) then
+    ErrorMessage := 'Stream seek error'
   else if (errorCode = ecGraphicsModeNotFound) then
-    ErrorMessage := 'Graphics mode not found'
+    ErrorMessage := 'Graphics^ mode not found'
   else
     ErrorMessage := 'Unknown error';
 end;

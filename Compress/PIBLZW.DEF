@@ -1,0 +1,46 @@
+(*--------------------------------------------------------------------------*)
+(*                                                                          *)
+(*                  Global declarations for PIBLZW                          *)
+(*                                                                          *)
+(*--------------------------------------------------------------------------*)
+
+CONST
+   MaxBuff  = 8192                 (* Buffer size for input and output files *);
+   MaxTab   = 4095                 (* Table size - 1 ==> 2**10-1 ==> 12 bits *);
+   No_Prev  = $7FFF                (* Special code for no previous character *);
+   EOF_Char = -2                   (* Marks end of file                      *);
+   End_List = -1                   (* Marks end of a list                    *);
+   Empty    = -3                   (* Indicates empty                        *);
+
+TYPE
+   AnyStr             = STRING[255]  (* General string type                  *);
+
+                                   (* One node in parsing table.             *)
+   String_Table_Entry = RECORD
+                           Used     : BOOLEAN  (* Is this node used yet?      *);
+                           PrevChar : INTEGER  (* Code for preceding string   *);
+                           FollChar : INTEGER  (* Code for current character  *);
+                           Next     : INTEGER  (* Next dupl in collision list *);
+                        END;
+
+VAR
+   Input_File     : FILE                     (* Input file   *);
+   Output_File    : FILE                     (* Output file  *);
+
+   InBufSize      : INTEGER                  (* Count of chars in input buffer *);
+
+   Input_Buffer   : ARRAY[1..MaxBuff] OF BYTE (* Input buffer area         *);
+   Output_Buffer  : ARRAY[1..MaxBuff] OF BYTE (* Output buffer area        *);
+
+   Input_Pos      : INTEGER                  (* Cur. pos. in input buffer   *);
+   Output_Pos     : INTEGER                  (* Cur. pos. in output buffer  *);
+
+                                             (* String table *)
+
+   String_Table   : ARRAY[0..MaxTab] OF String_Table_Entry;
+
+   Table_Used     : INTEGER                  (* # string table entries used *);
+   Output_Code    : INTEGER                  (* Output compressed code      *);
+   Input_Code     : INTEGER                  (* Input compressed code       *);
+   If_Compressing : BOOLEAN                  (* TRUE if compressing file    *);
+   Ierr           : INTEGER                  (* Input/output error          *);
