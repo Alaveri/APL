@@ -1,2 +1,4 @@
-# APL
-The Alaveri Pascal Library is an open source code library for Turbo/Borland Pascal 7 currently under development.
+# ADL
+Alaveri DOS Pascal Library
+
+The Alaveri DOS Library contains a comprehensive set of Borland/Turbo Pascal 7 units including graphics utilties (CGA/VGA/EGA/SVGA), mouse support, objects, lists, streams, sorting and searching, large strings, memory management (including Extended Memory support for real mode), and more.
