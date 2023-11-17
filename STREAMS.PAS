@@ -154,7 +154,7 @@ destructor TStream.Free;
 begin
   Close;
   inherited Free;
-end;
+nd;
 
 function TStream.Status: TStreamStatus;
 begin

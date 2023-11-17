@@ -21,7 +21,7 @@ type
   PStack = ^TStack;
   PStringList = ^TStringList;
   PSortFunc = ^TSortFunc;
-  PComparer = ^TComparer;
+ PComparer = ^TComparer;
   PCollection = ^TCollection;
 
   TSortFunc = procedure(AList: PList; AComparer: TComparer);
