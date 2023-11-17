@@ -311,8 +311,8 @@ begin
   end;
   index := 0;
 
-  { Swap any conentional references to XMS until there is enough available
-  or there are no more references that cna be moved }
+  { Swap any conventional references to XMS until there is enough available
+  or there are no more references that can be moved }
   while (index < FReferences^.Count) and (System.MaxAvail < ASize) do begin
     current := FReferences^.GetItem(index);
     Inc(index);
@@ -579,7 +579,6 @@ var
 begin
   inherited Init;
   OutOfMemoryException := New(PException, Create(ecNotEnoughMemory));
-  { references are always sorted by Xms flag and Offset ascending }
   FReferences := New(PReferenceList, Create);
   FCurrentReference := nil;
   FXmsSupported := false;

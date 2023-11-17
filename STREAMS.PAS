@@ -153,6 +153,7 @@ const
 destructor TStream.Free;
 begin
   Close;
+  inherited Free;
 end;
 
 function TStream.Status: TStreamStatus;
@@ -338,7 +339,8 @@ begin
     reference := FReferences^.GetItem(index);
     Memory.DeAlloc(reference);
   end;
-  Dispose(FReferences, Free);
+  FreeAndNil(FReferences);
+  inherited Free;
 end;
 
 function TMemoryStream.Read(ABuffer: PByte; ACount: longint): longint;
