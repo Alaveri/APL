@@ -1,7 +1,7 @@
 {$IFDEF debug}
-  {$A-,B-,D+,E+,F+,G-,I+,L+,N+,M 16384 0 655360,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,E+,F+,G-,I+,L-,N+,M 16384 0 655360,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit Lzw;
 
@@ -48,7 +48,6 @@ type
     constructor CreateBitSize(ABitSize: byte);
     destructor Free; virtual;
     function CompressStream(ASource, ADest: PStream; ALength: longint): longint; virtual;
-    function GetTypeName: string; virtual;
     function GetOriginalSize(ASource: PStream): longint; virtual;
     procedure Init; virtual;
     procedure DecompressStream(ASource, ADest: PStream); virtual;
@@ -85,11 +84,6 @@ begin
   inherited Free;
 end;
 
-function TLzw.GetTypename: string;
-begin
-  GetTypeName := 'TLzw';
-end;
-
 procedure TLzw.Init;
 begin
   inherited Init;
@@ -109,7 +103,7 @@ begin
   AllocateDecodeBuffer := true;
   DeallocateDecodeBuffer;
   GetMem(FDecodeBuffer, FDictEntries);
-  if FDecodeBuffer = nil then begin
+  if not Assigned(FDecodeBuffer) then begin
     Raise(ecNotEnoughMemory);
     AllocateDecodeBuffer := false;
   end;
@@ -117,7 +111,7 @@ end;
 
 procedure TLzw.DeallocateDecodeBuffer;
 begin
-  if FDecodeBuffer <> nil then
+  if Assigned(FDecodeBuffer) then
     FreeMem(FDecodeBuffer, FDictEntries);
   FDecodeBuffer := nil;
 end;
@@ -129,7 +123,7 @@ begin
 
   GetMem(FDict, FDictSize);
 
-  if FDict = nil then begin
+  if not Assigned(FDict) then begin
     Raise(ecNotEnoughMemory);
     AllocateDictionary := false;
   end;
@@ -137,7 +131,7 @@ end;
 
 procedure TLzw.DeallocateDictionary;
 begin
-  if FDict <> nil then
+  if Assigned(FDict) then
     FreeMem(FDict, FDictSize);
   FDict := nil;
 end;

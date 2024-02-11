@@ -1,7 +1,7 @@
 {$IFDEF debug}
-  {$A-,B-,D+,E+,F+,G-,I+,L+,N+,M 16384 0 655360,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,E+,F+,G-,I+,L-,N+,M 16384 0 655360,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit GraphIni;
 
@@ -20,8 +20,8 @@ uses
 type
   TGraphDrivers =
   (
-    gdVga256,
-    gdSVga256,
+    gdVga8,
+    gdSVga8,
     gdEga,
     gdCga,
     gdHercules,
@@ -39,8 +39,8 @@ begin
     gdHercules: Graph := New(PHerculesDriver, Create);
     gdCga: Graph := New(PCgaDriver, Create);
     gdEga: Graph := New(PEgaDriver, Create);
-    gdVga256: Graph := New(PVga256Driver, Create);
-    gdSVga256: Graph := New(PSVga8Driver, Create);
+    gdVga8: Graph := New(PVga8Driver, Create);
+    gdSVga8: Graph := New(PSVga8Driver, Create);
     gdVgaUnchained: Graph := New(PVgaUnchainedDriver, Create);
   end;
 end;

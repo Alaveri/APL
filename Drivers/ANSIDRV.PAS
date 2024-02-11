@@ -1,7 +1,7 @@
 {$IFDEF debug}
-  {$A-,B-,D+,E+,F+,G-,I+,L+,N+,M 16384 0 655360,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,E+,F+,G-,I+,L-,N+,M 16384 0 655360,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit AnsiDrv;
 
@@ -24,7 +24,6 @@ type
     _startMode: byte;
     function GetTextAttributes(AForeColor, ABackColor: byte; ABlink: boolean): byte; virtual;
   public
-    function GetTypeName: string; virtual;
     procedure Write(const AText: string); virtual;
     procedure WriteLarge(AText: PChar); virtual;
     procedure SetForeColor(AColor: byte); virtual;
@@ -83,10 +82,6 @@ begin
 end;
 
 function TAnsiDriver.GetTextAttributes(AForeColor, ABackColor: byte; ABlink: boolean): byte;
-begin
-end;
-
-function TAnsiDriver.GetTypeName: string;
 begin
 end;
 

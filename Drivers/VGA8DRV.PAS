@@ -1,7 +1,7 @@
 {$IFDEF debug}
-  {$A-,B-,D+,E+,F+,G-,I+,L+,N+,M 16384 0 655360,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,E+,F+,G-,I+,L-,N+,M 16384 0 655360,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit Vga8Drv;
 
@@ -10,7 +10,7 @@ interface
 uses
   Objects,
   GraphDrv,
-  Graph8,
+  GrDrv8,
   Common,
   StrUtils,
   Strings,
@@ -19,10 +19,11 @@ uses
   Drawing;
 
 type
-  PVga256Driver = ^TVga256Driver;
+  PVga8Driver = ^TVga8Driver;
 
-  TVga256Driver = object(TGraphics256Driver)
+  TVga8Driver = object(TGraphics8Driver)
   private
+    function GetScreenPtr(AX, AY: integer; var AOffset: word): PByte;
   public
     function GetPixel(AX, AY: integer): byte; virtual;
     procedure GetImage(AX, AY, AWidth, AHeight: longint; ABuffer: PByte); virtual;
@@ -44,23 +45,26 @@ type
 
 implementation
 
-function TVga256Driver.GetPixel(AX, AY: integer): byte;
+uses
+  Except;
+
+function TVga8Driver.GetPixel(AX, AY: integer): byte;
 var
   offset: longint;
   ptr: PByte;
   drawRect: TRect;
 begin
   GetPixel := 0;
-  Mode^.Bounds.Intersection(State^.ViewPort, drawRect);
-  if not drawRect.IntersectCoords(AX, AY) then
+  Mode^.Bounds.GetIntersection(State.ViewPort, drawRect);
+  if not drawRect.IntersectsCoords(AX, AY) then
     exit;
-  offset := AX + longint(AY) * Mode^.Pitch;
-  ptr := State^.FrameBuffer;
+  offset := AX + longint(AY) * Mode^.BytesPerScanLine;
+  ptr := State.FrameBuffer;
   Inc(ptr, offset);
   GetPixel := ptr^;
 end;
 
-procedure TVga256Driver.SetMode(AMode: PGraphicsMode);
+procedure TVga8Driver.SetMode(AMode: PGraphicsMode);
 begin
   inherited SetMode(AMode);
   asm
@@ -68,80 +72,110 @@ begin
     mov   al, 13h
     int   10h
   end;
-  State^.FrameBuffer := Mode^.FrameBuffer;
+  State.FrameBuffer := Mode^.FrameBuffer;
   SetStandardPalette;
   Mouse.XDiv := 1;
 end;
 
-procedure TVga256Driver.SetPixel(AX, AY: integer);
+procedure TVga8Driver.SetPixel(AX, AY: integer);
 var
   offset: longint;
   ptr: PByte;
   drawRect: TRect;
 begin
-  Mode^.Bounds.Intersection(State^.ViewPort, drawRect);
-  if not drawRect.IntersectCoords(AX, AY) then
+  Mode^.Bounds.GetIntersection(State.ViewPort, drawRect);
+  if not drawRect.IntersectsCoords(AX, AY) then
     exit;
-  ptr := State^.FrameBuffer;
-  offset := AX + longint(AY) * Mode^.Pitch;
+  ptr := State.FrameBuffer;
+  offset := AX + longint(AY) * Mode^.BytesPerScanLine;
   Inc(ptr, offset);
-  ptr^ := State^.ForeColor;
+  ptr^ := State.ForeColor;
 end;
 
-procedure TVga256Driver.RenderText(AX, AY, ALength: integer; AText: PChar);
+function TVga8Driver.GetScreenPtr(AX, AY: integer; var AOffset: word): PByte;
+var
+  bank: integer;
+  screen: PByte;
+begin
+  if State.FrameBuffer <> Mode^.FrameBuffer then begin
+    screen := State.FrameBuffer;
+    AOffset := AY * State.ViewPort.Width + AX;
+    Inc(screen, AOffset);
+    GetScreenPtr := screen;
+    exit;
+  end;
+  AOffset := AY * Mode^.BytesPerScanLine + AX;
+  screen := Mode^.FrameBuffer;
+  Inc(screen, AOffset);
+  GetScreenPtr := screen;
+end;
+
+
+procedure TVga8Driver.RenderText(AX, AY, ALength: integer; AText: PChar);
 var
   drawRect: TRect;
   charIndex, yIndex, xIndex: integer;
   ch: char;
-  sy, sx, minX, maxX: integer;
+  sx, sy, minX, maxX: integer;
+  width: integer;
   linePtr: PByte;
-  width, height: integer;
+  height: integer;
   screen: PByte;
-  fore, back: byte;
+  fore: byte;
+  offset: word;
+  currentLine: byte;
 begin
-  Mode^.Bounds.Intersection(State^.ViewPort, drawRect);
+  if HasException then
+    exit;
+  Mode^.Bounds.GetIntersection(State.ViewPort, drawRect);
   if AX > drawRect.Right then
     exit;
   if AY > drawRect.Bottom then
     exit;
-  width := State^.Font^.TextWidth('w');
-  height := State^.Font^.Height;
-  if AX + width < drawRect.X then
-    exit;
+  height := State.Font^.Height;
   if AY + height < drawRect.Y then
     exit;
-  Inc(screen, AY * Mode^.Pitch + AX);
+  sx := AX;
   for charIndex := 0 to ALength - 1 do begin
     ch := AText[charIndex];
-    sx := AX + charIndex * width;
-    sy := AY;
-    fore := State^.ForeColor;
-    back := State^.BackColor;
-    linePtr := PMonospaceFont(State^.Font)^.FontData;
-    Inc(linePtr, Ord(ch) * height);
-    maxX := MinL(width - 1, drawRect.Right - sx);
-    minX := MaxL(0, drawRect.X - sx);
-    if minX > maxX then
+    width := State.Font^.TextWidth(ch);
+    if sx > drawRect.Right then
+      exit;
+    if sx + width < drawRect.X then begin
+      Inc(sx, width);
       continue;
-    Inc(linePtr, minX);
+    end;
+    sy := AY;
+    fore := State.ForeColor;
+    linePtr := State.Font^.FontData;
+    Inc(linePtr, Ord(ch) * height);
+    minX := MaxLong(0, drawRect.X - sx);
+    maxX := MinLong(State.Font^.TextWidth(ch) - 1, drawRect.Right - sx);
+    sy := AY;
     for yIndex := 0 to height - 1 do begin
-      sy := AY + yIndex;
+      currentLine := linePtr^;
+      if sy < drawRect.Y then begin
+        Inc(linePtr);
+        Inc(sy);
+        continue;
+      end;
       if sy > drawRect.Bottom then
         break;
-      screen := State^.FrameBuffer;
-      Inc(screen, sy * longint(Mode^.Pitch) + sx);
-      Inc(screen, minX);
+      screen := GetScreenPtr(sx + minX, sy, offset);
       for xIndex := minX to maxX do begin
-        if (linePtr^ and (128 shr xIndex)) > 0 then
+        if (currentLine and (128 shr xIndex)) > 0 then
           screen^ := fore;
         Inc(screen);
+        Inc(offset);
       end;
       Inc(linePtr);
+      Inc(sy);
     end;
+    Inc(sx, width);
   end;
 end;
 
-procedure TVga256Driver.Line(AX1, AY1, AX2, AY2: integer);
+procedure TVga8Driver.Line(AX1, AY1, AX2, AY2: integer);
 var
   aError, aError2, sx, sy, dlx, dly: integer;
   screenPtr: PByte;
@@ -149,7 +183,7 @@ var
   color: byte;
   drawRect: TRect;
 begin
-  Mode^.Bounds.Intersection(State^.ViewPort, drawRect);
+  Mode^.Bounds.GetIntersection(State.ViewPort, drawRect);
   dlx := Abs(AX2 - AX1);
   if AX1 < AX2 then
     sx := 1
@@ -167,9 +201,9 @@ begin
   y := drawRect.Y;
   right := drawRect.Right;
   bottom := drawRect.Bottom;
-  screenPtr := State^.FrameBuffer;
+  screenPtr := State.FrameBuffer;
   width := Mode^.Width;
-  color := State^.ForeColor;
+  color := State.ForeColor;
   asm
     mov cx, [aError]
     @loop:
@@ -256,241 +290,238 @@ begin
   end;}
 end;
 
-procedure TVga256Driver.HLine(AX, AY, AWidth: integer);
+procedure TVga8Driver.HLine(AX, AY, AWidth: integer);
 var
-  buffer: PByte;
-  bank: word;
-  offset: longint;
-  drawRect: TRect;
+  screen: PByte;
+  lineWidth: integer;
+  offset: word;
   color: byte;
+  drawRect: TRect;
 begin
-  Mode^.Bounds.Intersection(State^.ViewPort, drawRect);
+  if HasException then
+    exit;
+  Mode^.Bounds.GetIntersection(State.ViewPort, drawRect);
   if (AY < drawRect.Y) or (AY > drawRect.Bottom) then
     exit;
-  AX := MaxL(MinL(AX, drawRect.Right), drawRect.X);
-  AWidth := MinL(drawRect.Right - AX + 1, AWidth);
+  CheckRange(AX, drawRect.X, drawRect.Right);
+  AWidth := MinLong(drawRect.Width, AWidth);
   if AWidth <= 0 then
     exit;
-  offset := longint(AY) * Mode^.Pitch + AX;
-  buffer := State^.FrameBuffer;
+  screen := GetScreenPtr(AX, AY, offset);
   color := byte(ForeColor);
-  Inc(buffer, offset);
-  FillChar(buffer^, AWidth, color);
+  FillChar(screen^, AWidth, color);
 end;
 
-procedure TVga256Driver.VLine(AX, AY, AHeight: integer);
+procedure TVga8Driver.VLine(AX, AY, AHeight: integer);
 var
   index: integer;
-  offset: longint;
-  ptr: PByte;
+  offset: word;
+  screen: PByte;
   drawRect: TRect;
 begin
-  Mode^.Bounds.Intersection(State^.ViewPort, drawRect);
+  if HasException then
+    exit;
+  Mode^.Bounds.GetIntersection(State.ViewPort, drawRect);
   if (AX < drawRect.X) or (AX > drawRect.Right) then
     exit;
-  AY := MaxL(MinL(AY, drawRect.Right), drawRect.Y);
-  AHeight := MinL(drawRect.Bottom - AY + 1, AHeight);
+  CheckRange(AY, drawRect.Y, drawRect.Bottom);
+  AHeight := MinLong(drawRect.Height, AHeight);
   if AHeight <= 0 then
     exit;
-  for index := MaxL(AY, 0) to MinL(AY + AHeight - 1, Mode^.MaxY) do begin
-    offset := longint(AX) + index * Mode^.Pitch;
-    ptr := State^.FrameBuffer;
-    Inc(ptr, offset);
-    ptr^ := ForeColor;
+  for index := MaxLong(AY, 0) to MinLong(AY + AHeight - 1, Mode^.MaxY) do begin
+    screen := GetScreenPtr(AX, index, offset);
+    screen^ := ForeColor;
   end;
 end;
 
-procedure TVga256Driver.DrawImage(AX, AY, AWidth, AHeight: integer; AImage: PByte);
+procedure TVga8Driver.DrawImage(AX, AY, AWidth, AHeight: integer; AImage: PByte);
 var
-  imageRect, viewRect, drawRect: TRect;
-  yIndex, imageX, imageY: integer;
-  screenPtr, imagePtr: PByte;
+  imageRect, drawRect: TRect;
+  yIndex: integer;
+  screen, image: PByte;
+  offset: word;
+  sy: word;
+  lineWidth: integer;
 begin
-  imageRect.CreateDims(AX, AY, AWidth, AHeight);
-  Mode^.Bounds.Intersection(State^.ViewPort, viewRect);
-  viewRect.Intersection(imageRect, drawRect);
+  if HasException then
+    exit;
+  GetImageDrawRects(AX, AY, AWidth, AHeight, imageRect, drawRect);
   if drawRect.IsEmpty then
     exit;
-  imageX := drawRect.X - AX;
-  imageY := drawRect.Y - AY;
+  sy := drawRect.Y;
+  lineWidth := drawRect.Width;
   for yIndex := 0 to drawRect.Height - 1 do begin
-    screenPtr := State^.FrameBuffer;
-    Inc(screenPtr, (yIndex + drawRect.Y) * Mode^.Pitch + drawRect.X);
-    imagePtr := AImage;
-    Inc(imagePtr, (imageY + yIndex) * AWidth + imageX);
-    Move(imagePtr^, screenPtr^, drawRect.Width);
+    screen := GetScreenPtr(drawRect.X, sy, offset);
+    image := AImage;
+    Inc(image, (yIndex + imageRect.Y) * imageRect.Width + imageRect.X);
+    Move(image^, screen^, lineWidth);
+    Inc(image, lineWidth);
+    Inc(sy);
   end;
 end;
 
-procedure TVga256Driver.DrawImageT(AX, AY, AWidth, AHeight: integer; AImage: PByte);
+procedure TVga8Driver.DrawImageT(AX, AY, AWidth, AHeight: integer; AImage: PByte);
 var
-  imageRect, viewRect, drawRect: TRect;
-  xIndex, yIndex, imageX, imageY: integer;
-  screenPtr, imagePtr: PByte;
+  imageRect, drawRect: TRect;
+  xIndex, yIndex: integer;
+  sy: longint;
+  offset: word;
+  screen, image: PByte;
 begin
-  imageRect.CreateDims(AX, AY, AWidth, AHeight);
-  Mode^.Bounds.Intersection(State^.ViewPort, viewRect);
-  viewRect.Intersection(imageRect, drawRect);
+  if HasException then
+    exit;
+  GetImageDrawRects(AX, AY, AWidth, AHeight, imageRect, drawRect);
   if drawRect.IsEmpty then
     exit;
-  imageX := drawRect.X - AX;
-  imageY := drawRect.Y - AY;
+  sy := drawRect.Y;
   for yIndex := 0 to drawRect.Height - 1 do begin
-    screenPtr := State^.FrameBuffer;
-    Inc(screenPtr, (yIndex + drawRect.Y) * Mode^.Pitch + drawRect.X);
-    imagePtr := AImage;
-    Inc(imagePtr, (imageY + yIndex) * AWidth + imageX);
+    screen := GetScreenPtr(drawRect.X, sy, offset);
+    image := AImage;
+    Inc(image, (yIndex + imageRect.Y) * imageRect.Width + imageRect.X);
     for xIndex := 0 to drawRect.Width - 1 do begin
-      if imagePtr^ <> TransparentColor then
-        screenPtr^ := imagePtr^;
-      Inc(imagePtr);
-      Inc(screenPtr);
+      if image^ <> TransparentColor then
+        screen^ := image^;
+      Inc(image);
+      Inc(screen);
     end;
+    Inc(sy);
   end;
 end;
 
-procedure TVga256Driver.DrawImageStream(AX, AY, AWidth, AHeight: integer; AStream: PStream);
+procedure TVga8Driver.DrawImageStream(AX, AY, AWidth, AHeight: integer; AStream: PStream);
 var
-  imageRect, viewRect, drawRect: TRect;
-  yIndex, imageX, imageY: integer;
-  screenPtr: PByte;
-  streamWidth, width: integer;
-  linePtr: PByte;
-begin
-  imageRect.CreateDims(AX, AY, AWidth, AHeight);
-  Mode^.Bounds.Intersection(State^.ViewPort, viewRect);
-  viewRect.Intersection(imageRect, drawRect);
-  if drawRect.IsEmpty then
-    exit;
-  imageX := drawRect.X - AX;
-  imageY := drawRect.Y - AY;
-  AStream^.Seek(imageY * AWidth + imageX, soFromPosition);
-  screenPtr := State^.FrameBuffer;
-  Inc(screenPtr, drawRect.Y * Mode^.Pitch + drawRect.X);
-  streamWidth := AWidth - drawRect.Width;
-  width := drawRect.Width;
-  GetMem(linePtr, drawRect.Width);
-  for yIndex := 0 to drawRect.Height - 1 do begin
-    AStream^.Read(linePtr, drawRect.Width);
-    asm
-      push ds
-      lds si, linePtr
-      les di, screenPtr
-      cld
-      mov cx, [width]
-      rep movsb
-      pop ds
-    end;
-    Inc(screenPtr, Mode^.Pitch);
-    AStream^.Seek(streamWidth, soFromPosition);
-    if AStream^.HasException then begin
-      Raise(AStream^.Exception^.Code);
-      break;
-    end;
-  end;
-  FreeMem(linePtr, drawRect.Width);
-end;
-
-procedure TVga256Driver.DrawImageStreamT(AX, AY, AWidth, AHeight: integer; AStream: PStream);
-var
-  imageRect, viewRect, drawRect: TRect;
-  yIndex, imageX, imageY: integer;
-  screenPtr, linePtr: PByte;
-  width: integer;
-begin
-  imageRect.CreateDims(AX, AY, AWidth, AHeight);
-  Mode^.Bounds.Intersection(State^.ViewPort, viewRect);
-  viewRect.Intersection(imageRect, drawRect);
-  if drawRect.IsEmpty then
-    exit;
-  imageX := drawRect.X - AX;
-  imageY := drawRect.Y - AY;
-  GetMem(linePtr, drawRect.Width);
-  width := drawRect.Width - 1;
-  for yIndex := 0 to drawRect.Height - 1 do begin
-    screenPtr := State^.FrameBuffer;
-    Inc(screenPtr, (yIndex + drawRect.Y) * Mode^.Pitch + drawRect.X);
-    AStream^.Seek((imageY + yIndex) * AWidth + imageX, soFromBeginning);
-    if AStream^.HasException then begin
-      FreeMem(linePtr, drawRect.Width);
-      exit;
-    end;
-    AStream^.Read(linePtr, drawRect.Width);
-    if AStream^.HasException then begin
-      FreeMem(linePtr, drawRect.Width);
-      exit;
-    end;
-    asm
-      push ds
-      mov cx, [width]
-      mov al, [TransparentColor]
-      les di, linePtr
-      lds si, screenPtr
-      @lineloop:
-        mov dl, [es:di]
-        cmp al, dl
-        je @transparent
-        mov [ds:si], dl
-      @transparent:
-        inc di
-        inc si
-      loop @lineloop
-      pop ds
-    end;
-  end;
-  FreeMem(linePtr, drawRect.Width);
-end;
-
-procedure TVga256Driver.GetImage(AX, AY, AWidth, AHeight: longint; ABuffer: PByte);
-var
-  imageRect, viewRect, drawRect: TRect;
+  imageRect, drawRect: TRect;
   yIndex: integer;
-  screenPtr, imagePtr: PByte;
+  screen: PByte;
+  offset: word;
+  sy: longint;
+  lineWidth: integer;
+  streamStart: longint;
 begin
-  imageRect.CreateDims(AX, AY, AWidth, AHeight);
-  Mode^.Bounds.Intersection(State^.ViewPort, viewRect);
-  viewRect.Intersection(imageRect, drawRect);
+  if AStream^.HasException or HasException then
+    exit;
+  GetImageDrawRects(AX, AY, AWidth, AHeight, imageRect, drawRect);
   if drawRect.IsEmpty then
     exit;
+  sy := drawRect.Y;
+  lineWidth := drawRect.Width;
+  streamStart := AStream^.Position;
   for yIndex := 0 to drawRect.Height - 1 do begin
-    screenPtr := State^.FrameBuffer;
-    Inc(screenPtr, (yIndex + drawRect.Y) * Mode^.Pitch + drawRect.X);
-    imagePtr := ABuffer;
-    Inc(imagePtr, yIndex * AWidth);
-    Move(screenPtr^, imagePtr^, drawRect.Width);
+    screen := GetScreenPtr(drawRect.X, sy, offset);
+    AStream^.Seek((yIndex + imageRect.Y) * imageRect.Width + imageRect.X, soFromBeginning);
+    AStream^.Read(screen, lineWidth);
   end;
+  if AStream^.HasException then
+    Raise(AStream^.Exception^.Code);
 end;
 
-procedure TVga256Driver.GetImageStream(AX, AY, AWidth, AHeight: longint; AStream: PStream);
+procedure TVga8Driver.DrawImageStreamT(AX, AY, AWidth, AHeight: integer; AStream: PStream);
 var
-  imageRect, viewRect, drawRect: TRect;
-  yIndex: integer;
-  screenPtr: PByte;
+  imageRect, drawRect: TRect;
+  xIndex, yIndex: integer;
+  screen: PByte;
+  offset: word;
+  imageLine, linePtr: PByte;
+  streamStart: longint;
+  sy: integer;
+  lineWidth: integer;
 begin
-  imageRect.CreateDims(AX, AY, AWidth, AHeight);
-  Mode^.Bounds.Intersection(State^.ViewPort, viewRect);
-  viewRect.Intersection(imageRect, drawRect);
+  if AStream^.HasException or HasException then
+    exit;
+  GetImageDrawRects(AX, AY, AWidth, AHeight, imageRect, drawRect);
   if drawRect.IsEmpty then
     exit;
+  lineWidth := drawRect.Width;
+  GetMem(imageLine, lineWidth);
+  if not Assigned(imageLine) then begin
+    Raise(ecNotEnoughMemory);
+    exit;
+  end;
+  streamStart := AStream^.Position;
+  sy := drawRect.Y;
+  AStream^.Seek((yIndex + imageRect.Y) * AWidth + imageRect.X, soFromPosition);
   for yIndex := 0 to drawRect.Height - 1 do begin
-    screenPtr := State^.FrameBuffer;
-    Inc(screenPtr, (yIndex + drawRect.Y) * Mode^.Pitch + drawRect.X);
-    AStream^.Write(screenPtr, drawRect.Width);
-    if AStream^.HasException then
-      exit;
+    screen := GetScreenPtr(drawRect.X, drawRect.Y + yIndex, offset);
+    AStream^.Seek(yIndex * imageRect.Width + imageRect.X, soFromBeginning);
+    AStream^.Read(imageLine, lineWidth);
+    linePtr := imageLine;
+    for xIndex := 0 to lineWidth - 1 do begin
+      if linePtr^ <> TransparentColor then
+        screen^ := linePtr^;
+      Inc(screen);
+      Inc(offset);
+      Inc(linePtr);
+    end;
+    Inc(sy);
+  end;
+  if AStream^.HasException then
+    Raise(AStream^.Exception^.Code);
+  FreeMem(imageLine, lineWidth);
+end;
+
+procedure TVga8Driver.GetImage(AX, AY, AWidth, AHeight: longint; ABuffer: PByte);
+var
+  imageRect, drawRect: TRect;
+  yIndex: integer;
+  screen, image: PByte;
+  offset: word;
+  sy: longint;
+  lineWidth: integer;
+begin
+  if HasException then
+    exit;
+  GetImageDrawRects(AX, AY, AWidth, AHeight, imageRect, drawRect);
+  if drawRect.IsEmpty then
+    exit;
+  sy := drawRect.Y;
+  lineWidth := drawRect.Width;
+  for yIndex := 0 to drawRect.Height - 1 do begin
+    screen := GetScreenPtr(drawRect.X, sy, offset);
+    image := ABuffer;
+    Inc(image, (yIndex + imageRect.Y) * imageRect.Width);
+    Move(screen^, image^, lineWidth);
+    Inc(image, lineWidth);
+    Inc(sy);
   end;
 end;
 
-procedure TVga256Driver.Init;
+procedure TVga8Driver.GetImageStream(AX, AY, AWidth, AHeight: longint; AStream: PStream);
+var
+  imageRect, drawRect: TRect;
+  yIndex: integer;
+  screen: PByte;
+  offset: word;
+  sy: longint;
+  lineWidth: integer;
+  streamStart: longint;
+begin
+  if AStream^.HasException or HasException then
+    exit;
+  GetImageDrawRects(AX, AY, AWidth, AHeight, imageRect, drawRect);
+  if drawRect.IsEmpty then
+    exit;
+  sy := drawRect.Y;
+  lineWidth := drawRect.Width;
+  streamStart := AStream^.Position;
+  for yIndex := 0 to drawRect.Height - 1 do begin
+    screen := GetScreenPtr(drawRect.X, sy, offset);
+    AStream^.Seek((yIndex + imageRect.Y) * imageRect.Width + imageRect.X, soFromBeginning);
+    AStream^.Write(screen, lineWidth);
+    Inc(sy);
+  end;
+  if AStream^.HasException then
+    Raise(AStream^.Exception^.Code);
+end;
+
+procedure TVga8Driver.Init;
 var
   newMode: PGraphicsMode;
   desc: string;
 begin
   inherited Init;
-  Modes := New(PGraphicsModeList, CreateCapacity(1));
   newMode := New(PGraphicsMode, Create);
   with newMode^ do begin
-    Id := NewLargeString('Vga'
+    Id := TString.New('Vga'
       + IntToStr(320)
       + 'x'
       + IntToStr(200)
@@ -501,25 +532,25 @@ begin
       + 'x'
       + IntToStr(200)
       + ' 256 Color';
-    Description := NewLargeString(desc);
+    Description := TString.New(desc);
     Width := 320;
     Height := 200;
     MaxX := 319;
     MaxY := 199;
     Bpp := 8;
-    Pitch := 320;
-    HelpText := NewLargeString('Requires a VGA card.');
+    BytesPerScanLine := 320;
+    HelpText := TString.New('Requires a VGA card.');
     FrameBuffer := Ptr($A000, $0000);
   end;
-  Modes^.Add(newMode);
+  Modes.Add(newMode);
 end;
 
-destructor TVga256Driver.Free;
+destructor TVga8Driver.Free;
 begin
   inherited Free;
 end;
 
-procedure TVga256Driver.WaitForVSync;
+procedure TVga8Driver.WaitForVSync;
 begin
   while (Port[$3DA] and $08) = $08 do;
   while (Port[$3DA] and $08) <> $08 do;

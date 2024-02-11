@@ -1,9 +1,9 @@
 {$IFDEF debug}
-  {$A-,B-,D+,E+,F+,G-,I+,L+,N+,M 16384 0 655360,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,E+,F+,G-,I+,L-,N+,M 16384 0 655360,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
-unit Graph8;
+unit GrDrv8;
 
 interface
 
@@ -11,7 +11,7 @@ uses
   Objects,
   Common,
   Drawing,
-  Collects,
+  Lists,
   Consts,
   MouseDrv,
   GraphDrv,
@@ -30,9 +30,13 @@ const
   TransparentColor: byte = 1;
 
 type
-  PGraphics256Driver = ^TGraphics256Driver;
+  PGraphics8Driver = ^TGraphics8Driver;
   PMouseCursor = ^TMouseCursor;
+  PMouseCursorList = ^TMouseCursorList;
   PRgbPalette = ^TRgbPalette;
+
+  TLargeMouseCursorImage = array[0..14, 0..7] of byte;
+  TSmallMouseCursorImage = array[0..8, 0..7] of byte;
 
   TStandardColor =
   (
@@ -65,38 +69,41 @@ type
 
   TRgbPalette = array[byte] of TRgbColor;
 
-  TMouseCursor = object(TObject)
+  TMouseCursor = object(TIdentifiable)
   private
-    FGraph: PGraphicsDriver;
     FBackData: PByte;
     FBackBuffer: PByte;
   public
     Visible: boolean;
     X, Y: integer;
+    OffsetX, OffsetY: integer;
     Image: PByte;
     Width, Height: word;
-    constructor Create(ADriver: PGraphicsDriver);
-    procedure Draw; virtual;
+    constructor Create(AId: string; AWidth, AHeight: integer; AImage: PByte);
+    procedure Draw;
+    procedure Paint;
     procedure Init; virtual;
-    procedure StoreBackground(AX, AY: integer); virtual;
+    procedure StoreBackground(AX, AY: integer);
     destructor Free; virtual;
-    function BackBuffer: PByte; virtual;
-    function BackData: PByte; virtual;
+    function BackBuffer: PByte;
+    function BackData: PByte;
   end;
 
-  TGraphics256Driver = object(TGraphicsDriver)
+  TGraphics8Driver = object(TGraphicsDriver)
   public
     MouseCursor: PMouseCursor;
     Palette: PRgbPalette;
     procedure Init; virtual;
     destructor Free; virtual;
-    function GetColor256(AColor: TStandardColor; AIntensity: byte): longint; virtual;
+    function GetColor8(AColor: TStandardColor; AIntensity: byte): longint; virtual;
+    procedure GetStandardColor(AColor: longint;
+      var AStandardColor: TStandardColor; var AIntensity: byte); virtual;
     function GetStandardPalette: PRgbPalette; virtual;
     procedure SetMode(AMode: PGraphicsMode); virtual;
     procedure SetStandardPalette; virtual;
     procedure SetRgbPalette(APalette: TRgbPalette); virtual;
-    procedure SetForeColor256(AColor: TStandardColor; AIntensity: byte); virtual;
-    procedure SetBackColor256(AColor: TStandardColor; AIntensity: byte); virtual;
+    procedure SetForeColor8(AColor: TStandardColor; AIntensity: byte); virtual;
+    procedure SetBackColor8(AColor: TStandardColor; AIntensity: byte); virtual;
     procedure ShowMouseCursor; virtual;
     procedure HideMouseCursor; virtual;
     procedure EraseMouseCursor(AMouseState: TMouseState); virtual;
@@ -104,11 +111,16 @@ type
     procedure MoveMouseCursor(AMouseState, AOldMouseState: TMouseState); virtual;
   end;
 
-implementation
-
-type
-  TLargeMouseCursorImage = array[0..14, 0..10] of byte;
-  TSmallMouseCursorImage = array[0..8, 0..7] of byte;
+  TMouseCursorList = object(TIdentifiableList)
+  private
+  public
+    function IndexOf(AItem: PMouseCursor): integer;
+    function Add(AItem: PMouseCursor): integer;
+    function GetItem(AIndex: integer): PMouseCursor;
+    function GetItemById(const AId: string): PMouseCursor;
+    procedure Init; virtual;
+    procedure Insert(AIndex: integer; AItem: PMouseCursor);
+  end;
 
 const
   DefaultSmallMouseCursor: TSmallMouseCursorImage =
@@ -126,24 +138,45 @@ const
 
   DefaultMouseCursor: TLargeMouseCursorImage =
   (
-    ($27, $01, $01, $01, $01, $01, $01, $01, $01, $01, $01),
-    ($27, $27, $01, $01, $01, $01, $01, $01, $01, $01, $01),
-    ($27, $00, $27, $01, $01, $01, $01, $01, $01, $01, $01),
-    ($27, $00, $00, $27, $01, $01, $01, $01, $01, $01, $01),
-    ($27, $00, $00, $00, $27, $01, $01, $01, $01, $01, $01),
-    ($27, $00, $00, $00, $00, $27, $01, $01, $01, $01, $01),
-    ($27, $00, $00, $00, $00, $00, $27, $01, $01, $01, $01),
-    ($27, $00, $00, $00, $00, $00, $00, $27, $01, $01, $01),
-    ($27, $00, $00, $00, $00, $00, $00, $00, $27, $01, $01),
-    ($27, $00, $00, $00, $00, $00, $00, $00, $00, $27, $01),
-    ($27, $00, $00, $00, $27, $27, $27, $27, $27, $27, $27),
-    ($27, $00, $00, $27, $01, $01, $01, $01, $01, $01, $01),
-    ($27, $00, $27, $01, $01, $01, $01, $01, $01, $01, $01),
-    ($27, $27, $01, $01, $01, $01, $01, $01, $01, $01, $01),
-    ($27, $01, $01, $01, $01, $01, $01, $01, $01, $01, $01)
+    ($27, $01, $01, $01, $01, $01, $01, $01),
+    ($27, $27, $01, $01, $01, $01, $01, $01),
+    ($27, $00, $27, $01, $01, $01, $01, $01),
+    ($27, $00, $00, $27, $01, $01, $01, $01),
+    ($27, $00, $00, $00, $27, $01, $01, $01),
+    ($27, $00, $00, $00, $00, $27, $01, $01),
+    ($27, $00, $00, $00, $00, $00, $27, $01),
+    ($27, $00, $00, $00, $00, $00, $00, $27),
+    ($27, $00, $00, $00, $00, $00, $00, $27),
+    ($27, $00, $00, $00, $27, $27, $27, $01),
+    ($27, $00, $00, $27, $01, $01, $01, $01),
+    ($01, $27, $27, $01, $01, $01, $01, $01),
+    ($01, $01, $01, $01, $01, $01, $01, $01),
+    ($01, $01, $01, $01, $01, $01, $01, $01),
+    ($01, $01, $01, $01, $01, $01, $01, $01)
   );
 
-procedure TGraphics256Driver.Init;
+  DefaultBeamMouseCursor: TLargeMouseCursorImage =
+  (
+    ($27, $27, $27, $01, $27, $27, $27, $01),
+    ($27, $00, $00, $27, $00, $00, $27, $01),
+    ($27, $27, $27, $00, $27, $27, $27, $01),
+    ($01, $01, $27, $00, $27, $01, $01, $01),
+    ($01, $01, $27, $00, $27, $01, $01, $01),
+    ($01, $01, $27, $00, $27, $01, $01, $01),
+    ($01, $01, $27, $00, $27, $01, $01, $01),
+    ($01, $01, $27, $00, $27, $01, $01, $01),
+    ($01, $01, $27, $00, $27, $01, $01, $01),
+    ($01, $01, $27, $00, $27, $01, $01, $01),
+    ($01, $01, $27, $00, $27, $01, $01, $01),
+    ($01, $01, $27, $00, $27, $01, $01, $01),
+    ($27, $27, $27, $00, $27, $27, $27, $01),
+    ($27, $00, $00, $27, $00, $00, $27, $01),
+    ($27, $27, $27, $01, $27, $27, $27, $01)
+  );
+
+implementation
+
+procedure TGraphics8Driver.Init;
 var
   oldMode: byte;
 begin
@@ -152,36 +185,36 @@ begin
   MouseCursor := nil;
 end;
 
-procedure TGraphics256Driver.SetMode(AMode: PGraphicsMode);
+procedure TGraphics8Driver.SetMode(AMode: PGraphicsMode);
 begin
   inherited SetMode(AMode);
-  if MouseCursor <> nil then
+  if Assigned(MouseCursor) then
     FreeAndNil(MouseCursor);
-  MouseCursor := New(PMouseCursor, Create(@self));
 end;
 
-procedure TGraphics256Driver.MoveMouseCursor(AMouseState, AOldMouseState: TMouseState);
+procedure TGraphics8Driver.MoveMouseCursor(AMouseState, AOldMouseState: TMouseState);
 var
   oldRect, newRect: TRect;
 begin
   if (not MouseCursor^.Visible) or not (AMouseState.Visible) then
     exit;
-  if MouseCursor^.FBackData <> nil then begin
+  Graph^.WaitForVSync;
+  if Assigned(MouseCursor^.FBackData) then
     EraseMouseCursor(AOldMouseState);
-
-  end;
   DrawMouseCursor(AMouseState);
 end;
 
-procedure TGraphics256Driver.EraseMouseCursor(AMouseState: TMouseState);
+procedure TGraphics8Driver.EraseMouseCursor(AMouseState: TMouseState);
 begin
   if (not MouseCursor^.Visible) or not (AMouseState.Visible) then
     exit;
-  if MouseCursor^.FBackData <> nil then
-    DrawImage(AMouseState.X, AMouseState.Y, MouseCursor^.Width, MouseCursor^.Height, MouseCursor^.FBackData);
+  if Assigned(MouseCursor^.FBackData) then begin
+    DrawImage(AMouseState.X - MouseCursor^.OffsetX, AMouseState.Y - MouseCursor^.OffsetY,
+      MouseCursor^.Width, MouseCursor^.Height, MouseCursor^.FBackData);
+  end;
 end;
 
-procedure TGraphics256Driver.DrawMouseCursor(AMouseState: TMouseState);
+procedure TGraphics8Driver.DrawMouseCursor(AMouseState: TMouseState);
 begin
   if (not MouseCursor^.Visible) or (not AMouseState.Visible) then
     exit;
@@ -191,7 +224,7 @@ begin
   MouseCursor^.Draw;
 end;
 
-procedure TGraphics256Driver.ShowMouseCursor;
+procedure TGraphics8Driver.ShowMouseCursor;
 var
   mouseState: TMouseState;
 begin
@@ -201,24 +234,24 @@ begin
   DrawMouseCursor(mouseState);
 end;
 
-procedure TGraphics256Driver.HideMouseCursor;
+procedure TGraphics8Driver.HideMouseCursor;
 begin
   if (not MouseCursor^.Visible) then exit;
-  State^.ViewPort.SetDims(0, 0, Mode^.Width, Mode^.Height);
-  EraseMouseCursor(Mouse.State^);
+  State.ViewPort.SetDims(0, 0, Mode^.Width, Mode^.Height);
+  EraseMouseCursor(Mouse.State);
   MouseCursor^.Visible := false;
   Mouse.HideMouse;
 end;
 
-procedure TGraphics256Driver.SetStandardPalette;
+procedure TGraphics8Driver.SetStandardPalette;
 begin
-  if Palette <> nil then
+  if Assigned(Palette) then
     Dispose(Palette);
   Palette := GetStandardPalette;
   SetRgbPalette(Palette^);
 end;
 
-function TGraphics256Driver.GetStandardPalette: PRgbPalette;
+function TGraphics8Driver.GetStandardPalette: PRgbPalette;
 var
   colorIndex: TStandardColor;
   shadeIndex, shade: integer;
@@ -312,7 +345,7 @@ begin
   GetStandardPalette := newPalette;
 end;
 
-procedure TGraphics256Driver.SetRgbPalette(APalette: TRgbPalette);
+procedure TGraphics8Driver.SetRgbPalette(APalette: TRgbPalette);
 var
   reg: Registers;
   segm, offs: word;
@@ -341,81 +374,100 @@ begin
   end;
 end;
 
-destructor TGraphics256Driver.Free;
+destructor TGraphics8Driver.Free;
 begin
-  if MouseCursor <> nil then
-    Dispose(MouseCursor, Free);
-  if Palette <> nil then
+  if Assigned(Palette) then
     Dispose(Palette);
   inherited Free;
 end;
 
-function TGraphics256Driver.GetColor256(AColor: TStandardColor; AIntensity: byte): longint;
+procedure TGraphics8Driver.GetStandardColor(AColor: longint;
+  var AStandardColor: TStandardColor; var AIntensity: byte);
 begin
-  if AColor = scBlack then begin
-    GetColor256 := 0;
+  if AColor = 0 then begin
+    AStandardColor := scBlack;
+    AIntensity := 0;
     exit;
   end;
-  GetColor256 := 21 + ord(AColor) * 18 + AIntensity;
+  AStandardColor := TStandardColor((AColor - 22) div 18);
+  AIntensity := (AColor - 22) mod 18 + 1;
 end;
 
-procedure TGraphics256Driver.SetForeColor256(AColor: TStandardColor; AIntensity: byte);
+function TGraphics8Driver.GetColor8(AColor: TStandardColor; AIntensity: byte): longint;
 begin
-  SetForeColor(GetColor256(AColor, AIntensity));
+  if AColor = scBlack then begin
+    GetColor8 := 0;
+    exit;
+  end;
+  GetColor8 := 21 + Ord(AColor) * 18 + AIntensity;
 end;
 
-procedure TGraphics256Driver.SetBackColor256(AColor: TStandardColor; AIntensity: byte);
+procedure TGraphics8Driver.SetForeColor8(AColor: TStandardColor; AIntensity: byte);
 begin
-  SetBackColor(GetColor256(AColor, AIntensity));
+  SetForeColor(GetColor8(AColor, AIntensity));
 end;
 
-constructor TMouseCursor.Create(ADriver: PGraphicsDriver);
+procedure TGraphics8Driver.SetBackColor8(AColor: TStandardColor; AIntensity: byte);
 begin
-  inherited Create;
-  FGraph := ADriver;
+  SetBackColor(GetColor8(AColor, AIntensity));
+end;
+
+constructor TMouseCursor.Create(AId: string; AWidth, AHeight: integer; AImage: PByte);
+begin
+  inherited CreateId(AId);
+  Width := AWidth;
+  Height := AHeight;
+  Image := AImage;
+  GetMem(FBackData, Width * Height);
 end;
 
 procedure TMouseCursor.Init;
 begin
-  TObject.Init;
-  Width := 8;
-  Height := 9;
+  inherited Init;
+  Width := 0;
+  Height := 0;
   Visible := true;
   Y := 0;
   X := 0;
+  OffsetX := 0;
+  OffsetY := 0;
   FBackData := nil;
   FBackBuffer := nil;
-  Image := @DefaultSmallMouseCursor;
+end;
+
+procedure TMouseCursor.Paint;
+begin
+  Graph^.DrawImageT(X - OffsetX, Y - OffsetY, Width, Height, Image);
 end;
 
 procedure TMouseCursor.Draw;
 begin
   if not Visible then
     exit;
-  FGraph^.PushState;
-  FGraph^.State^.ViewPort.SetRect(FGraph^.Mode^.Bounds);
-  FGraph^.DrawImageT(X, Y, Width, Height, Image);
-  FGraph^.PopState;
+  Graph^.PushState;
+  Graph^.State.ViewPort.SetRect(Graph^.Mode^.Bounds);
+  Paint;
+  Graph^.PopState;
 end;
 
 procedure TMouseCursor.StoreBackground(AX, AY: integer);
 var
   rect: TRect;
 begin
-  if FBackData = nil then
-    GetMem(FBackData, Width * Height);
+  Dec(AX, OffsetX);
+  Dec(AY, OffsetY);
   rect.CreateDims(AX, AY, Width, Height);
-  FGraph^.PushState;
-  FGraph^.State^.ViewPort.SetRect(FGraph^.Mode^.Bounds);
-  FGraph^.GetImage(AX, AY, Width, Height, FBackData);
-  FGraph^.PopState;
+  Graph^.PushState;
+  Graph^.State.ViewPort.SetRect(Graph^.Mode^.Bounds);
+  Graph^.GetImage(AX, AY, Width, Height, FBackData);
+  Graph^.PopState;
 end;
 
 destructor TMouseCursor.Free;
 begin
-  if FBackData <> nil then
+  if Assigned(FBackData) then
     FreeMem(FBackData, Width * Height);
-  if FBackBuffer <> nil then
+  if Assigned(FBackBuffer) then
     FreeMem(FBackBuffer, Width * Height * 2);
   inherited Free;
 end;
@@ -428,6 +480,36 @@ end;
 function TMouseCursor.BackData: PByte;
 begin
   BackData := FBackData;
+end;
+
+function TMouseCursorList.IndexOf(AItem: PMouseCursor): integer;
+begin
+  IndexOf := inherited IndexOf(AItem);
+end;
+
+function TMouseCursorList.Add(AItem: PMouseCursor): integer;
+begin
+  Add := inherited Add(AItem);
+end;
+
+function TMouseCursorList.GetItem(AIndex: integer): PMouseCursor;
+begin
+  GetItem := PMouseCursor(inherited GetItem(AIndex));
+end;
+
+procedure TMouseCursorList.Init;
+begin
+  inherited Init;
+end;
+
+procedure TMouseCursorList.Insert(AIndex: integer; AItem: PMouseCursor);
+begin
+  inherited Insert(AIndex, AItem);
+end;
+
+function TMouseCursorList.GetItemById(const AId: string): PMouseCursor;
+begin
+  GetItemById := PMouseCursor(inherited GetItemById(AId));
 end;
 
 end.

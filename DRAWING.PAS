@@ -1,7 +1,7 @@
 {$IFDEF debug}
-  {$A-,B-,D+,E+,F+,G-,I+,L+,N+,M 16384 0 655360,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,E+,F+,G-,I+,L-,N+,M 16384 0 655360,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit Drawing;
 
@@ -19,7 +19,7 @@ type
 
   TPoint = object(TObject)
   public
-    X, Y: longint;
+    X, Y: integer;
     constructor Create;
     constructor CreateCoords(AX, AY: longint);
     constructor CreatePoint(APoint: TPoint);
@@ -36,28 +36,30 @@ type
 
   TRect = object(TObject)
   public
-    X, Y, Width, Height: longint;
-    constructor Create;
-    constructor CreateDims(AX, AY, AWidth, AHeight: longint);
-    constructor CreateCoords(AX, AY, ARight, ABottom: longint);
+    X, Y: integer;
+    Width, Height: integer;
+    constructor CreateDims(AX, AY, AWidth, AHeight: integer);
+    constructor CreateCoords(AX, AY, ARight, ABottom: integer);
     constructor CreateRect(ARect: TRect);
-    procedure SetDims(AX, AY, AWidth, AHeight: longint);
-    procedure SetCoords(AX, AY, ARight, ABottom: longint);
+    procedure SetDims(AX, AY, AWidth, AHeight: integer);
+    procedure SetCoords(AX, AY, ARight, ABottom: integer);
     procedure SetRect(ARect: TRect);
+    procedure Assign(var ASource: TObject); virtual;
     procedure SetRight(ARight: integer);
     procedure SetBottom(ABottom: integer);
-    procedure Translate(ADX, ADY: longint);
+    procedure Translate(ADX, ADY: integer);
     procedure Grow(ADW, ADH: integer);
-    procedure Intersection(ARect: TRect; var AResult: TRect);
+    procedure Intersect(var ARect: TRect);
+    procedure GetIntersection(ARect: TRect; var AResult: TRect);
     procedure Init; virtual;
     function Equals(ARect: TRect): boolean;
-    function EqualsCoords(AX, AY, AWidth, AHeight: longint): boolean;
+    function EqualsCoords(AX, AY, AWidth, AHeight: integer): boolean;
     function IsEmpty: boolean;
     function Right: integer;
     function Bottom: integer;
-    function IntersectCoords(AX, AY: longint): boolean;
-    function IntersectPoint(APoint: TPoint): boolean;
-    function IntersectRect(ARect: TRect): boolean;
+    function IntersectsCoords(AX, AY: integer): boolean;
+    function IntersectsPoint(APoint: TPoint): boolean;
+    function IntersectsRect(ARect: TRect): boolean;
   end;
 
   TSize = object(TObject)
@@ -74,28 +76,19 @@ type
 
 implementation
 
-constructor TRect.Create;
-begin
-  inherited Create;
-  X := 0;
-  Y := 0;
-  Width := 0;
-  Height := 0;
-end;
-
 constructor TRect.CreateRect(ARect: TRect);
 begin
   inherited Create;
   SetRect(ARect);
 end;
 
-constructor TRect.CreateDims(AX, AY, AWidth, AHeight: longint);
+constructor TRect.CreateDims(AX, AY, AWidth, AHeight: integer);
 begin
   inherited Create;
   SetDims(AX, AY, AWidth, AHeight);
 end;
 
-constructor TRect.CreateCoords(AX, AY, ARight, ABottom: longint);
+constructor TRect.CreateCoords(AX, AY, ARight, ABottom: integer);
 begin
   inherited Create;
   SetCoords(AX, AY, ARight, ABottom);
@@ -120,10 +113,19 @@ begin
   Height := ABottom - Y + 1;
 end;
 
-procedure TRect.Translate(ADX, ADY: longint);
+procedure TRect.Translate(ADX, ADY: integer);
 begin
   Inc(X, ADX);
   Inc(Y, ADY);
+end;
+
+procedure TRect.Assign(var ASource: TObject);
+var
+  source: PRect;
+begin
+  inherited Assign(ASource);
+  source := PRect(@ASource);
+  SetRect(source^);
 end;
 
 procedure TRect.SetRect(ARect: TRect);
@@ -134,7 +136,7 @@ begin
   Height := ARect.Height
 end;
 
-procedure TRect.SetDims(AX, AY, AWidth, AHeight: longint);
+procedure TRect.SetDims(AX, AY, AWidth, AHeight: integer);
 begin
   X := AX;
   Y := AY;
@@ -142,7 +144,7 @@ begin
   Height := AHeight;
 end;
 
-procedure TRect.SetCoords(AX, AY, ARight, ABottom: longint);
+procedure TRect.SetCoords(AX, AY, ARight, ABottom: integer);
 begin
   X := AX;
   Y := AY;
@@ -161,7 +163,7 @@ begin
   Equals := EqualsCoords(ARect.X, ARect.Y, ARect.Width, ARect.Height);
 end;
 
-function TRect.EqualsCoords(AX, AY, AWidth, AHeight: longint): boolean;
+function TRect.EqualsCoords(AX, AY, AWidth, AHeight: integer): boolean;
 begin
   EqualsCoords :=
     (X = AX)
@@ -180,40 +182,60 @@ begin
   Bottom := Y + Height - 1;
 end;
 
-function TRect.IntersectCoords(AX, AY: longint): boolean;
+function TRect.IntersectsCoords(AX, AY: integer): boolean;
 begin
-  IntersectCoords :=
+  IntersectsCoords :=
     (AX >= X) and
     (AY >= Y) and
     (AX <= Right) and
     (AY <= Bottom);
 end;
 
-function TRect.IntersectPoint(APoint: TPoint): boolean;
+function TRect.IntersectsPoint(APoint: TPoint): boolean;
 begin
-  IntersectPoint := IntersectCoords(APoint.X, APoint.Y);
+  IntersectsPoint := IntersectsCoords(APoint.X, APoint.Y);
 end;
 
-function TRect.IntersectRect(ARect: TRect): boolean;
+function TRect.IntersectsRect(ARect: TRect): boolean;
 begin
-  IntersectRect := not
+  IntersectsRect := not
     ((ARect.Right < X) or
      (ARect.X > Right) or
      (ARect.Bottom < Y) or
      (ARect.Y > Bottom));
 end;
 
-function TRect.IsEmpty: boolean;
-begin
-  IsEmpty := (X = 0) and (Y = 0) and (Width = 0) and (Height = 0);
+function TRect.IsEmpty: boolean; assembler;
+asm
+  les di, self
+  mov al, 0
+  mov dx, es:[di].TRect.Width
+  cmp dx, 0
+  jg @end
+  mov dx, es:[di].TRect.Height
+  cmp dx, 0
+  jg @end
+  inc ax
+  @end:
 end;
 
-procedure TRect.Intersection(ARect: TRect; var AResult: TRect);
+procedure TRect.Intersect(var ARect: TRect);
+begin
+  if not IntersectsRect(ARect) then begin
+    SetDims(0, 0, 0, 0);
+    exit;
+  end;
+  SetCoords(MaxLong(X, ARect.X), MaxLong(Y, ARect.Y),
+    MinLong(Right, ARect.Right), MinLong(Bottom, ARect.Bottom));
+end;
+
+procedure TRect.GetIntersection(ARect: TRect; var AResult: TRect);
 begin
   AResult.Create;
-  if not IntersectRect(ARect) then
+  if not IntersectsRect(ARect) then
     exit;
-  AResult.SetCoords(MaxL(X, ARect.X), MaxL(Y, ARect.Y), MinL(Right, ARect.Right), MinL(Bottom, ARect.Bottom));
+  AResult.SetCoords(MaxLong(X, ARect.X), MaxLong(Y, ARect.Y),
+    MinLong(Right, ARect.Right), MinLong(Bottom, ARect.Bottom));
 end;
 
 constructor TPoint.Create;
