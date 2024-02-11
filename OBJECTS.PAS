@@ -1,7 +1,7 @@
 {$IFDEF debug}
-  {$A-,B-,D+,E+,F+,G-,I+,L+,N+,M 16384 0 655360,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,E+,F+,G-,I+,L-,N+,M 16384 0 655360,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit Objects;
 
@@ -20,6 +20,7 @@ type
 
   TComparer = function(AItem1, AItem2: pointer): integer;
   TPredicate = function(AItem: pointer; var AValue): boolean;
+  TFunc = procedure;
 
   TObject = object
   private
@@ -47,13 +48,16 @@ procedure FreeAndNil(var AObject);
 
 implementation
 
+uses
+  Common;
+
 procedure FreeAndNil(var AObject);
 var
   obj: PObject;
   ptr: PPointer;
 begin
   obj := PObject(AObject);
-  if obj <> nil then
+  if Assigned(obj) then
     Dispose(obj, Free);
   ptr := @AObject;
   ptr^ := nil;
@@ -74,7 +78,7 @@ end;
 
 function TObject.ToString: string;
 begin
-  ToString := '';
+  ToString := 'TObject';
 end;
 
 procedure TObject.Assign(var ASource: TObject);
@@ -89,14 +93,13 @@ end;
 
 destructor TIdentifiable.Free;
 begin
-  DisposeLargeString(Id);
+  TString.Dispose(Id);
   inherited Free;
 end;
 
 procedure TIdentifiable.SetId(const AId: string);
 begin
-  DisposeLargeString(Id);
-  Id := NewLargeString(AId);
+  TString.Assign(Id, AId);
 end;
 
 procedure TIdentifiable.Assign(var ASource: TObject);
@@ -105,8 +108,8 @@ var
 begin
   inherited Assign(ASource);
   source := PIdentifiable(@ASource);
-  DisposeLargeString(Id);
-  Id := CopyLargeString(source^.Id);
+  TString.Dispose(Id);
+  Id := TString.Copy(source^.Id);
 end;
 
 procedure TIdentifiable.Init;
@@ -118,7 +121,7 @@ end;
 function TIdentifiable.GetId: string;
 begin
   GetId := '';
-  if Id = nil then
+  if not Assigned(Id) then
     exit;
   GetId := StrPas(Id);
 end;

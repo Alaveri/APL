@@ -1,7 +1,7 @@
 {$IFDEF debug}
-  {$A-,B-,D+,E+,F+,G-,I+,L+,N+,M 16384 0 655360,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,E+,F+,G-,I+,L-,N+,M 16384 0 655360,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit SVga8Drv;
 
@@ -11,35 +11,39 @@ uses
   Objects,
   Except,
   GraphDrv,
-  Graph8,
+  GrDrv8,
   Common,
   StrUtils,
   Strings,
   Streams,
   Drawing;
 
+{$I SVGA8.inc}
+
 type
   PSVga8Mode = ^TSvga8Mode;
+
   TSvga8Mode = object(TGraphicsMode)
   private
-    FAttributes: word;
-    FGranularity: word;
+    FAttributes: TVbeModeAttributes;
+    FWinSize: word;
     FWinFuncPtr: pointer;
+    FGranularity: word;
   public
     procedure Init; virtual;
     procedure Assign(var ASource: TObject); virtual;
   end;
 
   PSVga8Driver = ^TSVga8Driver;
-  TSVga8Driver = object(TGraphics256Driver)
+  TSVga8Driver = object(TGraphics8Driver)
   private
     FSVga8Driver: integer;
     FCurrentBank: integer;
-    FGranularity: longint;
+    FWinSize: word;
     FWinFunc: pointer;
     FBankShift: word;
     procedure SetBank(ABank: word);
-    function GetScreenPtr(AX, AY: integer; var offset: longint): PByte;
+    function GetScreenPtr(AX, AY: integer; var AOffset: longint): PByte;
   public
     function GetPixel(AX, AY: integer): byte; virtual;
     procedure GetImage(AX, AY, AWidth, AHeight: longint; ABuffer: PByte); virtual;
@@ -65,67 +69,13 @@ uses
   Dos,
   MouseDrv;
 
-type
-  PVbeInfo = ^TVbeInfo;
-  PVbeMode = ^TVbeMode;
-
-  TVbeInfo = record
-    VbeSignature: array[0..3] of char;
-    VbeVersion: word;
-    OemStringPtr: pointer;
-    Capabilities: longint;
-    VideoModes: pointer;
-    TotalMemory: word;
-    SoftwareRevision: word;
-    Vendor: longint;
-    ProductName: pointer;
-    ProductRevision: pointer;
-    Reserved: array[0..221] of byte;
-    OemData: array[0..255] of byte
-  end;
-
-  TVbeMode = record
-    Attributes: word; {depricated; bit 7 indicates linear fram buffer support}
-    WindowA: byte; {depricated}
-    WindowB: byte; {depricated}
-    Granularity: word; {depricated}
-    WindowSize: word;
-    SegmentA: word;
-    SegmentB: word;
-    WinFuncPtr: pointer; {depricated}
-    Pitch: word; {bytes per horizontal line}
-    Width: word; {width in pixels}
-    Height: word; {height in pixels}
-    Wchar: char; {unused}
-    Ychar: char; {unused}
-    Planes: byte;
-    Bpp: byte; {bits per pixel}
-    Banks: byte; {deprecated; total number of banks in this mode}
-    MemoryModel: byte;
-    BankSize: byte; {deprecated; size of bank, usually 64k, could be 16k}
-    ImagePages: byte;
-    Reserved0: byte;
-    RedMask: byte;
-    RedPosition: byte;
-    GreenMask: byte;
-    GreenPosition: byte;
-    BlueMask: byte;
-    BluePosition: byte;
-    ReservedMask: byte;
-    ReservedPosition: byte;
-    DirectColorAttributes: byte;
-    FrameBuffer: pointer; {physical address of the frame buffer}
-    OffScreenMemOffset: longint;
-    OffScreenMemSize: word;
-    Reserved1: array[0..205] of byte;
-  end;
-
-procedure TSvga8Mode.Init;
+procedure TSVga8Mode.Init;
 begin
   inherited Init;
-  FGranularity := 0;
-  FAttributes := 0;
+  FWinSize := 0;
+  FAttributes := [];
   FWinFuncPtr := nil;
+  FGranularity := 0;
 end;
 
 procedure TSVga8Mode.Assign(var ASource: TObject);
@@ -135,83 +85,73 @@ begin
   inherited Assign(ASource);
   mode := PSVga8Mode(@ASource);
   FAttributes := mode^.FAttributes;
-  FGranularity := mode^.FGranularity;
+  FWinSize := mode^.FWinSize;
   FWinFuncPtr := mode^.FWinFuncPtr;
+  FGranularity := 0;
 end;
 
 procedure TSVga8Driver.Init;
 var
   newMode: PSVga8Mode;
   oldMode: byte;
-  info: TVbeInfo;
-  segm, offs, modeCount: word;
+  vbeInfo: TVbeInfo;
   supported, status: byte;
   modePtr: PWord;
-  modeInfo: TVbeMode;
   vbeModeIndex: word;
   colors: string;
-  index: integer;
   vbeMode: TVbeMode;
+  recordPtr: pointer;
   desc: string;
 begin
   inherited Init;
   FCurrentBank := -1;
-  segm := Seg(info);
-  offs := Ofs(info);
-  FGranularity := 0;
+  recordPtr := @vbeInfo;
+  FWinSize := 0;
   FBankShift := 0;
   asm
-    push ES
-    mov  AX, 4F00h
-    mov  ES, [segm]
-    mov  DI, [offs]
-    int  10h
-    mov  [supported], AL
-    mov  [status], AH
-    pop  ES
+    mov ax, 4F00h
+    les di, recordPtr
+    int 10h
+    mov [supported], al
+    mov [status], ah
   end;
   if (supported <> $4F) or (status <> 0) then begin
     Raise(ecGraphicsNotSupported);
     exit;
   end;
 
-  modePtr := info.VideoModes;
-  modeCount := 0;
-  while modePtr^ <> $FFFF do begin
-    Inc(modeCount);
-    Inc(modePtr);
-  end;
-
-  Modes := New(PGraphicsModeList, CreateCapacity(modeCount));
-
-  modePtr := info.VideoModes;
-  index := 0;
+  modePtr := vbeInfo.VideoModePtr;
   while modePtr^ <> $FFFF do begin
     vbeModeIndex := modePtr^;
-    segm := Seg(modeInfo);
-    offs := Ofs(modeInfo);
-    asm
-      mov  AX, $4F01
-      mov  ES, [segm]
-      mov  DI, [offs]
-      mov  CX, [vbeModeIndex]
-      int  10h
-    end;
-    if modeInfo.Bpp <> 8 then begin
+    if vbeModeIndex < $100 then begin
       Inc(modePtr);
-      Inc(index);
+      continue;
+    end;
+    recordPtr := @vbeMode;
+    asm
+      mov ax, $4F01
+      les di, recordPtr
+      mov cx, [vbeModeIndex]
+      int 10h
+    end;
+    if (vbeMode.v1.Bpp <> 8)
+      or (not vbeMode.v1.MemoryModel = mmPackedPixel)
+      or (not (vbeSupportedInHardware in vbeMode.v1.ModeAttributes))
+      or (vbeIsNotVgaCompatible in vbeMode.v1.ModeAttributes)
+      or (not (vbeIsColor in vbeMode.v1.ModeAttributes))
+      or (not (vbeIsGraphics in vbeMode.v1.ModeAttributes)) then begin
+      Inc(modePtr);
       continue;
     end;
     newMode := New(PSVga8Mode, Create);
-    vbeMode := modeInfo;
     with newMode^ do begin
-      Id := NewLargeString('SVga'
-        + IntToStr(vbeMode.Width)
+      Id := TString.New('SVga'
+        + IntToStr(vbeMode.v1.XResolution)
         + 'x'
-        + IntToStr(vbeMode.Height)
+        + IntToStr(vbeMode.v1.YResolution)
         + 'x'
-        + IntToStr(vbeMode.Bpp));
-      case vbeMode.Bpp of
+        + IntToStr(vbeMode.v1.Bpp));
+      case vbeMode.v1.Bpp of
           4: colors := '16';
           8: colors := '256';
           15: colors := '32k';
@@ -219,29 +159,29 @@ begin
           32: colors := '16m';
       end;
       desc := 'SVGA '
-        + IntToStr(vbeMode.Width)
+        + IntToStr(vbeMode.v1.XResolution)
         + 'x'
-        + IntToStr(vbeMode.Height)
+        + IntToStr(vbeMode.v1.YResolution)
         + ' '
         + colors
         + ' Color';
-      Description := NewLargeString(desc);
-      AdditionalData := vbeModeIndex;
-      Width := vbeMode.Width;
-      Height := vbeMode.Height;
-      MaxX := vbeMode.Width - 1;
-      MaxY := vbeMode.Height - 1;
-      Bpp := vbeMode.Bpp;
-      Pitch := vbeMode.Pitch;
-      FAttributes := vbeMode.Attributes;
-      FGranularity := vbeMode.Granularity;
-      FWinFuncPtr := vbeMode.WinFuncPtr;
-      HelpText := NewLargeString('Requires a VESA compliant Super VGA card.');
-      FrameBuffer := Ptr($A000,$0000);
+      Description := TString.New(desc);
+      ModeIndex := vbeModeIndex;
+      Width := vbeMode.v1.XResolution;
+      Height := vbeMode.v1.YResolution;
+      MaxX := vbeMode.v1.XResolution - 1;
+      MaxY := vbeMode.v1.YResolution - 1;
+      Bpp := vbeMode.v1.Bpp;
+      BytesPerScanLine := vbeMode.v1.BytesPerScanLine;
+      FAttributes := vbeMode.v1.ModeAttributes;
+      FWinSize := vbeMode.v1.WinSize;
+      FWinFuncPtr := vbeMode.v1.WinFuncPtr;
+      HelpText := TString.New('Requires a VESA compliant Super VGA card.');
+      FrameBuffer := Ptr(vbeMode.v1.WinSegmentA, 0);
+      FGranularity := vbeMode.v1.WinGranularity;
     end;
     Inc(modePtr);
-    Inc(index);
-    Modes^.Add(newMode);
+    Modes.Add(newMode);
   end;
 end;
 
@@ -250,6 +190,8 @@ var
   offset: longint;
   screen: PByte;
 begin
+  if HasException then
+    exit;
   screen := GetScreenPtr(AX, AY, offset);
   GetPixel := screen^;
 end;
@@ -261,10 +203,7 @@ var
 begin
   inherited SetMode(AMode);
   svgaMode := PSVga8Mode(pointer(AMode));
-  selectedMode := AMode^.AdditionalData;
-  if (bit7 in TBits(Lo(sVgaMode^.FAttributes))) then begin
-    selectedMode := selectedMode or $4000;
-  end;
+  selectedMode := AMode^.ModeIndex;
   asm
     mov   ax, 4F02h
     mov   bx, [selectedMode]
@@ -273,15 +212,14 @@ begin
   Mouse.SetMouseResolution(AMode^.Width, AMode^.Height);
   if HasException then
     exit;
-  State^.FrameBuffer := AMode^.FrameBuffer;
+  State.FrameBuffer := AMode^.FrameBuffer;
   SetStandardPalette;
-  FGranularity := longint(SVgaMode^.FGranularity) * 1024 - 1;
+  FWinSize := longint(SVgaMode^.FWinSize) * 1024 - 1;
   FWinFunc := SVgaMode^.FWinFuncPtr;
   FCurrentBank := -1;
   FBankShift := 0;
-  while (64 shr FBankShift <> SvgaMode^.FGranularity) do begin
+  while (64 shr FBankShift <> SVgaMode^.FGranularity) do
     Inc(FBankShift);
-  end;
 end;
 
 procedure TSVga8Driver.SetBank(ABank: word);
@@ -291,13 +229,15 @@ begin
   if ABank = FCurrentBank then
     exit;
   FCurrentBank := ABank;
+  ABank := ABank shl FBankShift;
   winFunc := FWinFunc;
   asm
     mov bx, 0
     mov dx, [ABank]
     call [winFunc]
 
-    inc bx
+    mov bx, 1
+    mov dx, [ABank]
     call [winFunc]
   end;
 end;
@@ -307,20 +247,30 @@ var
   offset: longint;
   screen: PByte;
 begin
+  if HasException then
+    exit;
   screen := GetScreenPtr(AX, AY, offset);
-  screen^ := State^.ForeColor;
+  screen^ := State.ForeColor;
 end;
 
-function TSVga8Driver.GetScreenPtr(AX, AY: integer; var offset: longint): PByte;
+function TSVga8Driver.GetScreenPtr(AX, AY: integer; var AOffset: longint): PByte;
 var
   bank: integer;
   screen: PByte;
+  count: longint;
 begin
-  offset := longint(AY) * Mode^.Pitch + AX;
-  bank := offset shr 16;
-  offset := offset and FGranularity;
+  if State.FrameBuffer <> Mode^.FrameBuffer then begin
+    screen := State.FrameBuffer;
+    AOffset := AY * State.ViewPort.Width + AX;
+    Inc(screen, AOffset);
+    GetScreenPtr := screen;
+    exit;
+  end;
+  AOffset := longint(AY) * Mode^.BytesPerScanLine + AX;
   screen := Mode^.FrameBuffer;
-  Inc(screen, offset);
+  bank := AOffset shr 16;
+  AOffset := AOffset and FWinSize;
+  Inc(screen, AOffset);
   SetBank(bank);
   GetScreenPtr := screen;
 end;
@@ -330,53 +280,64 @@ var
   drawRect: TRect;
   charIndex, yIndex, xIndex: integer;
   ch: char;
-  sy, sx, minX, maxX: integer;
+  sx, sy, minX, maxX: integer;
+  width: integer;
   linePtr: PByte;
-  width, height: integer;
+  height: integer;
   screen: PByte;
-  fore, back: byte;
+  fore: byte;
   offset: longint;
-  granularity: word;
+  currentLine: byte;
 begin
-  Mode^.Bounds.Intersection(State^.ViewPort, drawRect);
+  if HasException then
+    exit;
+  Mode^.Bounds.GetIntersection(State.ViewPort, drawRect);
   if AX > drawRect.Right then
     exit;
   if AY > drawRect.Bottom then
     exit;
-  height := State^.Font^.Height;
+  height := State.Font^.Height;
   if AY + height < drawRect.Y then
     exit;
-  granularity := FGranularity;
-  width := 0;
+  sx := AX;
   for charIndex := 0 to ALength - 1 do begin
     ch := AText[charIndex];
-    sx := AX + width;
-    sy := AY;
-    fore := State^.ForeColor;
-    back := State^.BackColor;
-    linePtr := PMonospaceFont(State^.Font)^.FontData;
-    Inc(linePtr, Ord(ch) * height);
-    maxX := MinL(State^.Font^.TextWidth(ch) - 1, drawRect.Right - sx);
-    minX := MaxL(0, drawRect.X - sx);
-    if minX > maxX then
+    width := State.Font^.TextWidth(ch);
+    if sx > drawRect.Right then
+      exit;
+    if sx + width < drawRect.X then begin
+      Inc(sx, width);
       continue;
-    Inc(linePtr, minX);
+    end;
+    sy := AY;
+    fore := State.ForeColor;
+    linePtr := State.Font^.FontData;
+    Inc(linePtr, Ord(ch) * height);
+    minX := MaxLong(0, drawRect.X - sx);
+    maxX := MinLong(State.Font^.TextWidth(ch) - 1, drawRect.Right - sx);
+    sy := AY;
     for yIndex := 0 to height - 1 do begin
-      sy := AY + yIndex;
+      currentLine := linePtr^;
+      if sy < drawRect.Y then begin
+        Inc(linePtr);
+        Inc(sy);
+        continue;
+      end;
       if sy > drawRect.Bottom then
         break;
       screen := GetScreenPtr(sx + minX, sy, offset);
       for xIndex := minX to maxX do begin
-        if (linePtr^ and (128 shr xIndex)) > 0 then
+        if (currentLine and (128 shr xIndex)) > 0 then
           screen^ := fore;
         Inc(screen);
         Inc(offset);
-        if offset > granularity then
-          screen := GetScreenPtr(xIndex, sy, offset);
+        if offset > FWinSize then
+          screen := GetScreenPtr(sx + xIndex + 1, sy, offset);
       end;
       Inc(linePtr);
+      Inc(sy);
     end;
-    Inc(width, State^.Font^.TextWidth(ch));
+    Inc(sx, width);
   end;
 end;
 
@@ -392,18 +353,19 @@ var
   color: byte;
   drawRect: TRect;
 begin
-  Mode^.Bounds.Intersection(State^.ViewPort, drawRect);
+  if HasException then
+    exit;
+  Mode^.Bounds.GetIntersection(State.ViewPort, drawRect);
   if (AY < drawRect.Y) or (AY > drawRect.Bottom) then
     exit;
-  AX := MaxL(MinL(AX, drawRect.Right), drawRect.X);
-  AWidth := MinL(drawRect.Right - AX + 1, AWidth);
+  CheckRange(AX, drawRect.X, drawRect.Right);
+  AWidth := MinLong(drawRect.Width, AWidth);
   if AWidth <= 0 then
     exit;
-
   screen := GetScreenPtr(AX, AY, offset);
   color := byte(ForeColor);
-  if AWidth + offset > FGranularity then begin
-    partialWidth := FGranularity - offset + 1;
+  if AWidth + offset > FWinSize then begin
+    partialWidth := FWinSize - offset + 1;
     FillChar(screen^, partialWidth, color);
     SetBank(FCurrentBank + 1);
     screen := Mode^.FrameBuffer;
@@ -420,14 +382,16 @@ var
   screen: PByte;
   drawRect: TRect;
 begin
-  Mode^.Bounds.Intersection(State^.ViewPort, drawRect);
+  if HasException then
+    exit;
+  Mode^.Bounds.GetIntersection(State.ViewPort, drawRect);
   if (AX < drawRect.X) or (AX > drawRect.Right) then
     exit;
-  AY := MaxL(MinL(AY, drawRect.Right), drawRect.Y);
-  AHeight := MinL(drawRect.Bottom - AY + 1, AHeight);
+  CheckRange(AY, drawRect.Y, drawRect.Bottom);
+  AHeight := MinLong(drawRect.Height, AHeight);
   if AHeight <= 0 then
     exit;
-  for index := MaxL(AY, 0) to MinL(AY + AHeight - 1, Mode^.MaxY) do begin
+  for index := MaxLong(AY, 0) to MinLong(AY + AHeight - 1, Mode^.MaxY) do begin
     screen := GetScreenPtr(AX, index, offset);
     screen^ := ForeColor;
   end;
@@ -435,16 +399,16 @@ end;
 
 procedure TSVga8Driver.DrawImage(AX, AY, AWidth, AHeight: integer; AImage: PByte);
 var
-  imageRect, viewRect, drawRect: TRect;
+  imageRect, drawRect: TRect;
   yIndex: integer;
   screen, image: PByte;
   offset: longint;
   sy: longint;
   lineWidth, partialWidth: integer;
 begin
-  imageRect.CreateDims(AX, AY, AWidth, AHeight);
-  Mode^.Bounds.Intersection(State^.ViewPort, viewRect);
-  viewRect.Intersection(imageRect, drawRect);
+  if HasException then
+    exit;
+  GetImageDrawRects(AX, AY, AWidth, AHeight, imageRect, drawRect);
   if drawRect.IsEmpty then
     exit;
   sy := drawRect.Y;
@@ -452,9 +416,9 @@ begin
   for yIndex := 0 to drawRect.Height - 1 do begin
     screen := GetScreenPtr(drawRect.X, sy, offset);
     image := AImage;
-    Inc(image, yIndex * drawRect.Width);
-    if offset + lineWidth > FGranularity then begin
-      partialWidth := FGranularity - offset + 1;
+    Inc(image, (yIndex + imageRect.Y) * imageRect.Width + imageRect.X);
+    if offset + lineWidth > FWinSize then begin
+      partialWidth := FWinSize - offset + 1;
       Move(image^, screen^, partialWidth);
       Inc(image, partialWidth);
       SetBank(FCurrentBank + 1);
@@ -472,122 +436,130 @@ end;
 
 procedure TSVga8Driver.DrawImageT(AX, AY, AWidth, AHeight: integer; AImage: PByte);
 var
-  imageRect, viewRect, drawRect: TRect;
-  xIndex, yIndex, imageX, imageY: integer;
-  offset: longint;
+  imageRect, drawRect: TRect;
+  xIndex, yIndex: integer;
+  sy, offset: longint;
   screen, image: PByte;
 begin
-  imageRect.CreateDims(AX, AY, AWidth, AHeight);
-  Mode^.Bounds.Intersection(State^.ViewPort, viewRect);
-  viewRect.Intersection(imageRect, drawRect);
+  if HasException then
+    exit;
+  GetImageDrawRects(AX, AY, AWidth, AHeight, imageRect, drawRect);
   if drawRect.IsEmpty then
     exit;
-  imageX := drawRect.X - AX;
-  imageY := drawRect.Y - AY;
+  sy := drawRect.Y;
   for yIndex := 0 to drawRect.Height - 1 do begin
-    screen := GetScreenPtr(drawRect.X, yIndex + drawRect.Y, offset);
+    screen := GetScreenPtr(drawRect.X, sy, offset);
     image := AImage;
-    Inc(image, (imageY + yIndex) * AWidth + imageX);
+    Inc(image, (yIndex + imageRect.Y) * imageRect.Width + imageRect.X);
     for xIndex := 0 to drawRect.Width - 1 do begin
       if image^ <> TransparentColor then
         screen^ := image^;
       Inc(image);
       Inc(screen);
       Inc(offset);
-      if offset > FGranularity then
-        screen := GetScreenPtr(drawRect.X + xIndex, yIndex + imageY, offset);
+      if offset > FWinSize then
+        screen := GetScreenPtr(drawRect.X + xIndex + 1, sy, offset);
     end;
+    Inc(sy);
   end;
 end;
 
 procedure TSVga8Driver.DrawImageStream(AX, AY, AWidth, AHeight: integer; AStream: PStream);
 var
-  imageRect, viewRect, drawRect: TRect;
-  imageX, imageY, yIndex: integer;
+  imageRect, drawRect: TRect;
+  yIndex: integer;
   screen: PByte;
   offset: longint;
+  sy: longint;
   lineWidth, partialWidth: integer;
-  streamWidth: integer;
+  streamStart: longint;
 begin
-  imageRect.CreateDims(AX, AY, AWidth, AHeight);
-  Mode^.Bounds.Intersection(State^.ViewPort, viewRect);
-  viewRect.Intersection(imageRect, drawRect);
+  if AStream^.HasException or HasException then
+    exit;
+  GetImageDrawRects(AX, AY, AWidth, AHeight, imageRect, drawRect);
   if drawRect.IsEmpty then
     exit;
+  sy := drawRect.Y;
   lineWidth := drawRect.Width;
-  imageX := drawRect.X - AX;
-  imageY := drawRect.Y - AY;
-  AStream^.Seek(imageY * AWidth + imageX, soFromPosition);
-  streamWidth := AWidth - drawRect.Width;
+  streamStart := AStream^.Position;
   for yIndex := 0 to drawRect.Height - 1 do begin
-    screen := GetScreenPtr(drawRect.X, yIndex + drawRect.Y, offset);
-    if offset + lineWidth > FGranularity then begin
-      partialWidth := FGranularity - offset + 1;
+    screen := GetScreenPtr(drawRect.X, sy, offset);
+    AStream^.Seek((yIndex + imageRect.Y) * imageRect.Width + imageRect.X, soFromBeginning);
+    if offset + lineWidth > FWinSize then begin
+      partialWidth := FWinSize - offset + 1;
       AStream^.Read(screen, partialWidth);
       SetBank(FCurrentBank + 1);
       screen := Mode^.FrameBuffer;
       AStream^.Read(screen, lineWidth - partialWidth);
     end
-    else begin
+    else
       AStream^.Read(screen, lineWidth);
-    end;
-    AStream^.Seek(streamWidth, soFromPosition);
-    if AStream^.HasException then begin
-      Raise(AStream^.Exception^.Code);
+    Inc(sy);
+    if AStream^.HasException then
       break;
-    end;
   end;
+  if AStream^.HasException then
+    Raise(AStream^.Exception^.Code);
 end;
 
 procedure TSVga8Driver.DrawImageStreamT(AX, AY, AWidth, AHeight: integer; AStream: PStream);
 var
-  imageRect, viewRect, drawRect: TRect;
-  imageX, imageY, xIndex, yIndex: integer;
+  imageRect, drawRect: TRect;
+  xIndex, yIndex: integer;
   screen: PByte;
   offset: longint;
-  streamWidth: integer;
-  pixel: byte;
+  imageLine, linePtr: PByte;
+  streamStart: longint;
+  sy: integer;
+  lineWidth: integer;
 begin
-  imageRect.CreateDims(AX, AY, AWidth, AHeight);
-  Mode^.Bounds.Intersection(State^.ViewPort, viewRect);
-  viewRect.Intersection(imageRect, drawRect);
+  if AStream^.HasException or HasException then
+    exit;
+  GetImageDrawRects(AX, AY, AWidth, AHeight, imageRect, drawRect);
   if drawRect.IsEmpty then
     exit;
-  imageX := drawRect.X - AX;
-  imageY := drawRect.Y - AY;
-  AStream^.Seek(imageY * AWidth + imageX, soFromPosition);
-  streamWidth := AWidth - drawRect.Width;
+  lineWidth := drawRect.Width;
+  GetMem(imageLine, lineWidth);
+  if not Assigned(imageLine) then begin
+    Raise(ecNotEnoughMemory);
+    exit;
+  end;
+  streamStart := AStream^.Position;
+  sy := drawRect.Y;
+  AStream^.Seek((yIndex + imageRect.Y) * AWidth + imageRect.X, soFromPosition);
   for yIndex := 0 to drawRect.Height - 1 do begin
-    screen := GetScreenPtr(drawRect.X, yIndex + drawRect.Y, offset);
-    for xIndex := 0 to drawRect.Width - 1 do begin
-      pixel := AStream^.ReadByte;
-      if pixel <> TransparentColor then
-        screen^ := pixel;
+    screen := GetScreenPtr(drawRect.X, drawRect.Y + yIndex, offset);
+    AStream^.Seek(yIndex * imageRect.Width + imageRect.X, soFromBeginning);
+    AStream^.Read(imageLine, lineWidth);
+    linePtr := imageLine;
+    for xIndex := 0 to lineWidth - 1 do begin
+      if linePtr^ <> TransparentColor then
+        screen^ := linePtr^;
       Inc(screen);
       Inc(offset);
-      if offset > FGranularity then
-        screen := GetScreenPtr(drawRect.X + xIndex, yIndex + imageY, offset);
+      Inc(linePtr);
+      if offset > FWinSize then
+        screen := GetScreenPtr(drawRect.X + xIndex + 1, sy, offset);
     end;
-    AStream^.Seek(streamWidth, soFromPosition);
-    if AStream^.HasException then begin
-      Raise(AStream^.Exception^.Code);
-      break;
-    end;
+    Inc(sy);
   end;
+  if AStream^.HasException then
+    Raise(AStream^.Exception^.Code);
+  FreeMem(imageLine, lineWidth);
 end;
 
 procedure TSVga8Driver.GetImage(AX, AY, AWidth, AHeight: longint; ABuffer: PByte);
 var
-  imageRect, viewRect, drawRect: TRect;
+  imageRect, drawRect: TRect;
   yIndex: integer;
   screen, image: PByte;
   offset: longint;
   sy: longint;
   lineWidth, partialWidth: integer;
 begin
-  imageRect.CreateDims(AX, AY, AWidth, AHeight);
-  Mode^.Bounds.Intersection(State^.ViewPort, viewRect);
-  viewRect.Intersection(imageRect, drawRect);
+  if HasException then
+    exit;
+  GetImageDrawRects(AX, AY, AWidth, AHeight, imageRect, drawRect);
   if drawRect.IsEmpty then
     exit;
   sy := drawRect.Y;
@@ -595,14 +567,14 @@ begin
   for yIndex := 0 to drawRect.Height - 1 do begin
     screen := GetScreenPtr(drawRect.X, sy, offset);
     image := ABuffer;
-    Inc(image, yIndex * drawRect.Width);
-    if offset + lineWidth > FGranularity then begin
-      partialWidth := FGranularity - offset + 1;
+    Inc(image, (yIndex + imageRect.Y) * imageRect.Width + imageRect.X);
+    if offset + lineWidth > FWinSize then begin
+      partialWidth := FWinSize - offset + 1;
       Move(screen^, image^, partialWidth);
       Inc(image, partialWidth);
       SetBank(FCurrentBank + 1);
       screen := Mode^.FrameBuffer;
-      Move(image^, screen^, lineWidth - partialWidth);
+      Move(screen^, image^, lineWidth - partialWidth);
       Inc(image, lineWidth - partialWidth);
     end
     else begin
@@ -615,41 +587,43 @@ end;
 
 procedure TSVga8Driver.GetImageStream(AX, AY, AWidth, AHeight: longint; AStream: PStream);
 var
-  imageRect, viewRect, drawRect: TRect;
+  imageRect, drawRect: TRect;
   yIndex: integer;
   screen: PByte;
   offset: longint;
+  sy: longint;
   lineWidth, partialWidth: integer;
+  streamStart: longint;
 begin
-  imageRect.CreateDims(AX, AY, AWidth, AHeight);
-  Mode^.Bounds.Intersection(State^.ViewPort, viewRect);
-  viewRect.Intersection(imageRect, drawRect);
+  if AStream^.HasException or HasException then
+    exit;
+  GetImageDrawRects(AX, AY, AWidth, AHeight, imageRect, drawRect);
   if drawRect.IsEmpty then
     exit;
+  sy := drawRect.Y;
   lineWidth := drawRect.Width;
+  streamStart := AStream^.Position;
   for yIndex := 0 to drawRect.Height - 1 do begin
-    screen := GetScreenPtr(drawRect.X, yIndex + drawRect.Y, offset);
-    if offset + lineWidth > FGranularity then begin
-      partialWidth := FGranularity - offset + 1;
+    screen := GetScreenPtr(drawRect.X, sy, offset);
+    AStream^.Seek((yIndex + imageRect.Y) * imageRect.Width + imageRect.X, soFromBeginning);
+    if offset + lineWidth > FWinSize then begin
+      partialWidth := FWinSize - offset + 1;
       AStream^.Write(screen, partialWidth);
       SetBank(FCurrentBank + 1);
       screen := Mode^.FrameBuffer;
       AStream^.Write(screen, lineWidth - partialWidth);
     end
-    else begin
+    else
       AStream^.Write(screen, lineWidth);
-    end;
-    if AStream^.HasException then begin
-      Raise(AStream^.Exception^.Code);
-      break;
-    end;
+    Inc(sy);
   end;
+  if AStream^.HasException then
+    Raise(AStream^.Exception^.Code);
 end;
 
 procedure TSVga8Driver.WaitForVSync;
 begin
-  while (Port[$3DA] and $08) = $08 do;
-  while (Port[$3DA] and $08) <> $08 do;
+  while Port[$3DA] and $08 = $08 do;
 end;
 
 destructor TSVga8Driver.Free;

@@ -1,7 +1,7 @@
 {$IFDEF debug}
-  {$A-,B-,D+,E+,F+,G-,I+,L+,N+,M 16384 0 655360,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,E+,F+,G-,I+,L-,N+,M 16384 0 655360,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit GraphApp;
 
@@ -9,10 +9,10 @@ interface
 
 uses
   Objects,
-  Collects,
+  Lists,
   Except,
   Apps,
-  Graph8,
+  GrDrv8,
   GraphDrv,
   Vga8Drv,
   GraphIni;
@@ -33,7 +33,7 @@ type
   end;
 
 var
-  Graph256: PGraphics256Driver;
+  Graph8: PGraphics8Driver;
 
 implementation
 
@@ -49,15 +49,17 @@ var
   mode: PGraphicsMode;
 begin
   InitGraphicsDriver(ADriverId);
-  Graph256 := PGraphics256Driver(Graph);
-  mode := Graph^.Modes^.GetItemById(FModeId);
-  if mode = nil then begin
-    WriteLn('Graphics mode not supported.');
+  Graph8 := PGraphics8Driver(Graph);
+  mode := Graph^.Modes.GetItemById(FModeId);
+  if not Assigned(mode) then begin
+    WriteLn(ErrorMessage(ecGraphicsModeNotFound));
     Close;
     exit;
   end;
+  WriteLn('Graphics initialized.');
   Graph^.SetMode(mode);
   if Graph^.HasException then begin
+    FreeAndNil(Graph);
     WriteLn(ErrorMessage(Graph^.Exception^.Code));
     Close;
   end;

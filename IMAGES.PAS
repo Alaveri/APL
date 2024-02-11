@@ -1,7 +1,7 @@
 {$IFDEF debug}
-  {$A-,B-,D+,E+,F+,G-,I+,L+,N+,M 16384 0 655360,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,E+,F+,G-,I+,L-,N+,M 16384 0 655360,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit Images;
 
@@ -10,7 +10,7 @@ interface
 uses
   Objects,
   Except,
-  Collects,
+  Lists,
   Common,
   Consts,
   Drawing,
@@ -25,6 +25,7 @@ const
 
 type
   PImage = ^TImage;
+  PImageList = ^TImageList;
 
   TImageCompression = (
     icNone,
@@ -72,6 +73,15 @@ type
     destructor Free; virtual;
   end;
 
+  TImageList = object(TObjectList)
+  private
+  public
+    function GetItem(AIndex: integer): PImage;
+    function IndexOf(AItem: PImage): integer;
+    function Add(AItem: PImage): integer;
+    procedure Insert(AIndex: integer; AItem: PImage);
+  end;
+
 implementation
 
 constructor TImage.Create;
@@ -92,7 +102,7 @@ begin
   if ABpp > 1 then
     bytes := ABpp div 8;
   Buffer := New(PMemoryStream, Create(AWidth * AHeight * bytes));
-  if (Buffer = nil) or Buffer^.HasException then begin
+  if not Assigned(Buffer) or Buffer^.HasException then begin
     Raise(ecNotEnoughMemory);
     exit;
   end;
@@ -103,7 +113,7 @@ end;
 
 destructor TImage.Free;
 begin
-  if Buffer <> nil then
+  if Assigned(Buffer) then
     Dispose(Buffer, Free);
   inherited Free;
 end;
@@ -131,15 +141,15 @@ procedure TImage.GetImage(AX, AY, AWidth, AHeight: longint);
 var
   bytes: byte;
 begin
-  if Buffer <> nil then begin
+  if Assigned(Buffer) then begin
     if (AWidth <> FHeader.Width) or (AHeight <> FHeader.Height) then
       Dispose(Buffer, Free);
     Buffer := nil;
   end;
-  if Buffer = nil then begin
+  if not Assigned(Buffer) then begin
     bytes := FHeader.Bpp div 8;
     Buffer := New(PMemoryStream, Create(AWidth * AHeight * bytes));
-    if (Buffer = nil) or Buffer^.HasException then begin
+    if not Assigned(Buffer) or Buffer^.HasException then begin
       Raise(ecNotEnoughMemory);
       exit;
     end;
@@ -210,10 +220,10 @@ begin
   FHeader := header;
   if FHeader.Bpp > 1 then
     bytes := FHeader.Bpp div 8;
-  if Buffer <> nil then
+  if Assigned(Buffer) then
     Dispose(Buffer, Free);
   Buffer := New(PMemoryStream, Create(FHeader.Width * FHeader.Height * bytes));
-  if (Buffer = nil) or Buffer^.HasException then begin
+  if not Assigned(Buffer) or Buffer^.HasException then begin
     Raise(ecNotEnoughMemory);
     exit;
   end;
@@ -227,7 +237,7 @@ begin
     end;
     icLzw: begin
       lzw.Create;
-      lzw.DecompressStream(ASource, Buffer, Buffer^.Size);
+      lzw.DecompressStream(ASource, Buffer);
       Buffer^.Seek(0, soFromBeginning);
       if Lzw.HasException then
         Raise(Lzw.Exception^.Code);
@@ -327,6 +337,26 @@ end;
 function TImage.Compression: TImageCompression;
 begin
   Compression := FHeader.Compression;
+end;
+
+function TImageList.GetItem(AIndex: integer): PImage;
+begin
+  GetItem := PImage(inherited GetItem(AIndex));
+end;
+
+function TImageList.IndexOf(AItem: PImage): integer;
+begin
+  IndexOf := inherited IndexOf(AItem);
+end;
+
+function TImageList.Add(AItem: PImage): integer;
+begin
+  Add := inherited Add(AItem);
+end;
+
+procedure TImageList.Insert(AIndex: integer; AItem: PImage);
+begin
+  inherited Insert(AIndex, AItem);
 end;
 
 end.

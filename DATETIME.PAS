@@ -1,7 +1,7 @@
 {$IFDEF debug}
-  {$A-,B-,D+,E+,F+,G-,I+,L+,N+,M 16384 0 655360,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,E+,F+,G-,I+,L-,N+,M 16384 0 655360,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit DateTime;
 
@@ -71,7 +71,6 @@ type
     function Minute: byte;
     function Second: byte;
     function Hundredth: byte;
-    function GetTypeName: string; virtual;
   end;
 
   TTimeSpan = object(TDateTime)
@@ -88,7 +87,6 @@ type
     function TotalMinutes: double;
     function TotalHours: double;
     function TotalDays: double;
-    function GetTypeName: string; virtual;
     function ToString: string; virtual;
     procedure Add(ATimeSpan: TTimeSpan);
     procedure AddHundredths(AHundredths: double);
@@ -113,7 +111,6 @@ type
     procedure Start;
     procedure Stop;
     procedure Reset;
-    function GetTypeName: string; virtual;
   end;
 
 implementation
@@ -181,11 +178,6 @@ end;
 destructor TDateTime.Free;
 begin
   inherited Free;
-end;
-
-function TDateTime.GetTypeName: string;
-begin
-  GetTypeName := 'TDateTime';
 end;
 
 function TDateTime.IsLeapYear(AYear: integer): boolean;
@@ -608,11 +600,6 @@ begin
   ATimeSpan.Ticks := Abs(Ticks);
 end;
 
-function TTimeSpan.GetTypeName: string;
-begin
-  GetTypeName := 'TTimeSpan';
-end;
-
 function TTimeSpan.ToString: string;
 begin
   ToString := ToStringFormat('HH:mm:ss:hh');
@@ -651,11 +638,6 @@ procedure TStopWatch.Reset;
 begin
   StartTime.CreateTicks(0);
   EndTime.CreateTicks(0);
-end;
-
-function TStopWatch.GetTypeName: string;
-begin
-  GetTypeName := 'TStopWatch';
 end;
 
 begin

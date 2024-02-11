@@ -1,7 +1,7 @@
 {$IFDEF debug}
-  {$A-,B-,D+,E+,F+,G-,I+,L+,N+,M 16384 0 655360,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,E+,F+,G-,I+,L-,N+,M 16384 0 655360,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit UVga8Drv;
 
@@ -10,7 +10,7 @@ interface
 uses
   Objects,
   GraphDrv,
-  Graph8,
+  GrDrv8,
   Common,
   StrUtils,
   Streams,
@@ -19,7 +19,7 @@ uses
 
 type
   PVgaUnchainedDriver = ^TVgaUnchainedDriver;
-  TVgaUnchainedDriver = object(TGraphics256Driver)
+  TVgaUnchainedDriver = object(TGraphics8Driver)
   private
     procedure DrawTextAny(x, y: integer; text: string; largeText: PChar); virtual;
   public
@@ -149,7 +149,7 @@ begin
   inherited Init;
   newMode := New(PGraphicsMode, Create);
   with newMode^ do begin
-    Id := NewLargeString('VgaUnchained'
+    Id := TString.New('VgaUnchained'
       + IntToStr(320)
       + 'x'
       + IntToStr(200)
@@ -160,17 +160,17 @@ begin
       + 'x'
       + IntToStr(200)
       + ' 256 Color';
-    Description := NewLargeString(desc);
+    Description := TString.New(desc);
     Width := 320;
     Height := 200;
     MaxX := 319;
     MaxY := 199;
     Bpp := 8;
-    Pitch := 320;
-    HelpText := NewLargeString('Requires a VGA card.');
+    BytesPerScanLine := 320;
+    HelpText := TString.New('Requires a VGA card.');
     FrameBuffer := Ptr($A000,$0000);
   end;
-  Modes^.Add(newMode);
+  Modes.Add(newMode);
 end;
 
 destructor TVgaUnchainedDriver.Free;

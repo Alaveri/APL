@@ -1,7 +1,7 @@
 {$IFDEF debug}
-  {$A-,B-,D+,E+,F+,G-,I+,L+,N+,M 16384 0 655360,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,E+,F+,G-,I+,L-,N+,M 16384 0 655360,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit Compress;
 
@@ -154,7 +154,7 @@ begin
     FWriteBitCounter := 0;
   end;
   FlushWriteBuffer;
-  if (OnProgress <> nil) and (ReadTotal mod ProgressIncrement = 0) then
+  if Assigned(OnProgress) and (ReadTotal mod ProgressIncrement = 0) then
     TCompressProgressProc(OnProgress)(@self, Source^.Size, ReadTotal);
 end;
 
@@ -218,7 +218,7 @@ end;
 procedure TCompressor.UpdateProgress(const AMax, ACurrent: longint);
 begin
   if (ACurrent >= AMax) or (FProgressCounter >= ProgressIncrement) then begin
-    if OnProgress <> nil then
+    if Assigned(OnProgress) then
       TCompressProgressProc(OnProgress)(@self, AMax, ACurrent);
     FProgressCounter := 0;
     exit;
@@ -252,11 +252,11 @@ end;
 
 destructor TCompressor.Free;
 begin
-  if FReadBuffer <> nil then begin
+  if Assigned(FReadBuffer) then begin
     FreeMem(FReadBuffer, FReadBufferSize);
     FReadBuffer := nil;
   end;
-  if FWriteBuffer <> nil then begin
+  if Assigned(FWriteBuffer) then begin
     FreeMem(FWriteBuffer, FWriteBufferSize);
     FWriteBuffer := nil;
   end;
