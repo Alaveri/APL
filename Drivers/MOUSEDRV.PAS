@@ -1,7 +1,7 @@
 {$IFDEF debug}
-  {$A-,B-,D+,E+,F+,G-,I+,L+,N+,M 16384 0 655360,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,E+,F+,G-,I+,L-,N+,M 16384 0 655360,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit MouseDrv;
 
@@ -9,7 +9,7 @@ interface
 
 uses
   Objects,
-  Collects;
+  Lists;
 
 const
   SetCursorPositionCode = $04;
@@ -33,6 +33,7 @@ type
     ButtonState: TButtonStates;
     Visible: boolean;
     procedure Init; virtual;
+    procedure Clear;
     function Moved(AState: TMouseState): boolean; virtual;
     function Equals(AState: TMouseState): boolean;
     procedure Assign(var ASource: TObject); virtual;
@@ -42,11 +43,10 @@ type
   TMouseDriver = object(TObject)
   private
   public
-    State: PMouseState;
-    StateStack: PStack;
+    State: TMouseState;
+    StateStack: TStack;
     UseSystemCursor: boolean;
     XDiv, YDiv: integer;
-    function GetTypeName: string; virtual;
     procedure Init; virtual;
     procedure ShowMouse; virtual;
     procedure HideMouse; virtual;
@@ -142,13 +142,18 @@ const
     }
   );
 
-procedure TMouseState.Init;
+procedure TMouseState.Clear;
 begin
-  inherited Init;
   X := 0;
   Y := 0;
   ButtonState := [];
   Visible := false;
+end;
+
+procedure TMouseState.Init;
+begin
+  inherited Init;
+  Clear;
 end;
 
 destructor TMouseState.Free;
@@ -159,6 +164,7 @@ procedure TMouseState.Assign(var ASource: TObject);
 var
   state: PMouseState;
 begin
+  inherited Assign(ASource);
   state := PMouseState(@ASource);
   X := state^.X;
   Y := state^.Y;
@@ -194,9 +200,9 @@ end;
 
 destructor TMouseDriver.Free;
 begin
-  StateStack^.DisposeObjects := true;
-  Dispose(StateStack, Free);
-  Dispose(State, Free);
+  StateStack.DisposeObjects := true;
+  StateStack.Free;
+  State.Free;
   inherited Free;
 end;
 
@@ -213,23 +219,18 @@ begin
     mov  [result], AX
   end;
   success := result = $FFFF;
-  State := New(PMouseState, Create);
+  State.Create;
   if success then
     InitMouseCursor;
-  StateStack := New(PStack, Create);
+  StateStack.Create;
   UseSystemCursor := false;
   XDiv := 0;
   YDiv := 0;
 end;
 
-function TMouseDriver.GetTypeName: string;
-begin
-  GetTypeName := 'TMouseDriver';
-end;
-
 procedure TMouseDriver.ShowMouse;
 begin;
-  State^.Visible := true;
+  State.Visible := true;
   if (not UseSystemCursor) then exit;
   asm
     mov   AX, 1
@@ -239,7 +240,7 @@ end;
 
 procedure TMouseDriver.HideMouse;
 begin;
-  State^.Visible := false;
+  State.Visible := false;
   if (not UseSystemCursor) then exit;
   asm
     mov   AX, 2
@@ -252,20 +253,20 @@ var
   newState: PMouseState;
 begin
   newState := New(PMouseState, Create);
-  newState^.Assign(State^);
-  StateStack^.Push(newState);
+  newState^.Assign(State);
+  StateStack.Push(newState);
 end;
 
 procedure TMouseDriver.PopState;
 var
   oldState: PMouseState;
 begin
-  oldState := PMouseState(StateStack^.Pop);
-  if oldState = nil then
+  oldState := PMouseState(StateStack.Pop);
+  if not Assigned(oldState) then
     exit;
-  State^.Assign(oldState^);
+  State.Assign(oldState^);
   Dispose(oldState, Free);
-  if state^.Visible then
+  if State.Visible then
     ShowMouse
   else
     HideMouse;
@@ -323,14 +324,14 @@ begin
   end;
   AState.X := x shr XDiv;
   AState.Y := y shr YDiv;
-  AState.Visible := State^.Visible;
+  AState.Visible := State.Visible;
   if (status and $01 > 0) then
     Include(AState.ButtonState, bsLeft);
   if (status and $02 > 0) then
     Include(AState.ButtonState, bsRight);
-  State^.X := AState.X;
-  State^.Y := AState.Y;
-  State^.ButtonState := AState.ButtonState;
+  State.X := AState.X;
+  State.Y := AState.Y;
+  State.ButtonState := AState.ButtonState;
 end;
 
 end.

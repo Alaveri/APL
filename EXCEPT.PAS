@@ -1,7 +1,7 @@
 {$IFDEF debug}
-  {$A-,B-,D+,E+,F+,G-,I+,L+,N+,M 16384 0 655360,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,E+,F+,G-,I+,L-,N+,M 16384 0 655360,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit Except;
 
@@ -11,6 +11,10 @@ uses
   Objects;
 
 type
+  PCustomErrorMessageProc = ^TCustomErrorMessageProc;
+
+  TCustomErrorMessageProc = function(AErrorCode: integer; var found: boolean): string;
+
   TExceptionCode = word;
 
   TExceptionSeverity =
@@ -86,6 +90,15 @@ const
   ecFontVersionNotSupported = 901;
   ecFontCompressionNotSupported = 902;
 
+  { File Errors }
+  ecPathNotFound = 1001;
+  ecFileAccessDenied = 1003;
+  ecFileInvalidHandle = 1004;
+  ecFileInvalidEnvironment = 1005;
+  ecFileInvalidFormat = 1006;
+
+  { User defined errors }
+  ecUser = 5000;
 type
   PException = ^TException;
   PExceptionObject = ^TExceptionObject;
@@ -121,12 +134,17 @@ type
 
 function ErrorMessage(AErrorCode: TExceptionCode): string;
 
+var
+  CustomErrorMessage: PCustomErrorMessageProc;
+
 implementation
 
 uses
   MemDrv;
 
 function ErrorMessage(AErrorCode: TExceptionCode): string;
+var
+  found: boolean;
 begin
   case AErrorCode of
     ecFileNotFound: ErrorMessage := 'File not found';
@@ -169,7 +187,21 @@ begin
   	ecImageVersionNotSupported: ErrorMessage := 'Image version not supported';
     ecStreamFormatNotSupported: ErrorMessage := 'Stream format not supported';
     ecFontVersionNotSupported: ErrorMessage := 'Font version not supported';
-    else ErrorMessage := 'Unknown error';
+    ecPathNotFound: ErrorMessage := 'Path not found';
+    ecFileAccessDenied: ErrorMessage := 'File access denied';
+    ecFileInvalidHandle: ErrorMessage := 'Invalid file handle';
+    ecFileInvalidEnvironment: ErrorMessage := 'Invalid environment';
+    ecFileInvalidFormat: ErrorMessage := 'Invalid file format';
+    else begin
+      if AErrorCode >= ecUser then begin
+        if Assigned(CustomErrorMessage) then begin
+          ErrorMessage := TCustomErrorMessageProc(CustomErrorMessage)(AErrorCode, found);
+          if found then
+            exit;
+        end;
+      end;
+      ErrorMessage := 'Unknown error';
+    end;
   end;
 end;
 
@@ -207,7 +239,7 @@ begin
   inherited Assign(ASource);
   source := PException(@ASource);
   Clear;
-  if source^.InnerException <> nil then begin
+  if Assigned(source^.InnerException) then begin
     InnerException := New(PException, Create(ecNone));
     InnerException^.Assign(source^.InnerException^);
   end;
@@ -226,22 +258,22 @@ var
   result: PException;
 begin
   GetBaseException := Exception;
-  if Exception = nil then
+  if not Assigned(Exception) then
     exit;
   result := Exception;
-  while Exception^.InnerException <> nil do
+  while Assigned(Exception^.InnerException) do
     result := result^.InnerException;
   GetBaseException := result;
 end;
 
 function TExceptionObject.HasException: boolean;
 begin
-  HasException := Exception <> nil;
+  HasException := Assigned(Exception);
 end;
 
 function TExceptionObject.NoException: boolean;
 begin
-  NoException := Exception = nil;
+  NoException := not Assigned(Exception);
 end;
 
 procedure TExceptionObject.Raise(ACode: TExceptionCode);
@@ -250,9 +282,9 @@ var
   prev: PException;
 begin
   newException := New(PException, Create(ACode));
-  if newException = nil then
+  if not Assigned(newException) then
     newException := OutOfMemoryException;
-  if Exception = nil then begin
+  if not Assigned(Exception) then begin
     Exception := newException;
     exit;
   end;
@@ -275,9 +307,7 @@ end;
 
 procedure TExceptionObject.ClearException;
 begin
-  if Exception <> nil then
-    Exception^.Free;
-  Exception := nil;
+  FreeAndNil(Exception);
 end;
 
 destructor TExceptionObject.Free;
@@ -297,4 +327,6 @@ begin
   Exception^.Assign(source^.Exception^);
 end;
 
+begin
+  CustomErrorMessage := nil;
 end.

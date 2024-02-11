@@ -1,7 +1,7 @@
 {$IFDEF debug}
-  {$A-,B-,D+,E+,F+,G-,I+,L+,N+,M 16384 0 655360,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,E+,F+,G-,I+,L-,N+,M 16384 0 655360,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit Common;
 
@@ -13,6 +13,7 @@ uses
 
 type
   PByte = ^byte;
+  PByteArray = ^TByteArray;
   PPointer = ^pointer;
   PInteger = ^integer;
   PWord = ^word;
@@ -21,7 +22,11 @@ type
   Int64 = comp;
   TBit = (bit0, bit1, bit2, bit3, bit4, bit5, bit6, bit7);
   TBits = set of TBit;
+  TBit16 = (sbit0, sbit1, sbit2, sbit3, sbit4, sbit5, sbit6, sbit7, sbit8,
+   sbit9, sbit10, sbit11, sbit12, sbit13, sbit14, sbit15);
+  TBits16 = set of TBit16;
   THexString = string[9];
+  TByteArray = array[byte] of byte;
 
   TLongLowHigh = record
     Low: word;
@@ -36,7 +41,6 @@ const
 
 function Trim(AString: string): string;
 function IntToStr(ANum: longint): string;
-function WordToStr(ANum: word): string;
 function IntToHex(ANum: longint): THexString;
 function IntToBool(ANum: longint): boolean;
 function DoubleToStr(ADouble: double; ADigits: byte): string;
@@ -45,10 +49,16 @@ function BoolToYN(ABool: boolean): string;
 function BoolToYesNo(ABool: boolean): string;
 function BoolToInt(ABool: boolean): byte;
 function BoolToIntStr(ABool: boolean): string;
-function MaxW(AWord1, AWord2: word): word;
-function MinW(AWord1, AWord2: word): word;
-function MaxL(ALong1, ALong2: longint): longint;
-function MinL(ALong1, ALong2: longint): longint;
+function Min(ANum1, ANum2: integer): integer;
+function MinShort(ANum1, ANum2: shortint): shortint;
+function MinByte(ANum1, ANum2: byte): byte;
+function MinWord(ANum1, ANum2: word): word;
+function MinLong(ANum1, ANum2: longint): longint;
+function Max(ANum1, ANum2: integer): integer;
+function MaxShort(ANum1, ANum2: shortint): shortint;
+function MaxByte(ANum1, ANum2: byte): byte;
+function MaxWord(ANum1, ANum2: word): word;
+function MaxLong(ANum1, ANum2: longint): longint;
 function FileExists(const AFilename: string): boolean;
 function GetExtension(const AFilename: string): string;
 function UpperCase(const AString: string): string;
@@ -60,9 +70,19 @@ function Replace(const AString, APattern, AReplacePattern: string): string;
 function ZeroPad(AInt: longint; ALength: byte): string;
 function EndZeroPad(AInt: longint; ALength: byte): string;
 function FormatLong(ALong: longint): string;
-procedure SwapL(var ALong1: longint; var ALong2: longint);
-procedure SwapW(var AWord1: word; var AWord2: word);
-procedure FillByteLarge(ABuffer: pointer; ASize: longint; AChar: byte);
+function StartsWith(const AString, AStartsWith: string): boolean;
+function EndsWith(const AString, AEndsWith: string): boolean;
+procedure Swap(var ANum1: integer; var ANum2: integer);
+procedure SwapShort(var ANum1: shortint; var ANum2: shortint);
+procedure SwapByte(var ANum1: byte; var ANum2: byte);
+procedure SwapWord(var ANum1: word; var ANum2: word);
+procedure SwapLong(var ANum1: longint; var ANum2: longint);
+procedure SwapPointer(var APointer1: pointer; var APointer2: pointer);
+procedure CheckRange(var ANum: integer; AMin, AMax: integer);
+procedure CheckShortRange(var ANum: shortint; AMin, AMax: shortint);
+procedure CheckByteRange(var ANum: byte; AMin, AMax: byte);
+procedure CheckWordRange(var ANum: word; AMin, AMax: word);
+procedure CheckLongRange(var ANum: longint; AMin, AMax: longint);
 
 var
   WhiteSpaceChars: set of char;
@@ -70,28 +90,18 @@ var
 implementation
 
 uses
-  MemDrv,
-  TPAlloc;
+  Dos,
+  MemDrv;
 
-procedure FillByteLarge(ABuffer: pointer; ASize: longint; AChar: byte);
-var
-  current: PByte;
-  pos: longint;
+function StartsWith(const AString, AStartsWith: string): boolean;
 begin
-  current := ABuffer;
-  while ASize > 0 do begin
-    if ASize <= MaxVarSize then begin
-      FillChar(current^, ASize, AChar);
-      exit;
-    end;
-    FillChar(current^, MaxVarSize, AChar);
-    pos := Linear(current);
-    Inc(pos, MaxVarSize);
-    current := LinearToPointer(pos);
-    Dec(ASize, MaxVarSize);
-  end;
+  StartsWith := LowerCase(Copy(AString, 1, Length(AStartsWith))) = LowerCase(AStartsWith);
 end;
 
+function EndsWith(const AString, AEndsWith: string): boolean;
+begin
+  EndsWith := LowerCase(Copy(AString, Length(AString) - Length(AEndsWith) + 1, Length(AEndsWith))) = LowerCase(AEndsWith);
+end;
 
 function Trim(AString: string): string;
 var
@@ -129,22 +139,58 @@ begin
   end;
 end;
 
-procedure SwapL(var ALong1: longint; var ALong2: longint);
+procedure Swap(var ANum1: integer; var ANum2: integer);
 var
-  temp: longint;
+  temp: integer;
 begin
-  temp := ALong1;
-  ALong1 := ALong2;
-  ALong2 := temp;
+  temp := ANum1;
+  ANum1 := ANum2;
+  ANum2 := temp;
 end;
 
-procedure SwapW(var AWord1: word; var AWord2: word);
+procedure SwapShort(var ANum1: shortint; var ANum2: shortint);
+var
+  temp: shortint;
+begin
+  temp := ANum1;
+  ANum1 := ANum2;
+  ANum2 := temp;
+end;
+
+procedure SwapByte(var ANum1: byte; var ANum2: byte);
+var
+  temp: byte;
+begin
+  temp := ANum1;
+  ANum1 := ANum2;
+  ANum2 := temp;
+end;
+
+procedure SwapWord(var ANum1: word; var ANum2: word);
 var
   temp: word;
 begin
-  temp := AWord1;
-  AWord1 := AWord2;
-  AWord2 := temp;
+  temp := ANum1;
+  ANum1 := ANum2;
+  ANum2 := temp;
+end;
+
+procedure SwapLong(var ANum1: longint; var ANum2: longint);
+var
+  temp: longint;
+begin
+  temp := ANum1;
+  ANum1 := ANum2;
+  ANum2 := temp;
+end;
+
+procedure SwapPointer(var APointer1: pointer; var APointer2: pointer);
+var
+  temp: pointer;
+begin
+  temp := APointer1;
+  APointer1 := APointer2;
+  APointer2 := temp;
 end;
 
 function FileExists(const AFilename: string): boolean;
@@ -208,28 +254,104 @@ begin
     UpperCase[index] := UpCase(AString[index]);
 end;
 
-function MaxW(AWord1, AWord2: word): word;
+function Min(ANum1, ANum2: integer): integer;
 begin
-  MaxW := AWord1;
-  if (AWord2 > AWord1) then MaxW := AWord2;
+  Min := ANum1;
+  if ANum2 < ANum1 then
+    Min := ANum2;
 end;
 
-function MinW(AWord1, AWord2: word): word;
+function MinShort(ANum1, ANum2: shortint): shortint;
 begin
-  MinW := AWord1;
-  if (AWord2 < AWord1) then MinW := AWord2;
+  MinShort := ANum1;
+  if ANum2 < ANum1 then
+    MinShort := ANum2;
 end;
 
-function MaxL(ALong1, ALong2: longint): longint;
+function MinByte(ANum1, ANum2: byte): byte;
 begin
-  MaxL := ALong1;
-  if (ALong2 > ALong1) then MaxL := ALong2;
+  MinByte := ANum1;
+  if ANum2 < ANum1 then
+    MinByte := ANum2;
 end;
 
-function MinL(ALong1, ALong2: longint): longint;
+function MinWord(ANum1, ANum2: word): word;
 begin
-  MinL := ALong1;
-  if (ALong2 < ALong1) then MinL := ALong2;
+  MinWord := ANum1;
+  if ANum2 < ANum1 then
+    MinWord := ANum2;
+end;
+
+function MinLong(ANum1, ANum2: longint): longint;
+begin
+  MinLong := ANum1;
+  if ANum2 < ANum1 then
+    MinLong := ANum2;
+end;
+
+function Max(ANum1, ANum2: integer): integer;
+begin
+  Max := ANum1;
+  if ANum2 > ANum1 then
+    Max := ANum2;
+end;
+
+function MaxShort(ANum1, ANum2: shortint): shortint;
+begin
+  MaxShort := ANum1;
+  if ANum2 > ANum1 then
+    MaxShort := ANum2;
+end;
+
+function MaxByte(ANum1, ANum2: byte): byte;
+begin
+  MaxByte := ANum1;
+  if ANum2 > ANum1 then
+    MaxByte := ANum2;
+end;
+
+function MaxWord(ANum1, ANum2: word): word;
+begin
+  MaxWord := ANum1;
+  if ANum2 > ANum1 then
+    MaxWord := ANum2;
+end;
+
+function MaxLong(ANum1, ANum2: longint): longint;
+begin
+  MaxLong := ANum1;
+  if ANum2 > ANum1 then
+    MaxLong := ANum2;
+end;
+
+procedure CheckRange(var ANum: integer; AMin, AMax: integer);
+begin
+  ANum := Min(ANum, AMax);
+  ANum := Max(ANum, AMin);
+end;
+
+procedure CheckShortRange(var ANum: shortint; AMin, AMax: shortint);
+begin
+  ANum := MinShort(ANum, AMax);
+  ANum := MaxShort(ANum, AMin);
+end;
+
+procedure CheckByteRange(var ANum: byte; AMin, AMax: byte);
+begin
+  ANum := MinByte(ANum, AMax);
+  ANum := MaxByte(ANum, AMin);
+end;
+
+procedure CheckWordRange(var ANum: word; AMin, AMax: word);
+begin
+  ANum := MinWord(ANum, AMax);
+  ANum := MaxWord(ANum, AMin);
+end;
+
+procedure CheckLongRange(var ANum: longint; AMin, AMax: longint);
+begin
+  ANum := MinLong(ANum, AMax);
+  ANum := MaxLong(ANum, AMin);
 end;
 
 function IntToStr(ANum: longint): string;
@@ -238,14 +360,6 @@ var
 begin
   Str(ANum, result);
   IntToStr := result;
-end;
-
-function WordToStr(ANum: word): string;
-var
-  result: string;
-begin
-  Str(ANum, result);
-  WordToStr := result;
 end;
 
 function DoubleToStr(ADouble: double; ADigits: byte): string;
@@ -330,20 +444,10 @@ end;
 
 function ExtractFilePath(const AFilename: string): string;
 var
-  index: integer;
-  result: string;
+  dir, name, ext: string;
 begin
-  ExtractFilePath := '';
-  if Length(AFilename) = 0 then exit;
-  result := '';
-  for index := Length(AFilename) downto 1 do begin
-    if AFilename[index] = '\' then
-    begin
-      result := Copy(AFilename, 1, index);
-      break;
-    end;
-  end;
-  ExtractFilePath := result;
+  FSplit(AFilename, dir, name, ext);
+  ExtractFilePath := dir;
 end;
 
 function Replace(const AString, APattern, AReplacePattern: string): string;
@@ -415,6 +519,18 @@ begin
     aLong := aLong div 1000;
   end;
   FormatLong := result;
+end;
+
+procedure FreeMemAndNil(var APtr; ASize: word);
+var
+  ptr: PObject;
+  pointerPtr: PPointer;
+begin
+  ptr := pointer(APtr);
+  if Assigned(ptr) then
+     FreeMem(ptr, ASize);
+  pointerPtr := @Ptr;
+  pointerPtr^ := nil;
 end;
 
 begin

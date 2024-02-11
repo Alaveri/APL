@@ -1,7 +1,7 @@
 {$IFDEF debug}
-  {$A-,B-,D+,E+,F+,G-,I+,L+,N+,M 16384 0 655360,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,E+,F+,G-,I+,L-,N+,M 16384 0 655360,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit Streams;
 
@@ -12,7 +12,7 @@ uses
   Objects,
   Except,
   Common,
-  Collects,
+  Lists,
   MemDrv;
 
 type
@@ -54,6 +54,7 @@ type
     function ReadInteger: integer; virtual;
     function ReadWord: word; virtual;
     function ReadLong: longint; virtual;
+    function ReadString: string; virtual;
     function Write(ABuffer: PByte; ACount: longint): longint; virtual;
     function Seek(AOffset: longint; AOrigin: TSeekOrigin): longint; virtual;
     function WriteToStream(AStream: PStream; ACount: longint): longint; virtual;
@@ -64,7 +65,7 @@ type
     procedure WriteInteger(AValue: integer); virtual;
     procedure WriteWord(AValue: word); virtual;
     procedure WriteLong(AValue: longint); virtual;
-    function GetTypeName: string; virtual;
+    procedure WriteString(const AString: string); virtual;
   end;
 
   TMemoryStream = object(TStream)
@@ -77,7 +78,6 @@ type
     function Write(ABuffer: PByte; ACount: longint): longint; virtual;
     function WriteToStream(AStream: PStream; ACount: longint): longint; virtual;
     function ReadFromStream(AStream: PStream; ACount: longint): longint; virtual;
-    function GetTypeName: string; virtual;
     function CanRead: boolean; virtual;
     function CanWrite: boolean; virtual;
     function CanSeek: boolean; virtual;
@@ -113,7 +113,6 @@ type
     function Write(ABuffer: PByte; ACount: longint): longint; virtual;
     function WriteToStream(AStream: PStream; ACount: longint): longint; virtual;
     function ReadFromStream(AStream: PStream; ACount: longint): longint; virtual;
-    function GetTypeName: string; virtual;
     function CanRead: boolean; virtual;
     function CanWrite: boolean; virtual;
     function CanSeek: boolean; virtual;
@@ -208,7 +207,7 @@ begin
       newPos := Position + AOffset;
     end;
   end;
-  Position := MinL(MaxL(0, newPos), Size);
+  Position := MinLong(MaxLong(0, newPos), Size);
 end;
 
 function TStream.ReadByte: byte;
@@ -264,11 +263,6 @@ begin
   FClosed := true;
 end;
 
-function TStream.GetTypeName;
-begin
-  GetTypeName := 'TStream';
-end;
-
 procedure TStream.Close;
 begin
   FClosed := true;
@@ -277,6 +271,27 @@ end;
 procedure TStream.WriteByte(AValue: byte);
 begin
   Write(@AValue, SizeOf(byte));
+end;
+
+function TStream.ReadString: string;
+var
+  len: byte;
+  result: string;
+begin
+  result := '';
+  len := ReadByte;
+  if HasException then
+    exit;
+  Read(@result[1], len);
+  if HasException then
+    exit;
+  result[0] := Chr(len);
+  ReadString := result;
+end;
+
+procedure TStream.WriteString(const AString: string);
+begin
+  Write(@AString, Length(AString) + 1);
 end;
 
 procedure TStream.WriteInteger(AValue: integer);
@@ -296,37 +311,28 @@ end;
 
 constructor TMemoryStream.Create(ASize: longint);
 var
-  index: integer;
   reference: PReference;
-  allocated: longint;
-  MaxVarSizeSize: longint;
-  blocks: longint;
-  blockSize: longint;
+  total: longint;
+  refSize: longint;
 begin
   inherited Create;
   FStatus := ssOk;
   Memory.BeginAllocTransaction;
-  blocks := ASize div MaxVarSize;
-  if ASize mod MaxVarSize > 0 then
-    Inc(blocks);
-  allocated := 0;
-  for index := 0 to blocks - 1 do begin
-    blockSize := MaxVarSize;
-    if (ASize - allocated) < MaxVarSize then
-      blockSize := ASize - allocated;
-    if blockSize <= 0 then
-      break;
-    reference := Memory.Alloc(blockSize);
+  total := ASize;
+  while total > 0 do begin
+    refSize := MinLong(total, MaxVarSize);
+    reference := Memory.Alloc(refSize);
     if Memory.HasException then begin
-      Memory.RollbackAllocTransaction;
       Raise(Memory.Exception^.Code);
       Memory.ClearException;
+      Memory.RollbackAllocTransaction;
+      FReferences^.Clear;
       exit;
     end;
-    Inc(Size, blockSize);
-    Inc(allocated, blockSize);
     FReferences^.Add(reference);
+    Dec(total, refSize);
   end;
+  Size := ASize;
   Memory.CommitAllocTransaction;
 end;
 
@@ -347,7 +353,7 @@ function TMemoryStream.Read(ABuffer: PByte; ACount: longint): longint;
 var
   bytesRead: longint;
   index: integer;
-  referencePos: longint;
+  offset: longint;
   reference: PReference;
   readSize: longint;
   ptr: PByte;
@@ -360,13 +366,13 @@ begin
     index := Position div MaxVarSize;
     if index = -1 then
       break;
-    referencePos := Position mod MaxVarSize;
+    offset := Position mod MaxVarSize;
     reference := FReferences^.GetItem(index);
-    readSize := MinL(reference^.Size - referencePos, ACount - bytesRead);
+    readSize := MinLong(reference^.Size - offset, ACount - bytesRead);
     if readSize <= 0 then
       break;
     ptr := Memory.ReferencePointer(reference);
-    Inc(ptr, referencePos);
+    Inc(ptr, offset);
     Move(ptr^, ABuffer^, readSize);
     Inc(ABuffer, readSize);
     Inc(bytesRead, readSize);
@@ -380,7 +386,7 @@ var
   index: integer;
   written: longint;
   reference: PReference;
-  referencePos: longint;
+  offset: longint;
   writeSize: word;
   ptr: PByte;
 begin
@@ -392,13 +398,13 @@ begin
     index := Position div MaxVarSize;
     if index > FReferences^.Count - 1 then
       break;
-    referencePos := Position mod MaxVarSize;
+    offset := Position mod MaxVarSize;
     reference := FReferences^.GetItem(index);
-    writeSize := MinL(reference^.Size - referencePos, ACount - written);
+    writeSize := MinLong(reference^.Size - offset, ACount - written);
     if writeSize <= 0 then
       exit;
     ptr := Memory.ReferencePointer(reference);
-    Inc(ptr, referencePos);
+    Inc(ptr, offset);
     System.FillChar(ptr^, writeSize, AByte);
     Inc(written, writeSize);
     Inc(Position, writeSize);
@@ -411,7 +417,7 @@ var
   index: integer;
   written: longint;
   reference: PReference;
-  referencePos: longint;
+  offset: longint;
   writeSize: longint;
   ptr: PByte;
 begin
@@ -423,13 +429,13 @@ begin
     index := Position div MaxVarSize;
     if index > FReferences^.Count - 1  then
       break;
-    referencePos := Position mod MaxVarSize;
+    offset := Position mod MaxVarSize;
     reference := FReferences^.GetItem(index);
-    writeSize := MinL(reference^.Size - referencePos, ACount - written);
+    writeSize := MinLong(reference^.Size - offset, ACount - written);
     if writeSize <= 0 then
       break;
     ptr := Memory.ReferencePointer(reference);
-    Inc(ptr, referencePos);
+    Inc(ptr, offset);
     Move(ABuffer^, ptr^, writeSize);
     Inc(ABuffer, writeSize);
     Inc(written, writeSize);
@@ -444,7 +450,7 @@ var
   refWritten: word;
   bytesWritten, total: longint;
   reference: PReference;
-  referencePos: longint;
+  offset: longint;
   writeSize: longint;
   ptr, destPtr: PByte;
 begin
@@ -456,13 +462,13 @@ begin
     index := Position div MaxVarSize;
     if index > FReferences^.Count - 1 then
       break;
-    referencePos := Position mod MaxVarSize;
+    offset := Position mod MaxVarSize;
     reference := FReferences^.GetItem(index);
-    writeSize := MinL(reference^.Size - referencePos, ACount - total);
+    writeSize := MinLong(reference^.Size - offset, ACount - total);
     if writeSize <= 0 then
       break;
     ptr := Memory.ReferencePointer(reference);
-    Inc(ptr, referencePos);
+    Inc(ptr, offset);
     bytesWritten := AStream^.Write(ptr, writeSize);
     if bytesWritten = 0 then
       exit;
@@ -496,11 +502,6 @@ end;
 function TMemoryStream.CanSeek: boolean;
 begin
   CanSeek := true;
-end;
-
-function TMemoryStream.GetTypeName;
-begin
-  GetTypeName := 'TMemoryStream';
 end;
 
 constructor TFileStream.Create(AFilename: string; AMode: TFileStreamMode);
@@ -542,7 +543,7 @@ begin
     {$I-}
     if Eof(FFile) then
       break;
-    BlockRead(FFile, ABuffer^, MinL(ACount, MaxVarSize), bytesRead);
+    BlockRead(FFile, ABuffer^, MinLong(ACount, MaxVarSize), bytesRead);
     {$I+}
     if IOResult <> 0 then begin
       Raise(ecStreamReadError);
@@ -571,7 +572,7 @@ begin
   while total < ACount do begin
     Seek(Position, soFromBeginning);
     {$I-}
-    BlockWrite(FFile, ABuffer^, MinL(ACount, MaxVarSize), bytesWritten);
+    BlockWrite(FFile, ABuffer^, MinLong(ACount, MaxVarSize), bytesWritten);
     {$I+}
     if IOResult <> 0 then begin
       Raise(ecStreamReadError);
@@ -664,11 +665,6 @@ end;
 function TFileStream.ReadFromStream(AStream: PStream; ACount: longint): longint;
 begin
   ReadFromStream := AStream^.WriteToStream(@self, ACount);
-end;
-
-function TFileStream.GetTypeName: string;
-begin
-  GetTypeName := 'TFileStream';
 end;
 
 function TFileStream.CanRead: boolean;

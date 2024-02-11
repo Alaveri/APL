@@ -1,101 +1,178 @@
 {$IFDEF debug}
-  {$A-,B-,D+,E+,F+,G-,I+,L+,N+,M 16384 0 655360,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,E+,F+,G-,I+,L-,N+,M 16384 0 655360,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit KeyDrv;
 
 interface
 
 uses
-  Objects;
+  Objects,
+  Common,
+  DateTime;
 
 const
-  { Extended Codes }
-  kyAltQ = 316;
-  kyAltW = 317;
-  kyAltE = 318;
-  kyAltR = 319;
-  kyAltT = 320;
-  kyAltY = 321;
-  kyAltU = 322;
-  kyAltI = 323;
-  kyAltO = 324;
-  kyAltP = 325;
-  kyAltA = 330;
-  kyAltS = 331;
-  kyAltD = 332;
-  kyAltF = 333;
-  kyAltG = 334;
-  kyAltH = 335;
-  kyAltJ = 336;
-  kyAltK = 337;
-  kyAltL = 338;
-  kyAltZ = 344;
-  kyAltX = 345;
-  kyAltC = 346;
-  kyAltV = 347;
-  kyAltB = 348;
-  kyAltN = 349;
-  kyAltM = 350;
-  kyF1 = 359;
-  kyF2 = 360;
-  kyF3 = 361;
-  kyF4 = 362;
-  kyF5 = 363;
-  kyF6 = 364;
-  kyF7 = 365;
-  kyF8 = 366;
-  kyF9 = 367;
-  kyF10 = 368;
-  kyAltF1 = 404;
-  kyAltF2 = 405;
-  kyAltF3 = 406;
-  kyAltF4 = 407;
-  kyAltF5 = 408;
-  kyAltF6 = 409;
-  kyAltF7 = 410;
-  kyAltF8 = 411;
-  kyAltF9 = 412;
-  kyAltF10 = 413;
-  kyShiftF1 = 384;
-  kyShiftF2 = 385;
-  kyShiftF3 = 386;
-  kyShiftF4 = 387;
-  kyShiftF5 = 388;
-  kyShiftF6 = 389;
-  kyShiftF7 = 390;
-  kyShiftF8 = 391;
-  kyShiftF9 = 392;
-  kyShiftF10 = 393;
+  ExtKeyFlag = word($100);
+  ExtShiftFlag = word($200);
 
-  kyCtrlRight = 416;
-  kyCtrlLeft = 415;
+  kyAltQ = ExtKeyFlag + 16;
+  kyAltW = ExtKeyFlag + 17;
+  kyAltE = ExtKeyFlag + 18;
+  kyAltR = ExtKeyFlag + 19;
+  kyAltT = ExtKeyFlag + 20;
+  kyAltY = ExtKeyFlag + 21;
+  kyAltU = ExtKeyFlag + 22;
+  kyAltI = ExtKeyFlag + 23;
+  kyAltO = ExtKeyFlag + 24;
+  kyAltP = ExtKeyFlag + 25;
+  kyAltA = ExtKeyFlag + 30;
+  kyAltS = ExtKeyFlag + 31;
+  kyAltD = ExtKeyFlag + 32;
+  kyAltF = ExtKeyFlag + 33;
+  kyAltG = ExtKeyFlag + 34;
+  kyAltH = ExtKeyFlag + 35;
+  kyAltJ = ExtKeyFlag + 36;
+  kyAltK = ExtKeyFlag + 37;
+  kyAltL = ExtKeyFlag + 38;
+  kyAltZ = ExtKeyFlag + 44;
+  kyAltX = ExtKeyFlag + 45;
+  kyAltC = ExtKeyFlag + 46;
+  kyAltV = ExtKeyFlag + 47;
+  kyAltB = ExtKeyFlag + 48;
+  kyAltN = ExtKeyFlag + 49;
+  kyAltM = ExtKeyFlag + 50;
 
-  kyAlt1 = 420;
-  kyAlt2 = 421;
-  kyAlt3 = 422;
-  kyAlt4 = 423;
-  kyAlt5 = 424;
-  kyAlt6 = 425;
-  kyAlt7 = 426;
-  kyAlt8 = 427;
-  kyAlt9 = 428;
-  kyAlt0 = 429;
-  kyAltDash = 430;
-  kyAltEqual = 431;
-  kyInsert = 382;
-  kyDel = 383;
-  kyLeft = 375;
-  kyRight = 377;
-  kyUp = 372;
-  kyDown = 380;
-  kyPageUp = 373;
-  kyPageDown = 381;
-  kyHome = 371;
-  kyEnd = 379;
+  kyShiftAltQ = ExtShiftFlag + kyAltQ;
+  kyShiftAltW = ExtShiftFlag + kyAltW;
+  kyShiftAltE = ExtShiftFlag + kyAltE;
+  kyShiftAltR = ExtShiftFlag + kyAltR;
+  kyShiftAltT = ExtShiftFlag + kyAltT;
+  kyShiftAltY = ExtShiftFlag + kyAltY;
+  kyShiftAltU = ExtShiftFlag + kyAltU;
+  kyShiftAltI = ExtShiftFlag + kyAltI;
+  kyShiftAltO = ExtShiftFlag + kyAltO;
+  kyShiftAltP = ExtShiftFlag + kyAltP;
+  kyShiftAltA = ExtShiftFlag + kyAltA;
+  kyShiftAltS = ExtShiftFlag + kyAltS;
+  kyShiftAltD = ExtShiftFlag + kyAltD;
+  kyShiftAltF = ExtShiftFlag + kyAltF;
+  kyShiftAltG = ExtShiftFlag + kyAltG;
+  kyShiftAltH = ExtShiftFlag + kyAltH;
+  kyShiftAltJ = ExtShiftFlag + kyAltJ;
+  kyShiftAltK = ExtShiftFlag + kyAltK;
+  kyShiftAltL = ExtShiftFlag + kyAltL;
+  kyShiftAltZ = ExtShiftFlag + kyAltZ;
+  kyShiftAltX = ExtShiftFlag + kyAltX;
+  kyShiftAltC = ExtShiftFlag + kyAltC;
+  kyShiftAltV = ExtShiftFlag + kyAltV;
+  kyShiftAltB = ExtShiftFlag + kyAltB;
+  kyShiftAltN = ExtShiftFlag + kyAltN;
+  kyShiftAltM = ExtShiftFlag + kyAltM;
 
-  { Standard Codes }
+  kyF1 = ExtKeyFlag + 59;
+  kyF2 = ExtKeyFlag + 60;
+  kyF3 = ExtKeyFlag + 61;
+  kyF4 = ExtKeyFlag + 62;
+  kyF5 = ExtKeyFlag + 63;
+  kyF6 = ExtKeyFlag + 64;
+  kyF7 = ExtKeyFlag + 65;
+  kyF8 = ExtKeyFlag + 66;
+  kyF9 = ExtKeyFlag + 67;
+  kyF10 = ExtKeyFlag + 68;
+  kyAltF1 = ExtKeyFlag + 104;
+  kyAltF2 = ExtKeyFlag + 105;
+  kyAltF3 = ExtKeyFlag + 106;
+  kyAltF4 = ExtKeyFlag + 107;
+  kyAltF5 = ExtKeyFlag + 108;
+  kyAltF6 = ExtKeyFlag + 109;
+  kyAltF7 = ExtKeyFlag + 110;
+  kyAltF8 = ExtKeyFlag + 111;
+  kyAltF9 = ExtKeyFlag + 112;
+  kyAltF10 = ExtKeyFlag + 113;
+  kyShiftF1 = ExtKeyFlag + 84;
+  kyShiftF2 = ExtKeyFlag + 85;
+  kyShiftF3 = ExtKeyFlag + 86;
+  kyShiftF4 = ExtKeyFlag + 87;
+  kyShiftF5 = ExtKeyFlag + 88;
+  kyShiftF6 = ExtKeyFlag + 89;
+  kyShiftF7 = ExtKeyFlag + 90;
+  kyShiftF8 = ExtKeyFlag + 91;
+  kyShiftF9 = ExtKeyFlag + 92;
+  kyShiftF10 = ExtKeyFlag + 93;
+
+  kyCtrlF1 = ExtKeyFlag + 94;
+  kyCtrlF2 = ExtKeyFlag + 95;
+  kyCtrlF3 = ExtKeyFlag + 96;
+  kyCtrlF4 = ExtKeyFlag + 97;
+  kyCtrlF5 = ExtKeyFlag + 98;
+  kyCtrlF6 = ExtKeyFlag + 99;
+  kyCtrlF7 = ExtKeyFlag + 100;
+  kyCtrlF8 = ExtKeyFlag + 101;
+  kyCtrlF9 = ExtKeyFlag + 102;
+  kyCtrlF10 = ExtKeyFlag + 103;
+
+  kyAlt1 = ExtKeyFlag + 120;
+  kyAlt2 = ExtKeyFlag + 121;
+  kyAlt3 = ExtKeyFlag + 122;
+  kyAlt4 = ExtKeyFlag + 123;
+  kyAlt5 = ExtKeyFlag + 124;
+  kyAlt6 = ExtKeyFlag + 125;
+  kyAlt7 = ExtKeyFlag + 126;
+  kyAlt8 = ExtKeyFlag + 427;
+  kyAlt9 = ExtKeyFlag + 128;
+  kyAlt0 = ExtKeyFlag + 129;
+
+  kyShiftAlt1 = ExtShiftFlag + kyAlt1;
+  kyShiftAlt2 = ExtShiftFlag + kyAlt2;
+  kyShiftAlt3 = ExtShiftFlag + kyAlt3;
+  kyShiftAlt4 = ExtShiftFlag + kyAlt4;
+  kyShiftAlt5 = ExtShiftFlag + kyAlt5;
+  kyShiftAlt6 = ExtShiftFlag + kyAlt6;
+  kyShiftAlt7 = ExtShiftFlag + kyAlt7;
+  kyShiftAlt8 = ExtShiftFlag + kyAlt8;
+  kyShiftAlt9 = ExtShiftFlag + kyAlt9;
+  kyShiftAlt0 = ExtShiftFlag + kyAlt0;
+
+  kyAltDash = ExtKeyFlag + 130;
+  kyAltEqual = ExtKeyFlag + 131;
+  kyInsert = ExtKeyFlag + 82;
+
+  kyDel = ExtKeyFlag + 83;
+  kyLeft = ExtKeyFlag + 75;
+  kyRight = ExtKeyFlag + 77;
+  kyUp = ExtKeyFlag + 72;
+  kyDown = ExtKeyFlag + 80;
+  kyPageUp = ExtKeyFlag + 73;
+  kyPageDown = ExtKeyFlag + 81;
+  kyHome = ExtKeyFlag + 71;
+  kyEnd = ExtKeyFlag + 79;
+
+  kyCtrlLeft = ExtKeyFlag + 115;
+  kyCtrlRight = ExtKeyFlag + 116;
+  kyCtrlPageUp = ExtKeyFlag + 132;
+  kyCtrlPageDown = ExtKeyFlag + 118;
+  kyCtrlHome = ExtKeyFlag + 119;
+  kyCtrlEnd = ExtKeyFlag + 117;
+
+  kyShiftDel = ExtShiftFlag + kyDel;
+  kyShiftLeft = ExtShiftFlag + kyLeft;
+  kyShiftRight = ExtShiftFlag + kyRight;
+  kyShiftUp = ExtShiftFlag + kyUp;
+  kyShiftDown = ExtShiftFlag + kyDown;
+  kyShiftPageUp = ExtShiftFlag + kyPageUp;
+  kyShiftPageDown = ExtShiftFlag + kyPageDown;
+  kyShiftHome = ExtShiftFlag + kyHome;
+  kyShiftEnd = ExtShiftFlag + kyEnd;
+  kyShiftIns = ExtShiftFlag + kyInsert;
+
+  kyShiftCtrlLeft = ExtShiftFlag + kyCtrlLeft;
+  kyShiftCtrlRight = ExtShiftFlag + kyCtrlRight;
+  kyShiftCtrlPageUp = ExtShiftFlag + kyCtrlPageUp;
+  kyShiftCtrlPageDown = ExtShiftFlag + kyCtrlPageDown;
+  kyShiftCtrlHome = ExtShiftFlag + kyCtrlHome;
+  kyShiftCtrlEnd = ExtShiftFlag + kyCtrlEnd;
+
   kyCtrlA = 1;
   kyCtrlB = 2;
   kyCtrlC = 3;
@@ -125,26 +202,111 @@ const
   kyEsc = 27;
   kyEnter = 13;
   kyBackSpace = 8;
-  kyDelete = 9;
+  kyTab = 9;
+  kyShiftTab = ExtKeyFlag + ExtShiftFlag + kyTab;
 
 type
   PKeyboardDriver = ^TKeyboardDriver;
+  PKeyInterruptProc = ^TKeyInterruptProc;
+
+  TKeyInterruptProc = procedure(AScanCode: byte; AKeyDown: boolean);
+
+  TKeyboardFlag = (
+    kfRightShift,
+    kfLeftShift,
+    kfControl,
+    kfAlt,
+    kfScrollLock,
+    kfNumLock,
+    kfCapsLock,
+    kfInsert
+  );
+
+  TKeyboardFlags = set of TKeyboardFlag;
+
+  TKeyboardState = record
+    ScanCode: byte;
+    Down: boolean;
+    ShiftState: TKeyboardFlags;
+  end;
+
   TKeyboardDriver = object(TObject)
   private
+    FDriverInstalled: boolean;
+    procedure InstallInterrupt;
+    procedure UninstallInterrupt;
   public
-    function KeyPressed: boolean; virtual;
-    function GetKey: word; virtual;
-    function KeyToShortcut(AKey: word): string; virtual;
-    function CharToAltChar(AChar: char): word; virtual;
-    function UpCase(AKey: word): word; virtual;
+    OnKeyInterrupt: PKeyInterruptProc;
+    function KeyPressed: boolean;
+    function GetKey: word;
+    function KeyToShortcut(AKey: word): string;
+    function CharToAltChar(AChar: char): word;
+    function UpCase(AKey: word): word;
+    procedure ProcessKeyUp(AScanCode: byte);
+    procedure ProcessKeyDown(AScanCode: byte);
     procedure CursorOn;
     procedure CursorOff;
+    procedure Init; virtual;
+    procedure GetKeyState(AScanCode: byte; var AState: TKeyboardState);
+    destructor Free; virtual;
   end;
 
 var
   Keyboard: TKeyboardDriver;
+  ShiftStateFlags: TKeyboardFlags absolute $40:$17;
 
 implementation
+
+uses
+  Dos;
+
+var
+  StoredInt09: pointer;
+
+var
+  KeyboardHead: byte absolute $0040:$001A;
+  KeyboardTail: byte absolute $0040:$001C;
+  KeyDown: array[byte] of boolean;
+
+procedure KeyboardHandler(Flags, CS, IP, AX, BX, CX, DX, SI, DI, DS, ES, BP: Word); interrupt;
+var
+  code: byte;
+  int9: pointer;
+begin
+  asm
+    in al, 60h
+    mov [code], al
+    in al, 61h
+    or al, 80h
+    out 61h, al
+    xor al, 80h
+    out 61h, al
+    mov al, 20h
+    out 20h, al
+  end;
+
+  if code and $80 > 0 then begin
+    code := code and not $80;
+    KeyDown[code] := false;
+  end
+  else begin
+    KeyDown[code] := true;
+  end;
+
+  int9 := StoredInt09;
+  asm
+    call int9;
+  end;
+end;
+
+procedure TKeyboardDriver.ProcessKeyUp;
+begin
+
+end;
+
+procedure TKeyboardDriver.ProcessKeyDown;
+begin
+end;
 
 function TKeyboardDriver.KeyToShortcut(AKey: word): string;
 var
@@ -188,6 +350,26 @@ begin
     kyF8: result := 'F8';
     kyF9: result := 'F9';
     kyF10: result := 'F10';
+    kyAltF1: result := 'Alt+F1';
+    kyAltF2: result := 'Alt+F2';
+    kyAltF3: result := 'Alt+F3';
+    kyAltF4: result := 'Alt+F4';
+    kyAltF5: result := 'Alt+F5';
+    kyAltF6: result := 'Alt+F6';
+    kyAltF7: result := 'Alt+F7';
+    kyAltF8: result := 'Alt+F8';
+    kyAltF9: result := 'Alt+F9';
+    kyAltF10: result := 'Alt+F10';
+    kyCtrlF1: result := 'Ctrl+F1';
+    kyCtrlF2: result := 'Ctrl+F2';
+    kyCtrlF3: result := 'Ctrl+F3';
+    kyCtrlF4: result := 'Ctrl+F4';
+    kyCtrlF5: result := 'Ctrl+F5';
+    kyCtrlF6: result := 'Ctrl+F6';
+    kyCtrlF7: result := 'Ctrl+F7';
+    kyCtrlF8: result := 'Ctrl+F8';
+    kyCtrlF9: result := 'Ctrl+F9';
+    kyCtrlF10: result := 'F10';
     kyAltF1: result := 'Alt+F1';
     kyAltF2: result := 'Alt+F2';
     kyAltF3: result := 'Alt+F3';
@@ -259,6 +441,32 @@ begin
     kyCtrlRight: result := 'Ctrl '#26;
     kyCtrlLeft: result := 'Ctrl '#27;
     kyEsc: result := 'Esc';
+    kyShiftAltA: result := 'Shift+Alt+A';
+    kyShiftAltB: result := 'Shift+Alt+B';
+    kyShiftAltC: result := 'Shift+Alt+C';
+    kyShiftAltD: result := 'Shift+Alt+D';
+    kyShiftAltE: result := 'Shift+Alt+E';
+    kyShiftAltF: result := 'Shift+Alt+F';
+    kyShiftAltG: result := 'Shift+Alt+G';
+    kyShiftAltH: result := 'Shift+Alt+H';
+    kyShiftAltI: result := 'Shift+Alt+I';
+    kyShiftAltJ: result := 'Shift+Alt+J';
+    kyShiftAltK: result := 'Shift+Alt+K';
+    kyShiftAltL: result := 'Shift+Alt+L';
+    kyShiftAltM: result := 'Shift+Alt+M';
+    kyShiftAltN: result := 'Shift+Alt+N';
+    kyShiftAltO: result := 'Shift+Alt+O';
+    kyShiftAltP: result := 'Shift+Alt+P';
+    kyShiftAltQ: result := 'Shift+Alt+Q';
+    kyShiftAltR: result := 'Shift+Alt+R';
+    kyShiftAltS: result := 'Shift+Alt+S';
+    kyShiftAltT: result := 'Shift+Alt+T';
+    kyShiftAltU: result := 'Shift+Alt+U';
+    kyShiftAltV: result := 'Shift+Alt+V';
+    kyShiftAltW: result := 'Shift+Alt+W';
+    kyShiftAltX: result := 'Shift+Alt+X';
+    kyShiftAltY: result := 'Shift+Alt+Y';
+    kyShiftAltZ: result := 'Shift+Alt+Z';
   end;
   KeyToShortcut := result;
 end;
@@ -307,26 +515,38 @@ end;
 
 function TKeyboardDriver.GetKey : word;
 var
-  aChar: char;
+  character: byte;
   scanCode: byte;
+  key: word;
+  flags: TKeyboardFlags;
 begin
+  flags := ShiftStateFlags;
   GetKey := 0;
   if not KeyPressed then
     exit;
   asm
     mov ah, 0
     int 16h
-    mov [aChar], al
+    mov [character], al
     mov [scanCode], ah
   end;
-  if aChar = #0 then begin
-    GetKey := 300 + scanCode;
+  if character = 0 then begin
+    key := ExtKeyFlag + scanCode;
+    if (kfLeftShift in ShiftStateFlags) or (kfRightShift in ShiftStateFlags) then
+      Inc(key, ExtShiftFlag);
   end
-  else
-    GetKey := ord(aChar);
+  else begin
+    if ((kfLeftShift in ShiftStateFlags) or (kfRightShift in ShiftStateFlags))
+      and (scanCode in [71..75, 77..83]) then begin
+      key := ExtShiftFlag + ExtKeyFlag + scanCode;
+    end
+    else
+      key := character;
+  end;
+  GetKey := key;
 end;
 
-function TKeyboardDriver.UpCase(AKey: word): word;
+function TKeyboardDriver.Upcase(AKey: word): word;
 begin
   if (AKey >= 97) and (AKey <= 122) then
     UpCase := AKey - 32
@@ -337,8 +557,10 @@ end;
 function TKeyboardDriver.CharToAltChar(AChar: char): word;
 var
   result: word;
+  ch: char;
 begin
-  case System.UpCase(AChar) of
+  ch := System.UpCase(AChar);
+  case ch of
     'A': result := kyAltA;
     'B': result := kyAltB;
     'C': result := kyAltC;
@@ -365,9 +587,49 @@ begin
     'X': result := kyAltX;
     'Y': result := kyAltY;
     'Z': result := kyAltZ;
-
   end;
   CharToAltChar := result;
+end;
+
+procedure TKeyboardDriver.InstallInterrupt;
+begin
+ if FDriverInstalled then
+    exit;
+  GetIntVec($09, StoredInt09);
+  SetIntVec($09, @KeyboardHandler);
+  FDriverInstalled := true;
+end;
+
+procedure TKeyboardDriver.UninstallInterrupt;
+begin
+  if not FDriverInstalled then
+    exit;
+  SetIntVec($09, StoredInt09);
+  FDriverInstalled := false;
+end;
+
+procedure TKeyboardDriver.GetKeyState(AScanCode: byte; var AState: TKeyboardState);
+begin
+  FillChar(AState, SizeOf(AState), 0);
+  AState.ScanCode := AScanCode;
+  AState.Down := KeyDown[AScanCode];
+  AState.ShiftState := ShiftStateFlags;
+end;
+
+procedure TKeyboardDriver.Init;
+begin
+  inherited Init;
+  FDriverInstalled := false;
+  FillChar(KeyDown, SizeOf(KeyDown), 0);
+  KeyboardHead := $20;
+  KeyboardTail := $20;
+{  InstallInterrupt;}
+end;
+
+destructor TKeyboardDriver.Free;
+begin
+{  UninstallInterrupt;}
+  inherited Free;
 end;
 
 end.

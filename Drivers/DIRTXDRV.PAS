@@ -1,7 +1,7 @@
 {$IFDEF debug}
-  {$A-,B-,D+,E+,F+,G-,I+,L+,N+,M 16384 0 655360,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,E+,F+,G-,I+,L-,N+,M 16384 0 655360,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit DirTxDrv;
 
@@ -9,7 +9,7 @@ interface
 
 uses
   Objects,
-  Collects,
+  Lists,
   Common,
   Drawing,
   DosConst,
@@ -25,7 +25,6 @@ type
     FStartMode: byte;
     function GetTextAttributes(AForeColor, ABackColor: byte; ABlink: boolean): byte; virtual;
   public
-    function GetTypeName: string; virtual;
     procedure RenderText(AText: PChar; ALength: word); virtual;
     procedure Write(const AText: string); virtual;
     procedure WriteLarge(AText: PChar); virtual;
@@ -208,25 +207,25 @@ end;
 
 procedure TDirectTextDriver.SetBlink(ABlink: boolean);
 begin
-  TTextDriver.SetBlink(ABlink);
+  inherited SetBlink(ABlink);
   State^.Attributes := GetTextAttributes(State^.ForeColor, State^.BackColor, ABlink);
 end;
 
 procedure TDirectTextDriver.SetForeColor(AColor: byte);
 begin
-  TTextDriver.SetForeColor(AColor);
+  inherited SetForeColor(AColor);
   State^.Attributes := GetTextAttributes(AColor, State^.BackColor, State^.Blink);
 end;
 
 procedure TDirectTextDriver.SetBackColor(AColor: byte);
 begin
-  TTextDriver.SetBackColor(AColor);
+  inherited SetBackColor(AColor);
   State^.Attributes := GetTextAttributes(State^.ForeColor, AColor, State^.Blink);
 end;
 
 procedure TDirectTextDriver.CursorOn;
 begin
-  TTextDriver.CursorOn;
+  inherited CursorOn;
   asm
     mov   ax,[Seg0040]
     mov   es,ax
@@ -240,7 +239,7 @@ end;
 
 procedure TDirectTextDriver.CursorOff;
 begin
-  TTextDriver.CursorOff;
+  inherited CursorOff;
   asm
     mov   ax,[Seg0040]
     mov   es,ax
@@ -261,11 +260,6 @@ begin
   GetTextAttributes := AForeColor or (ABackColor shl 4) or (byte(ABlink) shl 7);
 end;
 
-function TDirectTextDriver.GetTypeName: string;
-begin
-  GetTypeName := 'TDirectTextDriver';
-end;
-
 procedure TDirectTextDriver.Init;
 var
   newMode: PTextMode;
@@ -274,7 +268,7 @@ begin
   Scroll := false;
   newMode := New(PTextMode, Create);
   with newMode^ do begin
-    Id := NewLargeString('BW40');
+    SetId('BW40');
     Width := 40;
     Height := 25;
     MaxX := 39;
@@ -287,7 +281,7 @@ begin
   end;
   newMode := New(PTextMode, Create);
   with newMode^ do begin
-    Id := NewLargeString('BW80');
+    SetId('BW80');
     Width := 80;
     Height := 25;
     MaxX := 79;
@@ -300,7 +294,7 @@ begin
   end;
   newMode := New(PTextMode, Create);
   with newMode^ do begin
-    Id := NewLargeString('Mono');
+    SetId('Mono');
     Width := 80;
     Height := 25;
     MaxX := 79;
@@ -313,7 +307,7 @@ begin
   end;
   newMode := New(PTextMode, Create);
   with newMode^ do begin
-    Id := NewLargeString('CO40');
+    SetId('CO40');
     Width := 40;
     Height := 25;
     MaxX := 39;
@@ -326,7 +320,7 @@ begin
   end;
   newMode := New(PTextMode, Create);
   with newMode^ do begin
-    Id := NewLargeString('CO408x8');
+    SetId('CO408x8');
     Width := 40;
     Height := 25;
     MaxX := 39;
@@ -339,7 +333,7 @@ begin
   end;
   newMode := New(PTextMode, Create);
   with newMode^ do begin
-    Id := NewLargeString('CO80');
+    SetId('CO80');
     Width := 80;
     Height := 25;
     MaxX := 79;
@@ -352,7 +346,7 @@ begin
   end;
   newMode := New(PTextMode, Create);
   with newMode^ do begin
-    Id := NewLargeString('CO808x8');
+    SetId('CO808x8');
     Width := 80;
     Height := 50;
     MaxX := 79;

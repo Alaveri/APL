@@ -1,7 +1,7 @@
 {$IFDEF debug}
-  {$A-,B-,D+,E+,F+,G-,I+,L+,N+,M 16384 0 655360,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,E+,F+,G-,I+,L-,N+,M 16384 0 655360,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit TextDrv;
 
@@ -9,7 +9,7 @@ interface
 
 uses
   Objects,
-  Collects,
+  Lists,
   Consts,
   Common,
   MouseDrv,
@@ -41,11 +41,10 @@ type
     IsCursorOn: boolean;
     ViewPort: TRect;
     procedure Init; virtual;
-    function GetTypeName: string; virtual;
     procedure Assign(var ASource: TObject); virtual;
   end;
 
-  TTextMode = Object(TIdObject)
+  TTextMode = Object(TIdentifiable)
   private
   public
     Width, Height, MaxX, MaxY: integer;
@@ -57,11 +56,10 @@ type
     procedure GetBounds(var ARect: TRect); virtual;
   end;
 
-  TTextModeList = object(TIdObjectList)
+  TTextModeList = object(TIdentifiableList)
   private
   public
-    function GetItem(AIndex: integer): PTextMode;
-    function GetItemById(const AId: string): PTextMode;
+    function GetItem(AIndex: integer): PTextMode;    function GetItemById(const AId: string): PTextMode;
     function IndexOfId(const AId: string): integer;
     function IndexOf(AItem: PTextMode): integer;
     function Add(AItem: PTextMode): integer;
@@ -140,11 +138,6 @@ begin
   ViewPort.SetRect(state^.ViewPort);
 end;
 
-function TTextState.GetTypeName: string;
-begin
-  GetTypeName := 'TTextState';
-end;
-
 procedure TTextMode.Init;
 begin
   inherited Init;
@@ -207,7 +200,8 @@ var
   oldState: PTextState;
 begin
   oldState := PTextState(FStateStack^.Pop);
-  if (oldState = nil) then exit;
+  if not Assigned(oldState) then
+    exit;
   State^.Assign(oldState^);
   Dispose(oldState, Free);
   if State^.IsCursorOn then
