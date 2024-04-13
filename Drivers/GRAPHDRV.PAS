@@ -8,17 +8,19 @@ unit GraphDrv;
 interface
 
 uses
-  Objects,
-  Except,
-  Common,
-  Drawing,
-  Lists,
-  Consts,
-  StrUtils,
-  MemDrv,
+  {$IFDEF DOS}
   Strings,
   Dos,
-  Streams;
+  {$ENDIF}
+  Objects,
+  Errors,
+  Common,
+  Streams,
+  Drawing,
+  Lists,
+  AplConst,
+  StrUtils,
+  MemDrv;
 
 const
   FontMajorVersion = 1;
@@ -165,6 +167,7 @@ type
     StateStack: TStack;
     Modes: TGraphicsModeList;
     Mode: PGraphicsMode;
+    ResetModeOnFree: boolean;
     function GetPixel(AX, AY: integer): byte; virtual;
     function ForeColor: longint; virtual;
     function BackColor: longint; virtual;
@@ -235,6 +238,7 @@ var
   oldMode: byte;
 begin
   inherited Init;
+  ResetModeOnFree := true;
   asm
     mov ah, 0Fh
     int 10h
@@ -502,7 +506,8 @@ end;
 
 destructor TGraphicsDriver.Free;
 begin
-  ResetMode;
+  if ResetModeOnFree then
+    ResetMode;
   Modes.Free;
   State.Free;
   StateStack.DisposeObjects := true;

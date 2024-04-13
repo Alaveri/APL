@@ -8,8 +8,11 @@ unit Common;
 interface
 
 uses
-  Objects,
-  Strings;
+  {$IFDEF DOS}
+  Strings,
+  Dos,
+  {$ENDIF}
+  Objects;
 
 type
   PByte = ^byte;
@@ -83,6 +86,11 @@ procedure CheckShortRange(var ANum: shortint; AMin, AMax: shortint);
 procedure CheckByteRange(var ANum: byte; AMin, AMax: byte);
 procedure CheckWordRange(var ANum: word; AMin, AMax: word);
 procedure CheckLongRange(var ANum: longint; AMin, AMax: longint);
+function EnsureRange(ANum: integer; AMin, AMax: integer): integer;
+function EnsureShortRange(ANum: shortint; AMin, AMax: shortint): shortint;
+function EnsureByteRange(ANum: byte; AMin, AMax: byte): byte;
+function EnsureWordRange(ANum: word; AMin, AMax: word): word;
+function EnsureLongRange(ANum: longint; AMin, AMax: longint): longint;
 
 var
   WhiteSpaceChars: set of char;
@@ -90,7 +98,6 @@ var
 implementation
 
 uses
-  Dos,
   MemDrv;
 
 function StartsWith(const AString, AStartsWith: string): boolean;
@@ -352,6 +359,51 @@ procedure CheckLongRange(var ANum: longint; AMin, AMax: longint);
 begin
   ANum := MinLong(ANum, AMax);
   ANum := MaxLong(ANum, AMin);
+end;
+
+function EnsureRange(ANum: integer; AMin, AMax: integer): integer;
+var
+  result: integer;
+begin
+  result := Min(ANum, AMax);
+  result := Max(result, AMin);
+  EnsureRange := result;
+end;
+
+function EnsureShortRange(ANum: shortint; AMin, AMax: shortint): shortint;
+var
+  result: shortint;
+begin
+  result := MinShort(ANum, AMax);
+  result := MaxShort(result, AMin);
+  EnsureShortRange := result;
+end;
+
+function EnsureByteRange(ANum: byte; AMin, AMax: byte): byte;
+var
+  result: byte;
+begin
+  result := MinByte(ANum, AMax);
+  result := MaxByte(result, AMin);
+  EnsureByteRange := result;
+end;
+
+function EnsureWordRange(ANum: word; AMin, AMax: word): word;
+var
+  result: word;
+begin
+  result := MinWord(ANum, AMax);
+  result := MaxWord(result, AMin);
+  EnsureWordRange := result;
+end;
+
+function EnsureLongRange(ANum: longint; AMin, AMax: longint): longint;
+var
+  result: longint;
+begin
+  result := MinLong(ANum, AMax);
+  result := MaxLong(result, AMin);
+  EnsureLongRange := result;
 end;
 
 function IntToStr(ANum: longint): string;

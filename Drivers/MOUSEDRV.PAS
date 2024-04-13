@@ -42,11 +42,13 @@ type
 
   TMouseDriver = object(TObject)
   private
+    FMouseWheelSupported: boolean;
   public
     State: TMouseState;
     StateStack: TStack;
     UseSystemCursor: boolean;
     XDiv, YDiv: integer;
+    constructor Create(AUseSystemCursor: boolean);
     procedure Init; virtual;
     procedure ShowMouse; virtual;
     procedure HideMouse; virtual;
@@ -56,6 +58,7 @@ type
     procedure InitMouseCursor; virtual;
     procedure SetMouseResolution(AWidth, AHeight: word); virtual;
     procedure SetMousePosition(APx, APy: word); virtual;
+{    function IsMouseWheelSupported: boolean;}
     destructor Free; virtual;
   end;
 
@@ -65,8 +68,10 @@ var
 implementation
 
 uses
+  {$IFDEF DOS}
   Dos,
-  DosConst;
+  {$ENDIF}
+  AplDos;
 
 const
   MouseCursor: array[0..31] of word =
@@ -182,6 +187,14 @@ begin
   Moved := (AState.X <> X) or (AState.Y <> Y);
 end;
 
+constructor TMouseDriver.Create(AUseSystemCursor: boolean);
+begin
+  inherited Create;
+  UseSystemCursor := AUseSystemCursor;
+  if AUseSystemCursor then
+    InitMouseCursor;
+end;
+
 procedure TMouseDriver.InitMouseCursor;
 var
   segm, offs: word;
@@ -206,6 +219,20 @@ begin
   inherited Free;
 end;
 
+{procedure TMouseDriver.MouseWheelSupported;
+begin
+// INT 33/0011 - Check wheel support and get capabilities flags
+// 	AX = 0011h
+// Return:	AX = 574Dh ('WM' in assembly) if Wheel API is supported by driver
+// 	BX = Capabilities flag (all bits reserved)
+// 	CX = Capabilities flag
+// 		Bit(s)	Description
+// 		------	-----------
+// 		 0	1=Pointing device supports wheel
+// 		 1-15	Reserved
+// Note:	this function should be examined before accessing wheel features
+end;}
+
 procedure TMouseDriver.Init;
 var
   success: boolean;
@@ -220,8 +247,6 @@ begin
   end;
   success := result = $FFFF;
   State.Create;
-  if success then
-    InitMouseCursor;
   StateStack.Create;
   UseSystemCursor := false;
   XDiv := 0;
@@ -231,7 +256,8 @@ end;
 procedure TMouseDriver.ShowMouse;
 begin;
   State.Visible := true;
-  if (not UseSystemCursor) then exit;
+  if not UseSystemCursor then
+    exit;
   asm
     mov   AX, 1
     int   33h
@@ -241,7 +267,8 @@ end;
 procedure TMouseDriver.HideMouse;
 begin;
   State.Visible := false;
-  if (not UseSystemCursor) then exit;
+  if not UseSystemCursor then
+    exit;
   asm
     mov   AX, 2
     int   33h
@@ -266,10 +293,6 @@ begin
     exit;
   State.Assign(oldState^);
   Dispose(oldState, Free);
-  if State.Visible then
-    ShowMouse
-  else
-    HideMouse;
 end;
 
 procedure TMouseDriver.SetMouseResolution(AWidth, AHeight: word);

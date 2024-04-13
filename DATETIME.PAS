@@ -8,7 +8,9 @@ unit DateTime;
 interface
 
 uses
+  {$IFDEF DOS}
   Dos,
+  {$ENDIF}
   Objects,
   Common;
 

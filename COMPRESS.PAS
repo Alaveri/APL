@@ -9,7 +9,7 @@ interface
 
 uses
   Objects,
-  Except,
+  Errors,
   Streams,
   Common;
 

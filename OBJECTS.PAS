@@ -8,8 +8,11 @@ unit Objects;
 interface
 
 uses
-  Consts,
+  {$IFDEF DOS}
   Strings,
+  Dos,
+  {$ENDIF}
+  AplConst,
   StrUtils;
 
 type
@@ -28,6 +31,7 @@ type
     constructor Create;
     destructor Free; virtual;
     function ToString: string; virtual;
+    procedure Abstract; virtual;
     procedure Assign(var ASource: TObject); virtual;
     procedure Init; virtual;
   end;
@@ -38,10 +42,11 @@ type
     Id: PChar;
     constructor CreateId(const AId: string);
     destructor Free; virtual;
-    procedure SetId(const AId: string); virtual;
+    procedure SetId(const AId: string);
     procedure Assign(var ASource: TObject); virtual;
     procedure Init; virtual;
-    function GetId: string; virtual;
+    function GetId: string;
+    function ToString: string; virtual;
   end;
 
 procedure FreeAndNil(var AObject);
@@ -76,6 +81,12 @@ destructor TObject.Free;
 begin
 end;
 
+procedure TObject.Abstract;
+begin
+  WriteLn('Abstract method not implemented.');
+  RunError(301);
+end;
+
 function TObject.ToString: string;
 begin
   ToString := 'TObject';
@@ -108,8 +119,7 @@ var
 begin
   inherited Assign(ASource);
   source := PIdentifiable(@ASource);
-  TString.Dispose(Id);
-  Id := TString.Copy(source^.Id);
+  Id := TString.Reassign(Id, source^.Id);
 end;
 
 procedure TIdentifiable.Init;
@@ -120,10 +130,12 @@ end;
 
 function TIdentifiable.GetId: string;
 begin
-  GetId := '';
-  if not Assigned(Id) then
-    exit;
-  GetId := StrPas(Id);
+  GetId := TString.Get(Id);
+end;
+
+function TIdentifiable.ToString: string;
+begin
+  ToString := GetId;
 end;
 
 end.

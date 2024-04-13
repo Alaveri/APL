@@ -8,14 +8,14 @@ unit GraphIni;
 interface
 
 uses
- Objects,
- GraphDrv,
- Svga8Drv,
- Vga8Drv,
- EgaDrv,
- HercDrv,
- CgaDrv,
- UVga8Drv;
+  Objects,
+  GraphDrv,
+  Svga8Drv,
+  Vga8Drv,
+  EgaDrv,
+  HercDrv,
+  CgaDrv,
+  UVga8Drv;
 
 type
   TGraphDrivers =

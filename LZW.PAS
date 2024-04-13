@@ -9,7 +9,7 @@ interface
 
 uses
   Compress,
-  Except,
+  Errors,
   Streams,
   Common;
 

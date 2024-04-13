@@ -8,12 +8,15 @@ unit AnsiDrv;
 interface
 
 uses
+  {$IFDEF DOS}
+  Strings,
+  Dos,
+  {$ENDIF}
   Objects,
-  Collects,
+  Lists,
   Common,
   Drawing,
-  DosConst,
-  Strings,
+  AplDos,
   TextDrv;
 
 type

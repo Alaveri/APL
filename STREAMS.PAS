@@ -8,9 +8,11 @@ unit Streams;
 interface
 
 uses
+  {$IFDEF DOS}
   Dos,
+  {$ENDIF}
   Objects,
-  Except,
+  Errors,
   Common,
   Lists,
   MemDrv;

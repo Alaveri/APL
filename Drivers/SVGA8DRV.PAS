@@ -8,17 +8,19 @@ unit SVga8Drv;
 interface
 
 uses
+  {$IFDEF DOS}
+  Strings,
+  Dos,
+  {$ENDIF}
   Objects,
-  Except,
-  GraphDrv,
-  GrDrv8,
+  Errors,
+  Drawing,
   Common,
   StrUtils,
-  Strings,
   Streams,
-  Drawing;
-
-{$I SVGA8.inc}
+  GraphDrv,
+  GrDrv8,
+  SVgaType;
 
 type
   PSVga8Mode = ^TSvga8Mode;
@@ -66,7 +68,6 @@ type
 implementation
 
 uses
-  Dos,
   MouseDrv;
 
 procedure TSVga8Mode.Init;

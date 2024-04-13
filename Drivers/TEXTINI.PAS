@@ -19,14 +19,20 @@ type
     tdAnsi
   );
 
-procedure CreateTextDriver(ADriverId: TTextDrivers);
+procedure InitTextDriver(ADriverId: TTextDrivers);
+procedure FreeTextDriver;
 
 implementation
 
-procedure CreateTextDriver(ADriverId: TTextDrivers);
+procedure FreeTextDriver;
+begin
+  FreeAndNil(TextDriver);
+end;
+
+procedure InitTextDriver(ADriverId: TTextDrivers);
 begin
   case ADriverId of
-    tdDirect: Text := New(PDirectTextDriver, Create);
+    tdDirect: TextDriver := New(PDirectTextDriver, Create);
     tdAnsi: ;
   end;
 end;

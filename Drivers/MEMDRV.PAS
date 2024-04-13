@@ -9,7 +9,7 @@ interface
 
 uses
   Objects,
-  Except,
+  Errors,
   Common,
   Lists,
   Dos;
@@ -102,7 +102,7 @@ var
 implementation
 
 uses
-  Consts;
+  AplConst;
 
 var
   PreviousExitProc: ^TFunc;

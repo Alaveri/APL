@@ -1,3 +1,7 @@
+unit SVgaType;
+
+interface
+
 const
   mmTextMode = $00;
   mmCgaGraphics = $01;
@@ -136,3 +140,7 @@ type
     v2: TVbeModeInfo2;
     v3: TVbeModeInfo3;
   end;
+
+implementation
+
+end.

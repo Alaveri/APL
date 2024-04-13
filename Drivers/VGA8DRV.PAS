@@ -8,15 +8,18 @@ unit Vga8Drv;
 interface
 
 uses
+  {$IFDEF DOS}
+  Strings,
+  Dos,
+  {$ENDIF}
   Objects,
-  GraphDrv,
-  GrDrv8,
   Common,
   StrUtils,
-  Strings,
   Streams,
+  Drawing,
   MouseDrv,
-  Drawing;
+  GraphDrv,
+  GrDrv8;
 
 type
   PVga8Driver = ^TVga8Driver;
@@ -46,7 +49,7 @@ type
 implementation
 
 uses
-  Except;
+  Errors;
 
 function TVga8Driver.GetPixel(AX, AY: integer): byte;
 var

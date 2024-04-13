@@ -3,19 +3,21 @@
 {$ELSE}
   {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
-unit FileUtil;
+unit Files;
 
 interface
 
 uses
+  {$IFDEF DOS}
+  Strings,
+  Dos,
+  {$ENDIF}
   Objects,
   Lists,
-  Strings,
   StrUtils,
   Common,
   DateTime,
-  Except,
-  Dos;
+  Errors;
 
 type
   PDirectory = ^TDirectory;
@@ -38,7 +40,7 @@ type
   public
     Name: PChar;
     Attr: TFileAttributes;
-    Time: DateTime.TDateTime;
+    Time: TDateTime;
     Size: Longint;
     procedure Init; virtual;
     destructor Free; virtual;
@@ -51,18 +53,19 @@ type
   private
   public
     Files: PFileList;
+    Filter: string;
     constructor Create;
     procedure Init; virtual;
     procedure Sort(ASort: TDirSort; ADirection: TDirSortDirection; ADirsFirst: boolean);
     destructor Free; virtual;
   end;
 
-  TFileList = object(TLinkedObjectList)
+  TFileList = object(TObjectList)
   private
   public
     function GetItem(AIndex: longint): PFile;
     function IndexOf(AItem: PFile): longint;
-    function Add(AItem: PFile): PListNode;
+    function Add(AItem: PFile): integer;
     procedure Insert(AIndex: longint; AItem: PFile);
   end;
 
@@ -301,6 +304,7 @@ end;
 procedure TDirectory.Init;
 begin
   inherited Init;
+  Filter := '*.*';
 end;
 
 destructor TDirectory.Free;
@@ -345,7 +349,7 @@ begin
   IndexOf := inherited IndexOf(AItem);
 end;
 
-function TFileList.Add(AItem: PFile): PListNode;
+function TFileList.Add(AItem: PFile): integer;
 begin
   Add := inherited Add(AItem);
 end;

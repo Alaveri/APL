@@ -10,8 +10,8 @@ interface
 uses
   Objects,
   Lists,
-  Except,
-  Apps,
+  Errors,
+  AplApps,
   GrDrv8,
   GraphDrv,
   Vga8Drv,
@@ -30,6 +30,7 @@ type
     procedure InitGraphics(ADriverId: TGraphDrivers);
     procedure ProcessEvents; virtual;
     destructor Free; virtual;
+    destructor FreeNoReset; virtual;
   end;
 
 var
@@ -76,6 +77,14 @@ begin
   FreeGraphicsDriver;
   inherited Free;
 end;
+
+destructor TGraphApp.FreeNoReset;
+begin
+  Graph^.ResetModeOnFree := false;
+  FreeGraphicsDriver;
+  inherited Free;
+end;
+
 
 procedure TGraphApp.ProcessEvents;
 begin

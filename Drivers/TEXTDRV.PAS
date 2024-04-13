@@ -8,13 +8,19 @@ unit TextDrv;
 interface
 
 uses
+  {$IFDEF DOS}
+  Strings,
+  Dos,
+  {$ENDIF}
   Objects,
   Lists,
-  Consts,
+  AplConst,
+  KeyDrv,
   Common,
+  Errors,
+  Drawing,
   MouseDrv,
-  Strings,
-  Drawing;
+  Lines;
 
 type
   PTextDriver = ^TTextDriver;
@@ -26,11 +32,6 @@ type
     Character: char;
     Attributes: byte;
   end;
-
-  TLineStyle = (
-    lsSingle,
-    lsDouble
-  );
 
   TTextState = object(TObject)
   public
@@ -66,7 +67,7 @@ type
     procedure Insert(AIndex: integer; AItem: PTextMode);
   end;
 
-  TTextDriver = Object(TObject)
+  TTextDriver = Object(TExceptionObject)
     FStateStack: PStack;
   public
     Mode: PTextMode;
@@ -78,11 +79,13 @@ type
     function TextWidthLarge(AText: PChar): integer; virtual;
     procedure PushState; virtual;
     procedure PopState; virtual;
-    procedure RenderText(AText: PChar; ALength: word); virtual;
+    procedure RenderText(AXPos, AYPos: byte; AText: PChar; ALength: word); virtual;
     procedure Write(const AText: string); virtual;
     procedure WriteLarge(AText: PChar); virtual;
     procedure WriteLn(const AText: string); virtual;
     procedure WriteLnLarge(AText: PChar); virtual;
+    procedure DrawText(AXPos, AYPos: byte; AText: string);
+    procedure DrawTextLarge(AXPos, AYPos: byte; AText: PChar);
     procedure SetForeColor(AColor: byte); virtual;
     procedure SetBackColor(AColor: byte); virtual;
     procedure SetBlink(ABlink: boolean); virtual;
@@ -92,11 +95,14 @@ type
     procedure CursorOff; virtual;
     procedure Init; virtual;
     procedure SetMode(AMode: PTextMode); virtual;
-    procedure HLine(AX, AY, AWidth: integer; ALineStyle: TLineStyle); virtual;
-    procedure VLine(AX, AY, AHeight: integer; ALineStyle: TLineStyle); virtual;
-    procedure Box(ARect: TRect; ALineStyle: TLineStyle); virtual;
+    procedure HorzLine(AX, AY, AWidth: integer; ALineStyle: TLineStyle); virtual;
+    procedure VertLine(AX, AY, AHeight: integer; ALineStyle: TLineStyle); virtual;
+    procedure HorzLineWithEnds(AX, AY, AWidth: integer; ALineStyle: TLineStyle); virtual;
+    procedure VertLineWithEnds(AX, AY, AHeight: integer; ALineStyle: TLineStyle); virtual;
+    procedure HorzFill(AX, AY, AWidth: integer); virtual;
+    procedure VertFill(AX, AY, AHeight: integer); virtual;
     procedure FillRect(ARect: TRect); virtual;
-    procedure Rectangle(ARect: TRect; ALineStyle: TLineStyle); virtual;
+    procedure Rectangle(ARect: TRect; ABorderStyle: TBorderStyle); virtual;
     procedure ClrScr; virtual;
     procedure ShowMouseCursor; virtual;
     procedure HideMouseCursor; virtual;
@@ -106,7 +112,7 @@ type
   end;
 
 var
-  Text: PTextDriver;
+  TextDriver: PTextDriver;
 
 implementation
 
@@ -222,7 +228,17 @@ begin
   State^.ViewPort.SetDims(0, 0, AMode^.Width, AMode^.Height);
 end;
 
-procedure TTextDriver.RenderText(AText: PChar; ALength: word);
+procedure TTextDriver.DrawText(AXPos, AYPos: byte; AText: string);
+begin
+  RenderText(AXPos, AYPos, @AText[1], Length(AText));
+end;
+
+procedure TTextDriver.DrawTextLarge(AXPos, AYPos: byte; AText: PChar);
+begin
+  RenderText(AXPos, AYPos, AText, StrLen(AText));
+end;
+
+procedure TTextDriver.RenderText(AXPos, AYPos: byte; AText: PChar; ALength: word);
 begin
 end;
 
@@ -279,6 +295,7 @@ end;
 
 procedure TTextDriver.Init;
 begin
+  inherited Init;
   Modes := New(PTextModeList, Create);
   State := New(PTextState, Create);
   FStateStack := New(PStack, Create);
@@ -288,8 +305,16 @@ begin
   Scroll := true;
 end;
 
-procedure TTextDriver.Rectangle(ARect: TRect; ALineStyle: TLineStyle);
+procedure TTextDriver.Rectangle(ARect: TRect; ABorderStyle: TBorderStyle);
 begin
+  DrawText(ARect.X, ARect.Y, BorderChars[ABorderStyle, bcTopLeft]);
+  DrawText(ARect.Right, ARect.Y, BorderChars[ABorderStyle, bcTopRight]);
+  DrawText(ARect.X, ARect.Bottom, BorderChars[ABorderStyle, bcBottomLeft]);
+  DrawText(ARect.Right, ARect.Bottom, BorderChars[ABorderStyle, bcBottomRight]);
+  HorzLine(ARect.X + 1, ARect.Y, ARect.Width - 2, BorderToLine[ABorderStyle]);
+  HorzLine(ARect.X + 1, ARect.Bottom, ARect.Width - 2, BorderToLine[ABorderStyle]);
+  VertLine(ARect.X, ARect.Y + 1, ARect.Height - 2, BorderToLine[ABorderStyle]);
+  VertLine(ARect.Right, ARect.Y + 1, ARect.Height - 2, BorderToLine[ABorderStyle]);
 end;
 
 destructor TTextDriver.Free;
@@ -297,19 +322,57 @@ begin
   Dispose(Modes, Free);
   Dispose(State, Free);
   Dispose(FStateStack, Free);
+  Keyboard.CursorOn;
   inherited Free;
 end;
 
-procedure TTextDriver.HLine(AX, AY, AWidth: integer; ALineStyle: TLineStyle);
+procedure TTextDriver.HorzFill(AX, AY, AWidth: integer);
 begin
 end;
 
-procedure TTextDriver.VLine(AX, AY, AHeight: integer; ALineStyle: TLineStyle);
+procedure TTextDriver.VertFill(AX, AY, AHeight: integer);
 begin
 end;
 
-procedure TTextDriver.Box(ARect: TRect; ALineStyle: TLineStyle);
+procedure TTextDriver.HorzLineWithEnds(AX, AY, AWidth: integer; ALineStyle: TLineStyle);
 begin
+  DrawText(AX, AY, LineChars[loHorizontal, ALineStyle, lcStart]);
+  DrawText(AX + AWidth - 1, AY, LineChars[loHorizontal, ALineStyle, lcEnd]);
+  HorzLine(AX + 1, AY, AWidth - 2, ALineStyle);
+end;
+
+procedure TTextDriver.VertLineWithEnds(AX, AY, AHeight: integer; ALineStyle: TLineStyle);
+begin
+end;
+
+procedure TTextDriver.HorzLine(AX, AY, AWidth: integer; ALineStyle: TLineStyle);
+var
+  rect: TRect;
+  line: array[0..79] of TTextChar;
+  index: integer;
+begin
+  rect.CreateDims(AX, AY, AWidth, 1);
+  rect.Intersect(State^.ViewPort);
+  if rect.IsEmpty then
+    exit;
+  for index := rect.X to rect.X + rect.Width - 1 do
+    DrawText(index, AY, LineChars[loHorizontal, ALineStyle, lcMiddle]);
+end;
+
+procedure TTextDriver.VertLine(AX, AY, AHeight: integer; ALineStyle: TLineStyle);
+var
+  rect: TRect;
+  line: array[0..79] of TTextChar;
+  index: integer;
+begin
+  rect.CreateDims(AX, AY, 1, AHeight);
+  rect.Intersect(State^.ViewPort);
+  if rect.IsEmpty then
+    exit;
+  for index := rect.Y to rect.Y + rect.Height - 1 do begin
+    DrawText(rect.X, index, LineChars[loHorizontal, ALineStyle, lcMiddle]);
+    DrawText(rect.Right, index, LineChars[loVertical, ALineStyle, lcMiddle]);
+  end;
 end;
 
 procedure TTextDriver.ClrScr;

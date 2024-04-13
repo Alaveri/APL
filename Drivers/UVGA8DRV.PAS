@@ -8,14 +8,17 @@ unit UVga8Drv;
 interface
 
 uses
+  {$IFDEF DOS}
+  Strings,
+  Dos,
+  {$ENDIF}
   Objects,
-  GraphDrv,
-  GrDrv8,
   Common,
   StrUtils,
   Streams,
-  Strings,
-  Drawing;
+  Drawing,
+  GraphDrv,
+  GrDrv8;
 
 type
   PVgaUnchainedDriver = ^TVgaUnchainedDriver;

@@ -9,13 +9,14 @@ interface
 
 uses
   Objects,
-  Except,
+  Errors,
   Lists,
   Common,
-  Consts,
+  AplConst,
   Drawing,
   Streams,
   Lzw,
+
   GraphDrv;
 
 const

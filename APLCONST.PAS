@@ -3,7 +3,7 @@
 {$ELSE}
   {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
-unit Consts;
+unit AplConst;
 
 interface
 

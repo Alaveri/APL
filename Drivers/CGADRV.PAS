@@ -8,13 +8,15 @@ unit CgaDrv;
 interface
 
 uses
+  {$IFDEF DOS}
+  Strings,
+  {$ENDIF}
   Objects,
-  GraphDrv,
   Common,
   StrUtils,
-  Strings,
   Streams,
-  Drawing;
+  Drawing,
+  GraphDrv;
 
 type
   PCgaDriver = ^TCgaDriver;

@@ -8,13 +8,16 @@ unit EgaDrv;
 interface
 
 uses
+  {$IFDEF DOS}
+  Strings,
+  Dos,
+  {$ENDIF}
   Objects,
-  GraphDrv,
   Common,
   StrUtils,
-  Strings,
   Streams,
-  Drawing;
+  Drawing,
+  GraphDrv;
 
 type
   PEgaDriver = ^TEgaDriver;
@@ -46,9 +49,6 @@ type
   end;
 
 implementation
-
-uses
-  Dos;
 
 procedure TEgaDriver.Init;
 begin

@@ -8,12 +8,17 @@ unit DirTxDrv;
 interface
 
 uses
+  {$IFDEF DOS}
+  Dos,
+  Strings,
+  {$ENDIF}
   Objects,
   Lists,
   Common,
+  Lines,
   Drawing,
-  DosConst,
-  Strings,
+  AplTypes,
+  AplDos,
   StrUtils,
   TextDrv;
 
@@ -25,7 +30,7 @@ type
     FStartMode: byte;
     function GetTextAttributes(AForeColor, ABackColor: byte; ABlink: boolean): byte; virtual;
   public
-    procedure RenderText(AText: PChar; ALength: word); virtual;
+    procedure RenderText(AXPos, AYPos: byte; AText: PChar; ALength: word); virtual;
     procedure Write(const AText: string); virtual;
     procedure WriteLarge(AText: PChar); virtual;
     procedure WriteLn(const AText: string); virtual;
@@ -35,9 +40,6 @@ type
     procedure SetBlink(ABlink: boolean); virtual;
     procedure Init; virtual;
     procedure SetMode(AMode: PTextMode); virtual;
-    procedure HLine(AX, AY, AWidth: integer; ALineStyle: TLineStyle); virtual;
-    procedure VLine(AX, AY, AHeight: integer; ALineStyle: TLineStyle); virtual;
-    procedure Box(ARect: TRect; ALineStyle: TLineStyle); virtual;
     procedure FillRect(ARect: TRect); virtual;
     procedure SetXY(AXPos, AYPos: byte); virtual;
     procedure ScrollText; virtual;
@@ -158,7 +160,7 @@ begin
   SetXY(State^.X, State^.Y);
 end;
 
-procedure TDirectTextDriver.RenderText(AText: PChar; ALength: word);
+procedure TDirectTextDriver.RenderText(AXPos, AYPos: byte; AText: PChar; ALength: word);
 var
   ch: TTextChar;
   index: integer;
@@ -166,43 +168,43 @@ var
 begin
   if ALength = 0 then
     exit;
-  if State^.Y > State^.ViewPort.Bottom then
+  if AYPos > State^.ViewPort.Bottom then
     exit;
   ch.Attributes := State^.Attributes;
   for index := 1 to ALength do begin
-    if State^.X < State^.ViewPort.X then begin
+    if AXPos < State^.ViewPort.X then begin
       Inc(State^.X);
       continue;
     end;
-    if State^.Y < State^.ViewPort.Y then
+    if AYPos < State^.ViewPort.Y then
       continue;
     screenPtr := CurrentScreen;
-    Inc(screenPtr, 2 * (State^.Y * Mode^.Width + State^.X));
+    Inc(screenPtr, 2 * (AYPos * Mode^.Width + AXPos));
     ch.Character := AText^;
     Inc(AText);
     Move(ch, screenPtr^, 2);
-    Inc(State^.X);
-    if State^.X > State^.ViewPort.Right then begin
-      State^.X := 0;
-      if State^.Y + 1 > State^.ViewPort.Bottom then begin
+    Inc(AXPos);
+    if AXPos > State^.ViewPort.Right then begin
+      AXPos := State^.ViewPort.X;
+      if AYPos + 1 > State^.ViewPort.Bottom then begin
         if Scroll then
           ScrollText;
       end
       else
-        Inc(State^.Y);
+        Inc(AYPos);
     end;
   end;
-  SetXY(state^.X, state^.Y);
+  SetXY(AXPos, AYPos);
 end;
 
 procedure TDirectTextDriver.Write(const AText: string);
 begin
-  RenderText(@AText[1], Length(AText));
+  RenderText(State^.X, State^.X, @AText[1], Length(AText));
 end;
 
 procedure TDirectTextDriver.WriteLarge(AText: PChar);
 begin
-  RenderText(AText, StrLen(AText));
+  RenderText(State^.X, State^.X, AText, StrLen(AText));
 end;
 
 procedure TDirectTextDriver.SetBlink(ABlink: boolean);
@@ -359,85 +361,6 @@ begin
   end;
 end;
 
-procedure TDirectTextDriver.HLine(AX, AY, AWidth: integer; ALineStyle: TLineStyle);
-var
-  ch: TTextChar;
-  index: integer;
-  offset: PByte;
-  cursorState: boolean;
-begin
-  cursorState := State^.IsCursorOn;
-  if CursorState then CursorOff;
-  ch.Attributes := State^.Attributes;
-  ch.Character := #196;
-  if (ALineStyle = lsDouble) then ch.Character := #205;
-  Offset := CurrentScreen;
-  Inc(offset, 2 * (AY * Mode^.Width + AX));
-  for index := 0 to AWidth - 1 do begin
-    Move(ch, offset^, 2);
-    Inc(offset, 2);
-  end;
-  if CursorState then CursorOn;
-end;
-
-procedure TDirectTextDriver.VLine(AX, AY, AHeight: integer; ALineStyle: TLineStyle);
-var
-  ch: TTextChar;
-  index: integer;
-  offset: PByte;
-  cursorState: boolean;
-begin
-  cursorState := State^.IsCursorOn;
-  if CursorState then CursorOff;
-  ch.Attributes := State^.Attributes;
-  ch.Character := #179;
-  if (ALineStyle = lsDouble) then ch.Character := #186;
-  offset := CurrentScreen;
-  Inc(offset, 2 * (AY * Mode^.Width + AX));
-  for index := AY to AY + AHeight - 1 do begin
-    Move(ch, offset^, 2);
-    Inc(offset, 2 * Mode^.Width);
-  end;
-  if CursorState then CursorOn;
-end;
-
-procedure TDirectTextDriver.Box(ARect: TRect; ALineStyle: TLineStyle);
-var
-  ch: TTextChar;
-  offset: PByte;
-begin
-  ch.Attributes := State^.Attributes;
-
-  ch.Character := #218;
-  if (ALineStyle = lsDouble) then ch.Character := #201;
-  offset := CurrentScreen;
-  Inc(offset, 2 * (ARect.Y * Mode^.Width + ARect.X));
-  Move(ch, offset^, 2);
-
-  ch.Character := #191;
-  if (ALineStyle = lsDouble) then ch.Character := #187;
-  offset := CurrentScreen;
-  Inc(offset, 2 * (ARect.Y * Mode^.Width + ARect.X + ARect.Width - 1));
-  Move(ch, offset^, 2);
-
-  ch.Character := #192;
-  if (ALineStyle = lsDouble) then ch.Character := #200;
-  offset := CurrentScreen;
-  Inc(offset, 2 * ((ARect.Y + ARect.Height - 1) * Mode^.Width + ARect.X));
-  Move(ch, offset^, 2);
-
-  ch.Character := #217;
-  if (ALineStyle = lsDouble) then ch.Character := #188;
-  offset := CurrentScreen;
-  Inc(offset, 2 * ((ARect.Y + ARect.Height - 1) * Mode^.Width + ARect.X + ARect.Width - 1));
-  Move(ch, offset^, 2);
-
-  HLine(ARect.X + 1, ARect.Y, ARect.Width - 2, ALineStyle);
-  HLine(ARect.X + 1, ARect.Y + ARect.Height - 1, ARect.Width - 2, ALineStyle);
-  VLine(ARect.X, ARect.Y + 1, ARect.Height - 2, ALineStyle);
-  VLine(ARect.X + ARect.Width - 1, ARect.Y + 1, ARect.Height - 2, ALineStyle);
-end;
-
 procedure TDirectTextDriver.ClrScr;
 var
   rect: TRect;
@@ -452,7 +375,9 @@ var
   index: integer;
   offset: PByte;
   line, linePtr: PByte;
+  rect: TRect;
 begin
+  ARect.Intersect(State^.ViewPort);
   GetMem(line, ARect.Width * 2);
   offset := CurrentScreen;
   ch.Attributes := State^.Attributes;

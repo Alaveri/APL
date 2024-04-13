@@ -3,14 +3,17 @@
 {$ELSE}
   {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
-unit Apps;
+unit AplApps;
 
 interface
 
 uses
+  {$IFDEF DOS}
+  Dos,
+  {$ENDIF}
   Objects,
   MemDrv,
-  Dos,
+  AplTypes,
   Common,
   StrUtils,
   KeyDrv,
@@ -53,7 +56,7 @@ end;
 procedure TApplication.Init;
 begin
   inherited Init;
-  Mouse.Create;
+  Mouse.Create(false);
   WriteLn('Mouse initialized.');
   Keyboard.Create;
   WriteLn('Keyboard initialized.');

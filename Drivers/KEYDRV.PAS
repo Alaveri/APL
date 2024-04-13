@@ -203,7 +203,7 @@ const
   kyEnter = 13;
   kyBackSpace = 8;
   kyTab = 9;
-  kyShiftTab = ExtKeyFlag + ExtShiftFlag + kyTab;
+  kyShiftTab = ExtKeyFlag + ExtShiftFlag + 15;
 
 type
   PKeyboardDriver = ^TKeyboardDriver;

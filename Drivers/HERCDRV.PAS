@@ -8,13 +8,16 @@ unit HercDrv;
 interface
 
 uses
+  {$IFDEF DOS}
+  Strings,
+  Dos,
+  {$ENDIF}
   Objects,
-  GraphDrv,
   Common,
   StrUtils,
-  Strings,
   Streams,
-  Drawing;
+  Drawing,
+  GraphDrv;
 
 type
   PHerculesDriver = ^THerculesDriver;
@@ -46,9 +49,6 @@ type
   end;
 
 implementation
-
-uses
-  Dos;
 
 procedure THerculesDriver.Init;
 begin

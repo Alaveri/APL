@@ -8,10 +8,13 @@ unit Lists;
 interface
 
 uses
-  Consts,
-  Common,
-  Except,
+  {$IFDEF DOS}
   Strings,
+  Dos,
+  {$ENDIF}
+  AplConst,
+  Common,
+  Errors,
   StrUtils,
   Objects;
 
@@ -31,42 +34,12 @@ type
   PComparer = ^TComparer;
   PCollection = ^TCollection;
   PListBuffer = ^TListBuffer;
-  PEnumerator = ^TEnumerator;
-  PCollectionEnumerator = ^TEnumerator;
   PListNode = ^TListNode;
 
   TSortFunc = procedure(AList: PList; AComparer: TComparer);
   TListBuffer = array[0..ListBufferSize] of pointer;
 
-  TEnumerator = object(TObject)
-  private
-  public
-    Owner: PObject;
-    constructor Create(AOwner: PObject);
-    function MoveNext: boolean; virtual;
-    function Current: pointer; virtual;
-    procedure Init; virtual;
-    procedure Reset; virtual;
-  end;
-
-  TCollectionEnumerator = object(TEnumerator)
-  private
-    FIndex: integer;
-  public
-    function MoveNext: boolean; virtual;
-    function Current: pointer; virtual;
-    procedure Reset; virtual;
-    procedure Init; virtual;
-  end;
-
-  IEnumerable = object(TExceptionObject)
-  private
-  public
-    function GetEnumerator: PEnumerator; virtual;
-    procedure ForEach(AFunc: TFunc);
-  end;
-
-  TCollection = object(IEnumerable)
+  TCollection = object(TExceptionObject)
   private
     FCapacity: integer;
     FBuffer: PListBuffer;
@@ -77,7 +50,6 @@ type
     destructor Free; virtual;
     function Capacity: integer; virtual;
     function Add(AItem: pointer): integer;
-    function GetEnumerator: PEnumerator; virtual;
     procedure SetCapacity(ACapacity: integer);
     procedure Init; virtual;
     procedure Clear; virtual;
@@ -213,15 +185,22 @@ type
   public
   end;
 
+  TStringComparer = object(TObject)
+  private
+  public
+    function CaseSensitive: PComparer;
+    function CaseInsensitive: PComparer;
+  end;
 
-function StringCompare(AItem1, AItem2: pointer): integer; far;
+var
+  TStringCompare: TStringComparer;
 
 implementation
 
 uses
   MemDrv;
 
-function StringCompare(AItem1, AItem2: pointer): integer;
+function StringCompare(AItem1, AItem2: pointer): integer; far;
 var
   str1: PChar;
   str2: PChar;
@@ -231,88 +210,24 @@ begin
   StringCompare := StrComp(str1, str2);
 end;
 
-function IEnumerable.GetEnumerator: PEnumerator;
-begin
-  GetEnumerator := nil;
-end;
-
-{function IEnumerable.Where(APredicate: TPredicate; var AValue)
+function CaseInsensitiveStringCompare(AItem1, AItem2: pointer): integer; far;
 var
-  item: pointer;
+  str1: PChar;
+  str2: PChar;
 begin
-{  item := GetItem();}
-{end;}
-
-procedure IEnumerable.ForEach(AFunc: TFunc);
-var
-  enumerator: PEnumerator;
-  item: pointer;
-begin
-  enumerator := GetEnumerator;
-  item := enumerator^.Current;
-  if not Assigned(item) then
-    exit;
-  repeat
-    AFunc;
-  until not enumerator^.MoveNext;
-  FreeAndnil(enumerator);
+  str1 := PChar(AItem1);
+  str2 := PChar(AItem2);
+  CaseInsensitiveStringCompare := StrIComp(str1, str2);
 end;
 
-constructor TEnumerator.Create(AOwner: PObject);
+function TStringComparer.CaseSensitive: PComparer;
 begin
-  inherited Create;
-  Owner := AOwner;
+  CaseSensitive := @StringCompare;
 end;
 
-function TEnumerator.MoveNext: boolean;
+function TStringComparer.CaseInsensitive: PComparer;
 begin
-end;
-
-procedure TEnumerator.Init;
-begin
-  inherited Init;
-  Owner := nil;
-end;
-
-function TEnumerator.Current: pointer;
-begin
-  Current := nil;
-end;
-
-procedure TEnumerator.Reset;
-begin
-end;
-
-procedure TCollectionEnumerator.Init;
-begin
-  inherited Init;
-  FIndex := 0;
-end;
-
-function TCollectionEnumerator.MoveNext: boolean;
-begin
-  MoveNext := true;
-  if FIndex >= PCollection(Owner)^.Count - 1 then begin
-    MoveNext := false;
-    exit;
-  end;
-  Inc(FIndex);
-end;
-
-procedure TCollectionEnumerator.Reset;
-begin
-  FIndex := 0;
-end;
-
-function TCollectionEnumerator.Current: pointer;
-var
-  collection: PCollection;
-begin
-  Current := nil;
-  collection := PCollection(Owner);
-  if (FIndex < 0) or (FIndex > collection^.Count - 1) then
-    exit;
-  Current := collection^.FBuffer^[FIndex];
+  CaseInsensitive := @CaseInsensitiveStringCompare;
 end;
 
 constructor TCollection.CreateCapacity(ACapacity: integer);
@@ -327,11 +242,6 @@ begin
   Count := 0;
   FBuffer := nil;
   FCapacity := 0;
-end;
-
-function TCollection.GetEnumerator: PEnumerator;
-begin
-  GetEnumerator := New(PCollectionEnumerator, Create(@self));
 end;
 
 destructor TCollection.Free;
@@ -812,7 +722,7 @@ end;
 
 procedure TStringList.SortStrings;
 begin
-  Sort(StringCompare);
+  Sort(TStringCompare.CaseInsensitive^);
 end;
 
 procedure TStringList.Clear;
@@ -1160,4 +1070,6 @@ begin
   inherited FreeNode(ANode);
 end;
 
+begin
+  TStringCompare.Create;
 end.

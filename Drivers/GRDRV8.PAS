@@ -8,18 +8,21 @@ unit GrDrv8;
 interface
 
 uses
+  {$IFDEF DOS}
+  Strings,
+  Dos,
+  {$ENDIF}
   Objects,
   Common,
   Drawing,
   Lists,
-  Consts,
+  AplConst,
+  StrUtils,
+  Streams,
+
   MouseDrv,
   GraphDrv,
-  StrUtils,
-  MemDrv,
-  Strings,
-  Dos,
-  Streams;
+  MemDrv;
 
 const
   MinIntensity = 1;
@@ -228,6 +231,7 @@ procedure TGraphics8Driver.ShowMouseCursor;
 var
   mouseState: TMouseState;
 begin
+  State.ViewPort.SetDims(0, 0, Mode^.Width, Mode^.Height);
   Mouse.ShowMouse;
   Mouse.GetMouseState(mouseState);
   MouseCursor^.Visible := true;
@@ -236,7 +240,8 @@ end;
 
 procedure TGraphics8Driver.HideMouseCursor;
 begin
-  if (not MouseCursor^.Visible) then exit;
+  if not MouseCursor^.Visible then
+    exit;
   State.ViewPort.SetDims(0, 0, Mode^.Width, Mode^.Height);
   EraseMouseCursor(Mouse.State);
   MouseCursor^.Visible := false;
