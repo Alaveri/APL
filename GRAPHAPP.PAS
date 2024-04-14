@@ -1,7 +1,7 @@
 {$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit GraphApp;
 
@@ -28,9 +28,6 @@ type
     constructor Create(ADriverId: TGraphDrivers; AModeId: string);
     procedure Init; virtual;
     procedure InitGraphics(ADriverId: TGraphDrivers);
-    procedure ProcessEvents; virtual;
-    destructor Free; virtual;
-    destructor FreeNoReset; virtual;
   end;
 
 var
@@ -60,7 +57,6 @@ begin
   WriteLn('Graphics initialized.');
   Graph^.SetMode(mode);
   if Graph^.HasException then begin
-    FreeAndNil(Graph);
     WriteLn(ErrorMessage(Graph^.Exception^.Code));
     Close;
   end;
@@ -70,25 +66,6 @@ procedure TGraphApp.Init;
 begin
   inherited Init;
   InitGraphics(FDriverId);
-end;
-
-destructor TGraphApp.Free;
-begin
-  FreeGraphicsDriver;
-  inherited Free;
-end;
-
-destructor TGraphApp.FreeNoReset;
-begin
-  Graph^.ResetModeOnFree := false;
-  FreeGraphicsDriver;
-  inherited Free;
-end;
-
-
-procedure TGraphApp.ProcessEvents;
-begin
-  inherited ProcessEvents;
 end;
 
 end.

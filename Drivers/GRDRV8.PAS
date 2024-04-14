@@ -1,7 +1,7 @@
 {$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit GrDrv8;
 
@@ -10,7 +10,6 @@ interface
 uses
   {$IFDEF DOS}
   Strings,
-  Dos,
   {$ENDIF}
   Objects,
   Common,
@@ -104,14 +103,14 @@ type
     function GetStandardPalette: PRgbPalette; virtual;
     procedure SetMode(AMode: PGraphicsMode); virtual;
     procedure SetStandardPalette; virtual;
-    procedure SetRgbPalette(APalette: TRgbPalette); virtual;
+    procedure SetRgbPalette(APalette: PRgbPalette); virtual;
     procedure SetForeColor8(AColor: TStandardColor; AIntensity: byte); virtual;
     procedure SetBackColor8(AColor: TStandardColor; AIntensity: byte); virtual;
     procedure ShowMouseCursor; virtual;
     procedure HideMouseCursor; virtual;
-    procedure EraseMouseCursor(AMouseState: TMouseState); virtual;
-    procedure DrawMouseCursor(AMouseState: TMouseState); virtual;
-    procedure MoveMouseCursor(AMouseState, AOldMouseState: TMouseState); virtual;
+    procedure EraseMouseCursor(const AMouseState: TMouseState); virtual;
+    procedure DrawMouseCursor(const AMouseState: TMouseState); virtual;
+    procedure MoveMouseCursor(const AMouseState, AOldMouseState: TMouseState); virtual;
   end;
 
   TMouseCursorList = object(TIdentifiableList)
@@ -195,29 +194,34 @@ begin
     FreeAndNil(MouseCursor);
 end;
 
-procedure TGraphics8Driver.MoveMouseCursor(AMouseState, AOldMouseState: TMouseState);
+procedure TGraphics8Driver.MoveMouseCursor(const AMouseState, AOldMouseState: TMouseState);
 var
   oldRect, newRect: TRect;
 begin
   if (not MouseCursor^.Visible) or not (AMouseState.Visible) then
     exit;
-  Graph^.WaitForVSync;
+  WaitForVSync;
   if Assigned(MouseCursor^.FBackData) then
     EraseMouseCursor(AOldMouseState);
   DrawMouseCursor(AMouseState);
 end;
 
-procedure TGraphics8Driver.EraseMouseCursor(AMouseState: TMouseState);
+procedure TGraphics8Driver.EraseMouseCursor(const AMouseState: TMouseState);
 begin
   if (not MouseCursor^.Visible) or not (AMouseState.Visible) then
     exit;
   if Assigned(MouseCursor^.FBackData) then begin
-    DrawImage(AMouseState.X - MouseCursor^.OffsetX, AMouseState.Y - MouseCursor^.OffsetY,
-      MouseCursor^.Width, MouseCursor^.Height, MouseCursor^.FBackData);
+    DrawImage(
+      AMouseState.X - MouseCursor^.OffsetX,
+      AMouseState.Y - MouseCursor^.OffsetY,
+      MouseCursor^.Width,
+      MouseCursor^.Height,
+      MouseCursor^.FBackData
+    );
   end;
 end;
 
-procedure TGraphics8Driver.DrawMouseCursor(AMouseState: TMouseState);
+procedure TGraphics8Driver.DrawMouseCursor(const AMouseState: TMouseState);
 begin
   if (not MouseCursor^.Visible) or (not AMouseState.Visible) then
     exit;
@@ -228,14 +232,12 @@ begin
 end;
 
 procedure TGraphics8Driver.ShowMouseCursor;
-var
-  mouseState: TMouseState;
 begin
   State.ViewPort.SetDims(0, 0, Mode^.Width, Mode^.Height);
   Mouse.ShowMouse;
-  Mouse.GetMouseState(mouseState);
+  Mouse.UpdateState;
   MouseCursor^.Visible := true;
-  DrawMouseCursor(mouseState);
+  DrawMouseCursor(Mouse.State);
 end;
 
 procedure TGraphics8Driver.HideMouseCursor;
@@ -250,10 +252,9 @@ end;
 
 procedure TGraphics8Driver.SetStandardPalette;
 begin
-  if Assigned(Palette) then
-    Dispose(Palette);
+  FreeAndNil(Palette);
   Palette := GetStandardPalette;
-  SetRgbPalette(Palette^);
+  SetRgbPalette(Palette);
 end;
 
 function TGraphics8Driver.GetStandardPalette: PRgbPalette;
@@ -350,22 +351,21 @@ begin
   GetStandardPalette := newPalette;
 end;
 
-procedure TGraphics8Driver.SetRgbPalette(APalette: TRgbPalette);
+procedure TGraphics8Driver.SetRgbPalette(APalette: PRgbPalette);
 var
-  reg: Registers;
   segm, offs: word;
   index: integer;
 begin
   for index := 0 to 255 do begin
-    with APalette[index] do begin
+    with APalette^[index] do begin
       Red := Red shr 2;
       Green := Green shr 2;
       Blue := Blue shr 2;
     end;
   end;
 
-  segm := Seg(APalette);
-  offs := Ofs(APalette);
+  segm := Seg(APalette^);
+  offs := Ofs(APalette^);
 
   asm
     push  ES

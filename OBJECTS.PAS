@@ -1,7 +1,7 @@
 {$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit Objects;
 
@@ -10,7 +10,6 @@ interface
 uses
   {$IFDEF DOS}
   Strings,
-  Dos,
   {$ENDIF}
   AplConst,
   StrUtils;
@@ -20,6 +19,7 @@ type
   PPointer = ^pointer;
   PObject = ^TObject;
   PIdentifiable = ^TIdentifiable;
+  PFunc = ^TFunc;
 
   TComparer = function(AItem1, AItem2: pointer): integer;
   TPredicate = function(AItem: pointer; var AValue): boolean;
@@ -104,7 +104,7 @@ end;
 
 destructor TIdentifiable.Free;
 begin
-  TString.Dispose(Id);
+  TString.Free(Id);
   inherited Free;
 end;
 

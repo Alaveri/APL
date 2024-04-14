@@ -1,7 +1,7 @@
 {$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit Actions;
 
@@ -25,7 +25,7 @@ type
 
   TActionExecuteProc = procedure(AAction: PAction; AActionId: integer);
 
-  TAction = object(TIdentifiable)
+  TAction = object(TObject)
   private
   public
     ActionId: integer;
@@ -46,14 +46,13 @@ type
     procedure Init; virtual;
   end;
 
-  TActionList = object(TIdentifiableList)
+  TActionList = object(TObjectList)
   public
     OnUpdate: PActionListUpdateEventProc;
     function IndexOf(AItem: PAction): integer;
     function NewAction(AActionId: integer; AText: string; AShortcut: word): PAction;
     function Add(AItem: PAction): integer;
     function GetItem(AIndex: integer): PAction;
-    function GetItemById(AId: string): PAction;
     function GetActionById(AActionId: integer): PAction;
     function GetHelpMaxWidth(AControl: pointer): integer;
     procedure Init; virtual;
@@ -100,9 +99,9 @@ end;
 
 destructor TAction.Free;
 begin
-  TString.Dispose(Text);
-  TString.Dispose(ShortcutDisplayName);
-  TString.Dispose(HelpText);
+  TString.Free(Text);
+  TString.Free(ShortcutDisplayName);
+  TString.Free(HelpText);
   inherited Free;
 end;
 
@@ -162,11 +161,6 @@ function TActionList.Add(AItem: PAction): integer;
 begin
   Add := inherited Add(AItem);
   AItem^.ParentList := @self;
-end;
-
-function TActionList.GetItemById(AId: string): PAction;
-begin
-  GetItemById := PAction(inherited GetItemById(AId));
 end;
 
 function TActionList.GetActionById(AActionId: integer): PAction;

@@ -1,7 +1,7 @@
 {$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit GraphDrv;
 
@@ -61,7 +61,6 @@ type
     function IndexOfId(const AId: string): integer;
     function Add(AItem: PGraphicsMode): integer;
     function GetItem(AIndex: integer): PGraphicsMode;
-    function Where(APredicate: TPredicate; var AValue): PGraphicsModeList;
     procedure Insert(AIndex: integer; AItem: PGraphicsMode);
   end;
 
@@ -164,10 +163,9 @@ type
     FDrawBufferSize: word;
   public
     State: TGraphicsState;
-    StateStack: TStack;
+    StateStack: TObjectStack;
     Modes: TGraphicsModeList;
     Mode: PGraphicsMode;
-    ResetModeOnFree: boolean;
     function GetPixel(AX, AY: integer): byte; virtual;
     function ForeColor: longint; virtual;
     function BackColor: longint; virtual;
@@ -233,12 +231,14 @@ uses
   Compress,
   Lzw;
 
+var
+  PreviousExitProc: PFunc;
+
 procedure TGraphicsDriver.Init;
 var
   oldMode: byte;
 begin
   inherited Init;
-  ResetModeOnFree := true;
   asm
     mov ah, 0Fh
     int 10h
@@ -506,8 +506,7 @@ end;
 
 destructor TGraphicsDriver.Free;
 begin
-  if ResetModeOnFree then
-    ResetMode;
+  ResetMode;
   Modes.Free;
   State.Free;
   StateStack.DisposeObjects := true;
@@ -540,8 +539,8 @@ end;
 
 destructor TGraphicsMode.Free;
 begin
-  TString.Dispose(HelpText);
-  TString.Dispose(Description);
+  TString.Free(HelpText);
+  TString.Free(Description);
   inherited Free;
 end;
 
@@ -558,9 +557,9 @@ begin
   Bounds.SetRect(mode^.Bounds);
   Bpp := mode^.Bpp;
   ModeIndex := mode^.ModeIndex;
-  TString.Dispose(Description);
-  TString.Dispose(HelpText);
-  TString.Dispose(Id);
+  TString.Free(Description);
+  TString.Free(HelpText);
+  TString.Free(Id);
   Description := TString.Copy(mode^.Description);
   HelpText:= TString.Copy(mode^.HelpText);
   BytesPerScanLine := mode^.BytesPerScanLine;
@@ -595,11 +594,6 @@ end;
 procedure TGraphicsModeList.Insert(AIndex: integer; AItem: PGraphicsMode);
 begin
   inherited Insert(AIndex, AItem);
-end;
-
-function TGraphicsModeList.Where(APredicate: TPredicate; var AValue): PGraphicsModeList;
-begin
-  Where := PGraphicsModeList(TList.Where(APredicate, AValue));
 end;
 
 destructor TFont.Free;
@@ -1026,4 +1020,16 @@ begin
   inherited Insert(AIndex, AItem);
 end;
 
+procedure GraphDriverExitProc; far;
+begin
+  ExitProc := PreviousExitProc;
+  if Assigned(Graph) then
+    FreeAndNil(Graph);
+  WriteLn('Graphics driver uninstalled.');
+end;
+
+begin
+  Graph := nil;
+  PreviousExitProc := ExitProc;
+  ExitProc := @GraphDriverExitProc;
 end.

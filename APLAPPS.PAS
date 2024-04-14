@@ -1,7 +1,7 @@
 {$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit AplApps;
 
@@ -30,22 +30,14 @@ type
   public
     Closed: boolean;
     OnError: PApplicationErrorProc;
-    constructor Create;
     procedure Init; virtual;
     procedure Run; virtual;
     procedure Close; virtual;
-    procedure MainLoop; virtual;
     procedure ProcessEvents; virtual;
-    procedure Error(ASender: pointer; ACode: word);
-    destructor Free; virtual;
+    procedure Error(ASender: pointer; ACode: word); virtual;
   end;
 
 implementation
-
-constructor TApplication.Create;
-begin
-  inherited Create;
-end;
 
 procedure TApplication.Error(ASender: pointer; ACode: word);
 begin
@@ -56,10 +48,6 @@ end;
 procedure TApplication.Init;
 begin
   inherited Init;
-  Mouse.Create(false);
-  WriteLn('Mouse initialized.');
-  Keyboard.Create;
-  WriteLn('Keyboard initialized.');
   Closed := false;
   OnError := nil;
 end;
@@ -70,7 +58,6 @@ begin
     ProcessEvents;
     if Closed then
       exit;
-    MainLoop;
   until Closed;
 end;
 
@@ -81,17 +68,6 @@ end;
 procedure TApplication.Close;
 begin
   Closed := true;
-end;
-
-procedure TApplication.MainLoop;
-begin
-end;
-
-destructor TApplication.Free;
-begin
-  Mouse.Free;
-  Keyboard.Free;
-  inherited Free;
 end;
 
 end.

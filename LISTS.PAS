@@ -1,7 +1,7 @@
 {$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit Lists;
 
@@ -10,7 +10,6 @@ interface
 uses
   {$IFDEF DOS}
   Strings,
-  Dos,
   {$ENDIF}
   AplConst,
   Common,
@@ -25,9 +24,9 @@ const
 type
   PObjectList = ^TObjectList;
   PList = ^TList;
-  PLinkedList = ^TLinkedList;
   PLinkedObjectList = ^TLinkedObjectList;
   PStack = ^TStack;
+  PObjectStack = ^TStack;
   PQueue = ^TQueue;
   PStringList = ^TStringList;
   PSortFunc = ^TSortFunc;
@@ -69,7 +68,6 @@ type
     function GetItem(AIndex: integer): pointer;
     function SetItem(AIndex: integer; AItem: pointer): boolean;
     function IndexOf(AItem: pointer): integer;
-    function Where(APredicate: TPredicate; var AValue): PList;
     procedure SetComparer(AComparer: TComparer);
     procedure Swap(AIndex1, AIndex2: integer);
     procedure Sort(AComparer: TComparer); virtual;
@@ -101,7 +99,6 @@ type
     function GetNode(AIndex: longint): PListNode;
     function SetItem(AIndex: longint; AItem: pointer): boolean;
     function IndexOf(AItem: pointer): longint;
-    function Where(APredicate: TPredicate; var AValue): PLinkedList;
     procedure Swap(var AItem1, AItem2: PListNode);
     procedure Sort(AComparer: TComparer); virtual;
     procedure Insert(AIndex: longint; AItem: pointer);
@@ -136,7 +133,16 @@ type
     procedure FreeNode(ANode: PListNode); virtual;
   end;
 
-  TStack = object(TObjectList)
+  TStack = object(TList)
+  private
+  public
+    procedure Init; virtual;
+    function Push(AItem: pointer): integer;
+    function Pop: pointer;
+    function Peek: pointer;
+  end;
+
+  TObjectStack = object(TObjectList)
   private
   public
     procedure Init; virtual;
@@ -144,6 +150,7 @@ type
     function Pop: PObject;
     function Peek: PObject;
   end;
+
 
   TQueue = object(TObjectList)
   private
@@ -543,23 +550,8 @@ begin
   Inc(ptr, AIndex);
   next := ptr;
   Inc(next);
-  Move(next^, ptr^, (longint(Count) - AIndex - 1) * PointerSize);
+  Move(next^, ptr^, (Count - AIndex - 1) * PointerSize);
   Dec(Count);
-end;
-
-function TList.Where(APredicate: TPredicate; var AValue): PList;
-var
-  result: PList;
-  index: integer;
-  item: pointer;
-begin
-  result := New(PList, Create);
-  Where := result;
-  for index := 0 to Count - 1 do begin
-    item := GetItem(index);
-    if APredicate(item, AValue) then
-      result^.Add(item);
-  end;
 end;
 
 procedure TObjectList.Init;
@@ -639,18 +631,18 @@ begin
   Delete(0);
 end;
 
-procedure TStack.Init;
+procedure TObjectStack.Init;
 begin
   inherited Init;
   DisposeObjects := false;
 end;
 
-function TStack.Push(AObject: PObject): integer;
+function TObjectStack.Push(AObject: PObject): integer;
 begin
   Push := Add(AObject);
 end;
 
-function TStack.Pop: PObject;
+function TObjectStack.Pop: PObject;
 var
   result: PObject;
 begin
@@ -661,7 +653,36 @@ begin
   Delete(Count - 1);
 end;
 
-function TStack.Peek: PObject;
+function TObjectStack.Peek: PObject;
+begin
+  Peek := nil;
+  if Count = 0 then
+    exit;
+  Peek := GetItem(Count - 1);
+end;
+
+procedure TStack.Init;
+begin
+  inherited Init;
+end;
+
+function TStack.Push(AItem: pointer): integer;
+begin
+  Push := Add(AItem);
+end;
+
+function TStack.Pop: pointer;
+var
+  result: pointer;
+begin
+  result := Peek;
+  Pop := result;
+  if (Count = 0) or not Assigned(result) then
+    exit;
+  Delete(Count - 1);
+end;
+
+function TStack.Peek: pointer;
 begin
   Peek := nil;
   if Count = 0 then
@@ -711,7 +732,7 @@ begin
     exit;
   st := GetItem(AIndex);
   if DisposeStrings then
-    TString.Dispose(st);
+    TString.Free(st);
   inherited Delete(AIndex);
 end;
 
@@ -878,22 +899,6 @@ begin
     current := current^.Next;
   end;
   IndexOf := index;
-end;
-
-function TLinkedList.Where(APredicate: TPredicate; var AValue): PLinkedList;
-var
-  result: PLinkedList;
-  current: PListNode;
-  item: pointer;
-begin
-  result := New(PLinkedList, Create);
-  Where := result;
-  current := FHead;
-  while Assigned(current) do begin
-    if APredicate(current^.Item, AValue) then
-      result^.Add(item);
-    current := current^.Next;
-  end;
 end;
 
 procedure TLinkedList.Swap(var AItem1, AItem2: PListNode);

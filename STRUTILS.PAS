@@ -1,7 +1,7 @@
 {$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit StrUtils;
 
@@ -33,7 +33,7 @@ type
     function EndCopy(ASource: PChar): PChar;
     function Get(ASource: PChar): string;
     function Reassign(ADest, ASource: PChar): PChar;
-    procedure Dispose(var AString: PChar);
+    procedure Free(var AString: PChar);
     procedure Assign(var ADest: PChar; ASource: string);
   end;
 
@@ -92,7 +92,7 @@ begin
   Append := str;
 end;
 
-procedure TStringUtil.Dispose(var AString: PChar);
+procedure TStringUtil.Free(var AString: PChar);
 begin
   if not Assigned(AString) then
     exit;
@@ -144,7 +144,7 @@ end;
 
 function TStringUtil.Reassign(ADest, ASource: PChar): PChar;
 begin
-  self.Dispose(ADest);
+  Free(ADest);
   Reassign := Copy(ASource);
 end;
 
@@ -176,7 +176,7 @@ end;
 
 procedure TStringUtil.Assign(var ADest: PChar; ASource: string);
 begin
-  Dispose(ADest);
+  Free(ADest);
   ADest := New(ASource);
 end;
 

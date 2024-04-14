@@ -1,7 +1,7 @@
 {$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit Images;
 
@@ -114,8 +114,7 @@ end;
 
 destructor TImage.Free;
 begin
-  if Assigned(Buffer) then
-    Dispose(Buffer, Free);
+  FreeAndNil(Buffer);
   inherited Free;
 end;
 
@@ -144,8 +143,7 @@ var
 begin
   if Assigned(Buffer) then begin
     if (AWidth <> FHeader.Width) or (AHeight <> FHeader.Height) then
-      Dispose(Buffer, Free);
-    Buffer := nil;
+      FreeAndNil(Buffer);
   end;
   if not Assigned(Buffer) then begin
     bytes := FHeader.Bpp div 8;
@@ -222,7 +220,7 @@ begin
   if FHeader.Bpp > 1 then
     bytes := FHeader.Bpp div 8;
   if Assigned(Buffer) then
-    Dispose(Buffer, Free);
+    FreeAndNil(Buffer);
   Buffer := New(PMemoryStream, Create(FHeader.Width * FHeader.Height * bytes));
   if not Assigned(Buffer) or Buffer^.HasException then begin
     Raise(ecNotEnoughMemory);

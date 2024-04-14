@@ -1,7 +1,7 @@
 {$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit Files;
 
@@ -20,7 +20,7 @@ uses
   Errors;
 
 type
-  PDirectory = ^TDirectory;
+  PDirectoryContents = ^TDirectoryContents;
   PFile = ^TFile;
   PFileList = ^TFileList;
 
@@ -49,12 +49,11 @@ type
   TDirSort = (dsFilename, dsSize, dsTime);
   TDirSortDirection = (dsAsc, dsDesc);
 
-  TDirectory = object(TFile)
+  TDirectoryContents = object(TFile)
   private
   public
     Files: PFileList;
     Filter: string;
-    constructor Create;
     procedure Init; virtual;
     procedure Sort(ASort: TDirSort; ADirection: TDirSortDirection; ADirsFirst: boolean);
     destructor Free; virtual;
@@ -77,8 +76,8 @@ type
     DefaultFileAttributes: TFileAttributes;
     DefaultDirAttributes: TFileAttributes;
     procedure Init; virtual;
-    function GetDirectory(const APath: string): PDirectory;
-    function GetDirectoryWithAttr(const APath: string; AAttributes: TFileAttributes): PDirectory;
+    function GetDirectory(const APath: string): PDirectoryContents;
+    function GetDirectoryWithAttr(const APath: string; AAttributes: TFileAttributes): PDirectoryContents;
   end;
 
 const
@@ -91,13 +90,14 @@ const
   ];
 
 var
-  Directory: TDirectoryManager;
+  TDirectory: TDirectoryManager;
 
 implementation
 
 var
   SortDirection: TDirSortDirection;
   SortDirsFirst: boolean;
+  PreviousExitProc: PFunc;
 
 function FilenameCompare(AItem1, AItem2: pointer): integer;
 var
@@ -256,25 +256,25 @@ begin
   end;
 end;
 
-function TDirectoryManager.GetDirectory(const APath: string): PDirectory;
+function TDirectoryManager.GetDirectory(const APath: string): PDirectoryContents;
 begin
   GetDirectory := GetDirectoryWithAttr(APath, [faDirectory]);
 end;
 
-function TDirectoryManager.GetDirectoryWithAttr(const APath: string; AAttributes: TFileAttributes): PDirectory;
+function TDirectoryManager.GetDirectoryWithAttr(const APath: string; AAttributes: TFileAttributes): PDirectoryContents;
 var
   dirString: string;
   afile: PFile;
   path: string;
   attributes: TFileAttributes;
-  result: PDirectory;
+  result: PDirectoryContents;
   search: SearchRec;
   more: boolean;
 begin
   dirString := ExtractFilePath(APath);
   attributes := AAttributes + [faDirectory];
   path := dirString + '*.*';
-  result := New(PDirectory, Create);
+  result := New(PDirectoryContents, Create);
   result^.Name := TString.New(ExtractFilePath(FExpand(APath)));
   GetDirectoryWithAttr := result;
   FindFirst(path, byte(attributes), search);
@@ -295,25 +295,20 @@ begin
   end;
 end;
 
-constructor TDirectory.Create;
-begin
-  inherited Create;
-  Files := New(PFileList, Create);
-end;
-
-procedure TDirectory.Init;
+procedure TDirectoryContents.Init;
 begin
   inherited Init;
+  Files := New(PFileList, Create);
   Filter := '*.*';
 end;
 
-destructor TDirectory.Free;
+destructor TDirectoryContents.Free;
 begin
   FreeAndNil(Files);
   inherited Free;
 end;
 
-procedure TDirectory.Sort(ASort: TDirSort; ADirection: TDirSortDirection; ADirsFirst: boolean);
+procedure TDirectoryContents.Sort(ASort: TDirSort; ADirection: TDirSortDirection; ADirsFirst: boolean);
 begin
   SortDirection := ADirection;
   SortDirsFirst := ADirsFirst;
@@ -335,7 +330,7 @@ end;
 
 destructor TFile.Free;
 begin
-  TString.Dispose(Name);
+  TString.Free(Name);
   inherited Free;
 end;
 
@@ -359,6 +354,14 @@ begin
   inherited Insert(AIndex, AItem);
 end;
 
+procedure DirectoryExitProc; far;
 begin
-  Directory.Create;
+  ExitProc := PreviousExitProc;
+  TDirectory.Free;
+end;
+
+begin
+  TDirectory.Create;
+  PreviousExitProc := ExitProc;
+  ExitProc := @DirectoryExitProc;
 end.

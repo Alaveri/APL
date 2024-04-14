@@ -1,7 +1,7 @@
 {$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit SVga8Drv;
 
@@ -10,7 +10,6 @@ interface
 uses
   {$IFDEF DOS}
   Strings,
-  Dos,
   {$ENDIF}
   Objects,
   Errors,
@@ -210,7 +209,7 @@ begin
     mov   bx, [selectedMode]
     int   10h
   end;
-  Mouse.SetMouseResolution(AMode^.Width, AMode^.Height);
+  Mouse.SetMouseResolution(AMode^.Width - 1, AMode^.Height - 1);
   if HasException then
     exit;
   State.FrameBuffer := AMode^.FrameBuffer;
@@ -624,7 +623,13 @@ end;
 
 procedure TSVga8Driver.WaitForVSync;
 begin
-  while Port[$3DA] and $08 = $08 do;
+  asm
+    mov dx, 3DAh
+    @end:
+    in al, dx
+    test al, 8h
+    jz @end
+  end;
 end;
 
 destructor TSVga8Driver.Free;

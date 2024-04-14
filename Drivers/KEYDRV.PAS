@@ -1,13 +1,16 @@
 {$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit KeyDrv;
 
 interface
 
 uses
+  {$IFDEF DOS}
+  Dos,
+  {$ENDIF}
   Objects,
   Common,
   DateTime;
@@ -253,22 +256,23 @@ type
 
 var
   Keyboard: TKeyboardDriver;
-  ShiftStateFlags: TKeyboardFlags absolute $40:$17;
+  {$IFDEF DOS}
+  ShiftStateFlags: TKeyboardFlags absolute $0040:$0017;
+  {$ENDIF}
 
 implementation
 
-uses
-  Dos;
-
 var
   StoredInt09: pointer;
-
-var
+  {$IFDEF DOS}
   KeyboardHead: byte absolute $0040:$001A;
   KeyboardTail: byte absolute $0040:$001C;
   KeyDown: array[byte] of boolean;
+  {$ENDIF}
+  PreviousExitProc: PFunc;
 
-procedure KeyboardHandler(Flags, CS, IP, AX, BX, CX, DX, SI, DI, DS, ES, BP: Word); interrupt;
+(*
+procedure KeyboardHandler(Flags, CS, IP, AX, BX, CX, DX, SI, DI, DS, ES, BP: Word); {$IFDEF DOS}interrupt;{$ENDIF}
 var
   code: byte;
   int9: pointer;
@@ -297,7 +301,7 @@ begin
   asm
     call int9;
   end;
-end;
+end;*)
 
 procedure TKeyboardDriver.ProcessKeyUp;
 begin
@@ -596,7 +600,7 @@ begin
  if FDriverInstalled then
     exit;
   GetIntVec($09, StoredInt09);
-  SetIntVec($09, @KeyboardHandler);
+{  SetIntVec($09, @KeyboardHandler);}
   FDriverInstalled := true;
 end;
 
@@ -632,4 +636,16 @@ begin
   inherited Free;
 end;
 
+procedure KeyboardDriverExitProc; far;
+begin
+  ExitProc := PreviousExitProc;
+  Keyboard.Free;
+  WriteLn('Keyboard driver uninstalled.');
+end;
+
+begin
+  Keyboard.Create;
+  WriteLn('Keyboard driver installed.');
+  PreviousExitProc := ExitProc;
+  ExitProc := @KeyboardDriverExitProc;
 end.

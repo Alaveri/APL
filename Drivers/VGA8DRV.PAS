@@ -1,7 +1,7 @@
 {$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit Vga8Drv;
 
@@ -77,7 +77,7 @@ begin
   end;
   State.FrameBuffer := Mode^.FrameBuffer;
   SetStandardPalette;
-  Mouse.XDiv := 1;
+  Mouse.XShift := 1;
 end;
 
 procedure TVga8Driver.SetPixel(AX, AY: integer);

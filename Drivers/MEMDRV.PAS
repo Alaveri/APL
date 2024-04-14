@@ -1,18 +1,20 @@
 {$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit MemDrv;
 
 interface
 
 uses
+  {$IFDEF Dos}
+  Dos,
+  {$ENDIF}
   Objects,
   Errors,
   Common,
-  Lists,
-  Dos;
+  Lists;
 
 const
   MaxVarSize = $FFF8;
@@ -34,7 +36,6 @@ type
     function GetItem(AIndex: integer): PReference;
     function SetItem(AIndex: integer; AItem: PReference): boolean;
     function IndexOf(AItem: PReference): integer;
-    function Where(APredicate: TPredicate; var AValue): PReferenceList;
     procedure Insert(AIndex: integer; AItem: PReference);
   end;
 
@@ -97,7 +98,6 @@ var
   OutOfMemoryException: PException;
   XmsControl: pointer;
   MoveRecord: TXmsMoveRecord;
-  MemoryInitialized: boolean;
 
 implementation
 
@@ -105,7 +105,7 @@ uses
   AplConst;
 
 var
-  PreviousExitProc: ^TFunc;
+  PreviousExitProc: PFunc;
 
 const
   HiWord = 1;
@@ -121,10 +121,6 @@ begin
 
   { Default to return nil on error }
   OnHeapError := 1;
-
-  { Return nil if Memory driver is not initialized }
-  if not MemoryInitialized then
-    exit;
 
   { Purge conventional references until there is ASize avail + enough space
   for at least 1 reference to be swapped }
@@ -548,7 +544,6 @@ begin
   while FReferences^.Count > 0 do
     FreeReference(FReferences^.GetItem(0));
   FreeAndNil(FReferences);
-  MemoryInitialized := false;
   inherited Free;
 end;
 
@@ -580,7 +575,7 @@ begin
     current := FReferences^.GetItem(0);
     FreeReference(current);
   end;
-  Dispose(FTransactionReferences, Free);
+  FreeAndNil(FTransactionReferences);
 end;
 
 procedure TMemoryDriver.Init;
@@ -598,7 +593,6 @@ begin
   FTransactionReferences := nil;
   XmsControl := nil;
   InitXms;
-  MemoryInitialized := true;
 end;
 
 destructor TReferenceList.Free;
@@ -626,27 +620,21 @@ begin
   inherited SetItem(AIndex, AItem);
 end;
 
-function TReferenceList.Where(APredicate: TPredicate; var AValue): PReferenceList;
-begin
-  Where := PReferenceList(inherited Where(APredicate, AValue));
-end;
-
 procedure TReferenceList.Insert(AIndex: integer; AItem: PReference);
 begin
   inherited Insert(AIndex, AItem);
 end;
 
-procedure MemDrvExitProc; far;
+procedure MemoryDriverExitProc; far;
 begin
   ExitProc := PreviousExitProc;
-  if MemoryInitialized then
-    Memory.Free;
-  MemoryInitialized := false;
+  Memory.Free;
   WriteLn('Memory driver uninstalled.');
 end;
 
 begin
+  Memory.Create;
+  WriteLn('Memory driver installed.');
   PreviousExitProc := ExitProc;
-  ExitProc := @MemDrvExitProc;
-  MemoryInitialized := false;
+  ExitProc := @MemoryDriverExitProc;
 end.

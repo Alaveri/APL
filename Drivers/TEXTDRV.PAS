@@ -1,7 +1,7 @@
 {$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit TextDrv;
 
@@ -116,6 +116,9 @@ var
 
 implementation
 
+var
+  PreviousExitProc: PFunc;
+
 procedure TTextState.Init;
 begin
   ForeColor := 0;
@@ -209,7 +212,7 @@ begin
   if not Assigned(oldState) then
     exit;
   State^.Assign(oldState^);
-  Dispose(oldState, Free);
+  FreeAndNil(oldState);
   if State^.IsCursorOn then
     CursorOn
   else
@@ -319,9 +322,9 @@ end;
 
 destructor TTextDriver.Free;
 begin
-  Dispose(Modes, Free);
-  Dispose(State, Free);
-  Dispose(FStateStack, Free);
+  FreeAndNil(Modes);
+  FreeAndNil(State);
+  FreeAndNil(FStateStack);
   Keyboard.CursorOn;
   inherited Free;
 end;
@@ -407,4 +410,16 @@ procedure TTextDriver.ScrollText;
 begin
 end;
 
+procedure TextDriverExitProc; far;
+begin
+  ExitProc := PreviousExitProc;
+  if Assigned(TextDriver) then
+    FreeAndNil(TextDriver);
+  WriteLn('Text driver uninstalled.');
+end;
+
+begin
+  TextDriver := nil;
+  PreviousExitProc := ExitProc;
+  ExitProc := @TextDriverExitProc;
 end.

@@ -1,7 +1,7 @@
 {$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit Errors;
 
@@ -121,7 +121,9 @@ type
   public
     Exception: PException;
     procedure Init; virtual;
+    {$IFDEF DOS}
     procedure Raise(ACode: TExceptionCode);
+    {$ENDIF}
     procedure RaiseWarning(ACode: TExceptionCode);
     procedure RaiseHint(ACode: TExceptionCode);
     procedure ClearException;
@@ -276,6 +278,7 @@ begin
   NoException := not Assigned(Exception);
 end;
 
+{$IFDEF DOS}
 procedure TExceptionObject.Raise(ACode: TExceptionCode);
 var
   newException: PException;
@@ -292,6 +295,7 @@ begin
   Exception := newException;
   Exception^.InnerException := prev;
 end;
+{$ENDIF}
 
 procedure TExceptionObject.RaiseWarning(ACode: TExceptionCode);
 begin

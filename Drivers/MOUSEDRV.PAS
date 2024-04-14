@@ -1,7 +1,7 @@
 {$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
 {$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
 {$ENDIF}
 unit MouseDrv;
 
@@ -10,9 +10,6 @@ interface
 uses
   Objects,
   Lists;
-
-const
-  SetCursorPositionCode = $04;
 
 type
   PMouseDriver = ^TMouseDriver;
@@ -27,39 +24,38 @@ type
   TButtonStates = set of TButtonState;
 
   TMouseState = object(TObject)
-  private
   public
-    X, Y: integer;
+    X: integer;
+    Y: integer;
     ButtonState: TButtonStates;
     Visible: boolean;
+    WheelCounter: shortint;
     procedure Init; virtual;
-    procedure Clear;
-    function Moved(AState: TMouseState): boolean; virtual;
-    function Equals(AState: TMouseState): boolean;
     procedure Assign(var ASource: TObject); virtual;
-    destructor Free; virtual;
+    procedure Clear;
+    function Equals(const AState: TMouseState): boolean;
+    function Moved(const AState: TMouseState): boolean;
   end;
 
   TMouseDriver = object(TObject)
   private
     FMouseWheelSupported: boolean;
+    function CheckMouseWheelSupported: boolean;
   public
     State: TMouseState;
-    StateStack: TStack;
+    StateStack: TObjectStack;
     UseSystemCursor: boolean;
-    XDiv, YDiv: integer;
-    constructor Create(AUseSystemCursor: boolean);
-    procedure Init; virtual;
-    procedure ShowMouse; virtual;
-    procedure HideMouse; virtual;
-    procedure PushState; virtual;
-    procedure PopState; virtual;
-    procedure GetMouseState(var AState: TMouseState); virtual;
-    procedure InitMouseCursor; virtual;
-    procedure SetMouseResolution(AWidth, AHeight: word); virtual;
-    procedure SetMousePosition(APx, APy: word); virtual;
-{    function IsMouseWheelSupported: boolean;}
+    XShift, YShift: byte;
     destructor Free; virtual;
+    procedure Init; virtual;
+    procedure ShowMouse;
+    procedure HideMouse;
+    procedure PushState;
+    procedure PopState;
+    procedure UpdateState;
+    procedure SetMouseResolution(AMaxX, AMaxY: word);
+    procedure SetMousePosition(APx, APy: word);
+    function IsMouseWheelSupported: boolean;
   end;
 
 var
@@ -68,92 +64,10 @@ var
 implementation
 
 uses
-  {$IFDEF DOS}
-  Dos,
-  {$ENDIF}
   AplDos;
 
-const
-  MouseCursor: array[0..31] of word =
-  (
-    $7FFF,
-    $3FFF,
-    $1FFF,
-    $0FFF,
-    $07FF,
-    $03FF,
-    $3FFF,
-    $7FFF,
-    $FFFF,
-    $FFFF,
-    $FFFF,
-    $FFFF,
-    $FFFF,
-    $FFFF,
-    $FFFF,
-    $FFFF,
-
-    $0000,
-    $0000,
-    $4000,
-    $6000,
-    $7000,
-    $4000,
-    $0000,
-    $0000,
-    $0000,
-    $0000,
-    $0000,
-    $0000,
-    $0000,
-    $0000,
-    $0000,
-    $0000
-
-{
-      0111111111111111
-      0011111111111111
-      0001111111111111
-      0000111111111111
-      0000011111111111
-      0000001111111111
-      0011111111111111
-      0111111111111111
-      1111111111111111
-      1111111111111111
-      1111111111111111
-      1111111111111111
-      1111111111111111
-      1111111111111111
-      1111111111111111
-      1111111111111111
-
-      0000000000000000
-      0000000000000000
-      0100000000000000
-      0110000000000000
-      0111000000000000
-      0100000000000000
-      0000000000000000
-      0000000000000000
-      0000000000000000
-      0000000000000000
-      0000000000000000
-      0000000000000000
-      0000000000000000
-      0000000000000000
-      0000000000000000
-      0000000000000000
-    }
-  );
-
-procedure TMouseState.Clear;
-begin
-  X := 0;
-  Y := 0;
-  ButtonState := [];
-  Visible := false;
-end;
+var
+  PreviousExitProc: PFunc;
 
 procedure TMouseState.Init;
 begin
@@ -161,57 +75,45 @@ begin
   Clear;
 end;
 
-destructor TMouseState.Free;
-begin
-end;
-
 procedure TMouseState.Assign(var ASource: TObject);
 var
-  state: PMouseState;
+  source: PMouseState;
 begin
   inherited Assign(ASource);
-  state := PMouseState(@ASource);
-  X := state^.X;
-  Y := state^.Y;
-  ButtonState := state^.ButtonState;
-  Visible := state^.Visible;
+  source := PMouseState(@ASource);
+  X := source^.X;
+  Y := source^.Y;
+  ButtonState := source^.ButtonState;
+  WheelCounter := source^.WheelCounter;
+  Visible := source^.Visible;
 end;
 
-function TMouseState.Equals(AState: TMouseState): boolean;
+procedure TMouseState.Clear;
 begin
-  Equals := (AState.X = X) and (AState.Y = Y) and (AState.ButtonState = ButtonState);
+  X := 0;
+  Y := 0;
+  ButtonState := [];
+  WheelCounter := 0;
+  Visible := false;
 end;
 
-function TMouseState.Moved(AState: TMouseState): boolean;
+function TMouseState.Equals(const AState: TMouseState): boolean;
 begin
-  Moved := (AState.X <> X) or (AState.Y <> Y);
+  Equals :=
+    (AState.X = X)
+    and (AState.Y = Y)
+    and (AState.WheelCounter = WheelCounter)
+    and (AState.ButtonState = ButtonState);
 end;
 
-constructor TMouseDriver.Create(AUseSystemCursor: boolean);
+function TMouseState.Moved(const AState: TMouseState): boolean;
 begin
-  inherited Create;
-  UseSystemCursor := AUseSystemCursor;
-  if AUseSystemCursor then
-    InitMouseCursor;
-end;
-
-procedure TMouseDriver.InitMouseCursor;
-var
-  segm, offs: word;
-begin
-  segm := Seg(MouseCursor);
-  offs := Ofs(MouseCursor);
-  asm
-    mov   AX, 09h
-    mov   BX, 0
-    mov   CX, 0
-    mov   ES, [segm]
-    mov   DX, [offs]
-    int   33h
-  end;
+  Moved := (X <> AState.X) or (Y <> AState.Y);
 end;
 
 destructor TMouseDriver.Free;
+var
+  index: integer;
 begin
   StateStack.DisposeObjects := true;
   StateStack.Free;
@@ -219,38 +121,26 @@ begin
   inherited Free;
 end;
 
-{procedure TMouseDriver.MouseWheelSupported;
-begin
-// INT 33/0011 - Check wheel support and get capabilities flags
-// 	AX = 0011h
-// Return:	AX = 574Dh ('WM' in assembly) if Wheel API is supported by driver
-// 	BX = Capabilities flag (all bits reserved)
-// 	CX = Capabilities flag
-// 		Bit(s)	Description
-// 		------	-----------
-// 		 0	1=Pointing device supports wheel
-// 		 1-15	Reserved
-// Note:	this function should be examined before accessing wheel features
-end;}
-
 procedure TMouseDriver.Init;
 var
   success: boolean;
   result: word;
 begin
   inherited Init;
+  StateStack.Create;
+  State.Create;
   success := false;
   asm
     mov  AX, 0
     int  33h
-    mov  [result], AX
+    mov  result, AX
   end;
   success := result = $FFFF;
-  State.Create;
-  StateStack.Create;
+  if success then
+    CheckMouseWheelSupported;
   UseSystemCursor := false;
-  XDiv := 0;
-  YDiv := 0;
+  XShift := 0;
+  YShift := 0;
 end;
 
 procedure TMouseDriver.ShowMouse;
@@ -292,32 +182,40 @@ begin
   if not Assigned(oldState) then
     exit;
   State.Assign(oldState^);
-  Dispose(oldState, Free);
+  FreeAndNil(oldState);
 end;
 
-procedure TMouseDriver.SetMouseResolution(AWidth, AHeight: word);
+function TMouseDriver.IsMouseWheelSupported: boolean;
 begin
-  Dec(AWidth, 1);
-  Dec(AHeight, 1);
+  IsMouseWheelSupported := FMouseWheelSupported;
+end;
+
+function TMouseDriver.CheckMouseWheelSupported: boolean;
+var
+  result: word;
+  caps: word;
+begin
+  FMouseWheelSupported := false;
   asm
-    push si
-    mov ax, 0
-    int 33h
-    mov ax, 10h
-    mov cx, [AWidth]
-    mov dx, [AHeight]
-    mov si, 0
-    mov di, 0
-    int 33h
+    mov  AX, 0011h
+    int  33h
+    mov  [result], AX
+    mov  [caps], CX
+  end;
+  FMouseWheelSupported := (result = $574D) and (caps and $01 > 0);
+end;
+
+procedure TMouseDriver.SetMouseResolution(AMaxX, AMaxY: word);
+begin
+  asm
     mov ax, 07h
     mov cx, 0
-    mov dx, [AWidth]
+    mov dx, AMaxX
     int 33h
     mov ax, 08h
     mov cx, 0
-    mov dx, [AHeight]
+    mov dx, AMaxY
     int 33h
-    pop si
   end;
 end;
 
@@ -325,36 +223,46 @@ procedure TMouseDriver.SetMousePosition(APx, APy: word);
 begin
   asm
     mov   ax, 04h
-    mov   cx, [APx]
-    mov   dx, [APy]
+    mov   cx, APx
+    mov   dx, APy
     int   33h
   end;
 end;
 
-procedure TMouseDriver.GetMouseState(var AState: TMouseState);
+procedure TMouseDriver.UpdateState;
 var
-  reg: Registers;
   x, y, status: word;
 begin
-  FillChar(reg, SizeOf(reg), 0);
-  AState.Create;
   asm
     mov   AX, 3
     int   33h
-    mov   [x], CX
-    mov   [y], DX
-    mov   [status], BX
+    mov   x, CX
+    mov   y, DX
+    mov   status, BX
   end;
-  AState.X := x shr XDiv;
-  AState.Y := y shr YDiv;
-  AState.Visible := State.Visible;
+  State.X := x shr XShift;
+  State.Y := y shr YShift;
+  State.ButtonState := [];
+  if FMouseWheelSupported and (Hi(status) <> 0) then
+    State.WheelCounter := shortInt(hi(status))
+  else
+    State.WheelCounter := 0;
   if (status and $01 > 0) then
-    Include(AState.ButtonState, bsLeft);
+    Include(State.ButtonState, bsLeft);
   if (status and $02 > 0) then
-    Include(AState.ButtonState, bsRight);
-  State.X := AState.X;
-  State.Y := AState.Y;
-  State.ButtonState := AState.ButtonState;
+    Include(State.ButtonState, bsRight);
 end;
 
+procedure MouseDriverExitProc; far;
+begin
+  ExitProc := PreviousExitProc;
+  Mouse.Free;
+  WriteLn('Mouse driver uninstalled.');
+end;
+
+begin
+  Mouse.Create;
+  WriteLn('Mouse driver installed.');
+  PreviousExitProc := ExitProc;
+  ExitProc := @MouseDriverExitProc;
 end.
