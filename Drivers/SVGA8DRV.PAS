@@ -129,7 +129,7 @@ begin
     end;
     recordPtr := @vbeMode;
     asm
-      mov ax, $4F01
+      mov ax, 4F01h
       les di, recordPtr
       mov cx, [vbeModeIndex]
       int 10h

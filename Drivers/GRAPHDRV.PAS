@@ -654,6 +654,9 @@ function TFont.TextWidth(const AText: string): longint;
 var
   textPtr: PChar;
 begin
+  TextWidth := 0;
+  if Length(AText) = 0 then
+    exit;
   textPtr := @AText[1];
   TextWidth := TextWidthAny(textPtr, Length(AText));
 end;

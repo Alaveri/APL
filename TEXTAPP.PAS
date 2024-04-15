@@ -13,7 +13,6 @@ uses
   Errors,
   AplApps,
   KeyDrv,
-  Crt,
   TextDrv,
   TextIni;
 
@@ -70,7 +69,6 @@ end;
 destructor TTextApplication.Free;
 begin
   FreeTextDriver;
-  ClrScr;
   Keyboard.CursorOn;
   inherited Free;
 end;

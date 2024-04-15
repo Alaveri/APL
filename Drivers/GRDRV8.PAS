@@ -368,14 +368,12 @@ begin
   offs := Ofs(APalette^);
 
   asm
-    push  ES
     mov   AX, 1012h
     mov   BX, 0
     mov   CX, 00FFh
     mov   ES, [segm]
     mov   DX, [offs]
     int   10h
-    pop   ES
   end;
 end;
 

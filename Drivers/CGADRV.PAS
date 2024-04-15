@@ -49,8 +49,10 @@ type
 
 implementation
 
+{$IFDEF DOS }
 uses
   Dos;
+{$ENDIF}
 
 procedure TCgaDriver.Init;
 begin
