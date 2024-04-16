@@ -1,7 +1,7 @@
 {$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O-,P+,Q+,R+,S+,T-,V-,X+}
 {$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O-,P+,Q+,R-,S-,T+,V-,X+}
 {$ENDIF}
 unit Files;
 
@@ -53,6 +53,7 @@ type
   private
   public
     Files: PFileList;
+    Path: string;
     Filter: string;
     procedure Init; virtual;
     procedure Sort(ASort: TDirSort; ADirection: TDirSortDirection; ADirsFirst: boolean);
@@ -64,6 +65,7 @@ type
   public
     function GetItem(AIndex: longint): PFile;
     function IndexOf(AItem: PFile): longint;
+    function Find(const AFilename: string): PFile;
     function Add(AItem: PFile): integer;
     procedure Insert(AIndex: longint; AItem: PFile);
   end;
@@ -77,7 +79,6 @@ type
     DefaultDirAttributes: TFileAttributes;
     procedure Init; virtual;
     function GetDirectory(const APath: string): PDirectoryContents;
-    function GetDirectoryWithAttr(const APath: string; AAttributes: TFileAttributes): PDirectoryContents;
   end;
 
 const
@@ -87,6 +88,15 @@ const
     faSystem,
     faVolumeID,
     faDirectory
+  ];
+
+  ValidDosChars = [
+    'A'..'Z',
+    'a'..'z',
+    '0'..'9',
+    '.',
+    '!', '#', '$', '%', '&', ',', '(', ')', '-', '@', '^', '_',
+    '`', '{', '}', '~', '*', '?'
   ];
 
 var
@@ -222,8 +232,6 @@ end;
 procedure TDirectoryManager.Init;
 begin
   inherited Init;
-  DefaultDirAttributes := [faDirectory];
-  DefaultFileAttributes := [faReadOnly, faArchive];
 end;
 
 procedure TDirectoryManager.SetFileInfo(AFile: PFile; ASearch: SearchRec);
@@ -257,41 +265,51 @@ begin
 end;
 
 function TDirectoryManager.GetDirectory(const APath: string): PDirectoryContents;
-begin
-  GetDirectory := GetDirectoryWithAttr(APath, [faDirectory]);
-end;
-
-function TDirectoryManager.GetDirectoryWithAttr(const APath: string; AAttributes: TFileAttributes): PDirectoryContents;
 var
-  dirString: string;
   afile: PFile;
-  path: string;
   attributes: TFileAttributes;
   result: PDirectoryContents;
+  dirPath: string;
   search: SearchRec;
   more: boolean;
 begin
-  dirString := ExtractFilePath(APath);
-  attributes := AAttributes + [faDirectory];
-  path := dirString + '*.*';
   result := New(PDirectoryContents, Create);
-  result^.Name := TString.New(ExtractFilePath(FExpand(APath)));
-  GetDirectoryWithAttr := result;
-  FindFirst(path, byte(attributes), search);
+  result^.Path := FExpand(Trim(APath));
+  result^.Filter := ExtractFullname(APath);
+  result^.Name := TString.New(ExtractDirectory(APath));
+  GetDirectory := result;
+  attributes := [];
+
+  FindFirst(result^.Path, byte(attributes), search);
   more := HandleError(DosError);
   if HasException then
     exit;
   while more do begin
-    if not ((faDirectory in TFileAttributes(search.Attr))
-      and (search.Name = '.')) then begin
-      afile := New(PFile, Create);
-      SetFileInfo(afile, search);
-      result^.Files^.Add(afile);
-    end;
+    afile := New(PFile, Create);
+    SetFileInfo(afile, search);
+    result^.Files^.Add(afile);
     FindNext(search);
     more := HandleError(DosError);
     if HasException then
       exit;
+  end;
+  attributes := [faDirectory];
+  dirPath := ExtractDirectory(result^.Path) + '*.*';
+  FindFirst(dirPath, byte(attributes), search);
+  more := HandleError(DosError);
+  if HasException then
+    exit;
+  while more do begin
+    if (faDirectory in TFileAttributes(search.Attr))
+      and not ((search.Name = '..') and
+        (Length(ExtractDirectory(result^.Path)) <= 3))
+      and (search.Name <> '.') then begin
+      afile := New(PFile, Create);
+      SetFileInfo(afile, search);
+      result^.Files^.Add(afile);
+    end;
+    more := HandleError(DosError);
+    FindNext(search);
   end;
 end;
 
@@ -299,7 +317,8 @@ procedure TDirectoryContents.Init;
 begin
   inherited Init;
   Files := New(PFileList, Create);
-  Filter := '*.*';
+  Path := '';
+  Filter := '';
 end;
 
 destructor TDirectoryContents.Free;
@@ -337,6 +356,23 @@ end;
 function TFileList.GetItem(AIndex: longint): PFile;
 begin
   GetItem := PFile(inherited GetItem(AIndex));
+end;
+
+function TFileList.Find(const AFilename: string): PFile;
+var
+  index: integer;
+  aFile: PFile;
+  result: PFile;
+begin
+  result := nil;
+  for index := 0 to Count - 1 do begin
+    aFile := GetItem(index);
+    if not (faDirectory in aFile^.Attr)
+      and StringsEqualInsensitive(StrPas(aFile^.Name), AFilename) then begin
+      result := aFile;
+      exit;
+    end;
+  end;
 end;
 
 function TFileList.IndexOf(AItem: PFile): longint;

@@ -1,7 +1,7 @@
 {$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O-,P+,Q+,R+,S+,T-,V-,X+}
 {$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O-,P+,Q+,R-,S-,T+,V-,X+}
 {$ENDIF}
 unit DateTime;
 
@@ -59,6 +59,7 @@ type
     procedure GetDateParts(var AYear: word; var AMonth: byte; var ADay: byte);
     procedure GetTimeParts(var AHour, AMinute, ASecond, AHundredth: byte);
     procedure SetNow;
+    procedure Assign(var ASource: TObject); virtual;
     function ToString: string; virtual;
     function ToStringFormat(const AFormat: string): string;
     function GetTicks(AYear, AMonth, ADay, AHour, AMinute, ASecond,
@@ -426,6 +427,15 @@ end;
 function TDateTime.ToString: string;
 begin
   ToString := ToStringFormat(DateTimeFormat);
+end;
+
+procedure TDateTime.Assign(var ASource: TObject);
+var
+  source: PDateTime;
+begin
+  inherited Assign(ASource);
+  source := PDateTime(@ASource);
+  Ticks := source^.Ticks;
 end;
 
 function TDateTime.ToStringFormat(const AFormat: string): string;

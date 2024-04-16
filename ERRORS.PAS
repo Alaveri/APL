@@ -1,7 +1,7 @@
 {$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O-,P+,Q+,R+,S+,T-,V-,X+,Y+}
+  {$A-,B-,D+,F+,G-,I+,L+,N+,O-,P+,Q+,R+,S+,T-,V-,X+}
 {$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O-,P+,Q-,R-,S-,T-,V-,X+,Y-}
+  {$A-,B-,D-,F+,G-,I+,L-,N+,O-,P+,Q+,R-,S-,T+,V-,X+}
 {$ENDIF}
 unit Errors;
 
@@ -96,6 +96,7 @@ const
   ecFileInvalidHandle = 1004;
   ecFileInvalidEnvironment = 1005;
   ecFileInvalidFormat = 1006;
+  ecDirChangeError = 1007;
 
   { User defined errors }
   ecUser = 5000;
@@ -194,6 +195,7 @@ begin
     ecFileInvalidHandle: ErrorMessage := 'Invalid file handle';
     ecFileInvalidEnvironment: ErrorMessage := 'Invalid environment';
     ecFileInvalidFormat: ErrorMessage := 'Invalid file format';
+    ecDirChangeError: ErrorMessage := 'Error changing directory';
     else begin
       if AErrorCode >= ecUser then begin
         if Assigned(CustomErrorMessage) then begin
