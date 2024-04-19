@@ -1,8 +1,4 @@
-{$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O-,P+,Q+,R+,S+,T-,V-,X+}
-{$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O-,P+,Q+,R-,S-,T+,V-,X+}
-{$ENDIF}
+{$I COMPILER.INC}
 unit MouseDrv;
 
 interface
@@ -24,7 +20,7 @@ type
   TButtonStates = set of TButtonState;
 
   TMouseState = object(TObject)
-  public
+  {$IFDEF VER70}public{$ENDIF}
     X: integer;
     Y: integer;
     ButtonState: TButtonStates;
@@ -38,10 +34,10 @@ type
   end;
 
   TMouseDriver = object(TObject)
-  private
+  {$IFDEF VER70}private{$ENDIF}
     FMouseWheelSupported: boolean;
     function CheckMouseWheelSupported: boolean;
-  public
+  {$IFDEF VER70}public{$ENDIF}
     State: TMouseState;
     StateStack: TObjectStack;
     UseSystemCursor: boolean;
@@ -55,6 +51,8 @@ type
     procedure UpdateState;
     procedure SetMouseResolution(AMaxX, AMaxY: word);
     procedure SetMousePosition(APx, APy: word);
+    procedure SetIncToPixelRatio(AIncPerPixX, AIncPerPixY: word);
+    procedure SetSensitivity(ASensX, ASensY: real);
     function IsMouseWheelSupported: boolean;
   end;
 
@@ -183,6 +181,33 @@ begin
     exit;
   State.Assign(oldState^);
   FreeAndNil(oldState);
+end;
+
+procedure TMouseDriver.SetSensitivity(ASensX, ASensY: real);
+var
+  x, y: integer;
+begin
+  x := Round(32 / ASensX);
+  y := Round(32 / ASensY);
+  asm
+    mov AX, 000Fh
+    mov CX, x
+    mov DX, y
+    int 33h
+    mov AX, 0013h
+    mov DX, 65535
+  end;
+
+end;
+
+procedure TMouseDriver.SetIncToPixelRatio(AIncPerPixX, AIncPerPixY: word);
+begin
+  asm
+    mov AX, 000Fh
+    mov CX, AIncPerPixX
+    mov DX, AIncPerPixY
+    int 33h
+  end;
 end;
 
 function TMouseDriver.IsMouseWheelSupported: boolean;

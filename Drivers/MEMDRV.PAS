@@ -1,8 +1,4 @@
-{$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O-,P+,Q+,R+,S+,T-,V-,X+}
-{$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O-,P+,Q+,R-,S-,T+,V-,X+}
-{$ENDIF}
+{$I COMPILER.INC}
 unit MemDrv;
 
 interface
@@ -25,12 +21,13 @@ type
   PXmsMoveRecord = ^TXmsMoveRecord;
   PMemoryDriver = ^TMemoryDriver;
   PMemoryAllocErrorProc = ^TMemoryAllocErrorProc;
+  PBuffer = ^TBuffer;
 
   TMemoryAllocErrorProc = function(ASize: word): boolean;
 
   TReferenceList = object(TList)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     destructor Free; virtual;
     function Add(AItem: PReference): integer;
     function GetItem(AIndex: integer): PReference;
@@ -54,7 +51,7 @@ type
   end;
 
   TMemoryDriver = object(TExceptionObject)
-  private
+  {$IFDEF VER70}private{$ENDIF}
     FXmsSupported: boolean;
     FReferences: PReferenceList;
     FCurrentReference: PReference;
@@ -67,7 +64,7 @@ type
     procedure MoveReference(AMoveRecord: PXmsMoveRecord);
     procedure MoveToConventional(AReference: PReference);
     procedure PurgeConventional(ASize: longint);
-  public
+  {$IFDEF VER70}public{$ENDIF}
     OnAllocError: PMemoryAllocErrorProc;
     constructor Create;
     destructor Free; virtual;
@@ -91,6 +88,31 @@ type
     procedure DebugFreeHandles;
     procedure DebugWriteHandles(ANewHandle: word);
     {$ENDIF}
+  end;
+
+  TBuffer = object(TExceptionObject)
+  private
+    procedure SetDataSize(ASize: word; AClear, APreserve: boolean);
+  public
+    Data: PByte;
+    Size: word;
+    constructor Create;
+    constructor CreateSize(var ASize: word);
+    constructor CreateClear(var ASize: word);
+    function AsString: PChar;
+    procedure SetSize(ASize: word; AClear: boolean);
+    procedure SetSizePreserve(ASize: word; AClear: boolean);
+    procedure SetByte(APos: word; AByte: byte);
+    procedure SetChar(APos: word; AChar: char);
+    procedure Move(AFrom, ATo, ALength: word);
+    procedure FreeData;
+    procedure Clear;
+    procedure FillByte(AByte: byte; ASize: word);
+    procedure FillChar(AChar: char; ASize: word);
+    procedure FillAllBytes(AByte: word);
+    procedure FillAllChars(AChar: char);
+    procedure Init; virtual;
+    destructor Free; virtual;
   end;
 
 var
@@ -630,6 +652,153 @@ begin
   ExitProc := PreviousExitProc;
   Memory.Free;
   WriteLn('Memory driver uninstalled.');
+end;
+
+constructor TBuffer.Create;
+begin
+  inherited Create;
+  Data := nil;
+  Size := 0;
+end;
+
+constructor TBuffer.CreateSize(var ASize: word);
+begin
+  Create;
+  SetSize(ASize, false);
+end;
+
+constructor TBuffer.CreateClear(var ASize: word);
+begin
+  SetSize(ASize, true);
+end;
+
+function TBuffer.AsString: PChar;
+begin
+  AsString := PChar(Data);
+end;
+
+procedure TBuffer.SetSize(ASize: word; AClear: boolean);
+begin
+  SetDataSize(ASize, AClear, false);
+end;
+
+procedure TBuffer.SetSizePreserve(ASize: word; AClear: boolean);
+begin
+  SetDataSize(ASize, AClear, true);
+end;
+
+procedure TBuffer.SetDataSize(ASize: word; AClear, APreserve: boolean);
+var
+  newData: PByte;
+  ptr: PByte;
+begin
+  if ASize > MaxVarSize then begin
+    Raise(ecInvalidAllocSize);
+    exit;
+  end;
+  GetMem(newData, ASize);
+  if newData = nil then begin
+    Raise(ecNotEnoughMemory);
+    exit;
+  end;
+  if Data = nil then begin
+    Data := newData;
+    Size := ASize;
+    exit;
+  end;
+  if ASize > Size then begin
+    if APreserve then begin
+      System.Move(Data^, newData^, Size);
+      if AClear then begin
+        ptr := newData;
+        Inc(ptr, Size);
+        System.FillChar(ptr^, ASize - Size, 0);
+      end;
+    end
+    else begin
+      if AClear then
+        System.FillChar(newData^, ASize, 0);
+    end;
+  end else begin
+    if APreserve then
+      System.Move(Data^, newData^, ASize)
+    else begin
+      if AClear then
+        System.FillChar(newData^, ASize, 0);
+    end;
+  end;
+  FreeMem(Data, Size);
+  Data := newData;
+  Size := ASize;
+end;
+
+procedure TBuffer.FreeData;
+begin
+  if Size > 0 then
+    FreeMem(Data, Size);
+  Size := 0;
+  Data := nil;
+end;
+
+procedure TBuffer.Clear;
+begin
+  if Size > 0 then
+    System.FillChar(Data^, Size, 0);
+end;
+
+procedure TBuffer.FillByte(AByte: byte; ASize: word);
+begin
+  if (ASize = 0) or (ASize = 0) then
+    exit;
+  ASize := MinWord(ASize, Size);
+  System.FillChar(Data^, ASize, AByte);
+end;
+
+procedure TBuffer.FillChar(AChar: char; ASize: word);
+begin
+  FillByte(byte(AChar), ASize);
+end;
+
+procedure TBuffer.FillAllBytes(AByte: word);
+begin
+  FillByte(AByte, Size);
+end;
+
+procedure TBuffer.FillAllChars(AChar: char);
+begin
+  FillChar(AChar, Size);
+end;
+
+procedure TBuffer.SetByte(APos: word; AByte: byte);
+begin
+  if APos > Size - 1 then
+    exit;
+  AsString[APos] := char(AByte);
+end;
+
+procedure TBuffer.Move(AFrom, ATo, ALength: word);
+var
+  ptr: PChar;
+begin
+  ptr := AsString;
+  System.Move(ptr[AFrom], ptr[ATo], ALength);
+end;
+
+procedure TBuffer.SetChar(APos: word; AChar: char);
+begin
+  SetByte(APos, Ord(AChar));
+end;
+
+procedure TBuffer.Init;
+begin
+  inherited Init;
+  Data := nil;
+end;
+
+destructor TBuffer.Free;
+begin
+  FreeData;
+  inherited Free;
 end;
 
 begin

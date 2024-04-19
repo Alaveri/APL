@@ -1,8 +1,4 @@
-{$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O-,P+,Q+,R+,S+,T-,V-,X+}
-{$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O-,P+,Q+,R-,S-,T+,V-,X+}
-{$ENDIF}
+{$I COMPILER.INC}
 unit Images;
 
 interface
@@ -44,14 +40,14 @@ type
   end;
 
   TImage = object(TExceptionObject)
-  private
+  {$IFDEF VER70}private{$ENDIF}
     FHeader: TImageHeader;
     procedure InitHeader;
     procedure SaveToStreamLzw(ADest: PStream);
     procedure SaveToStreamRaw(ADest: PStream);
     procedure ReadHeader(ASource: PStream; var AHeader: TImageHeader);
     procedure WriteHeader(ADest: PStream);
-  public
+  {$IFDEF VER70}public{$ENDIF}
     Buffer: PMemoryStream;
     constructor Create;
     constructor CreateSize(AWidth, AHeight: word; ABpp: byte);
@@ -75,8 +71,8 @@ type
   end;
 
   TImageList = object(TObjectList)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     function GetItem(AIndex: integer): PImage;
     function IndexOf(AItem: PImage): integer;
     function Add(AItem: PImage): integer;

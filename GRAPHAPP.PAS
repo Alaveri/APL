@@ -1,8 +1,4 @@
-{$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O-,P+,Q+,R+,S+,T-,V-,X+}
-{$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O-,P+,Q+,R-,S-,T+,V-,X+}
-{$ENDIF}
+{$I COMPILER.INC}
 unit GraphApp;
 
 interface
@@ -21,10 +17,10 @@ type
   PGraphApp = ^TGraphApp;
 
   TGraphApp = object(TApplication)
-  private
+  {$IFDEF VER70}private{$ENDIF}
     FDriverId: TGraphDrivers;
     FModeId: string;
-  public
+  {$IFDEF VER70}public{$ENDIF}
     constructor Create(ADriverId: TGraphDrivers; AModeId: string);
     procedure Init; virtual;
     procedure InitGraphics(ADriverId: TGraphDrivers);

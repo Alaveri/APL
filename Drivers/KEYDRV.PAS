@@ -1,8 +1,4 @@
-{$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O-,P+,Q+,R+,S+,T-,V-,X+}
-{$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O-,P+,Q+,R-,S-,T+,V-,X+}
-{$ENDIF}
+{$I COMPILER.INC}
 unit KeyDrv;
 
 interface
@@ -234,11 +230,11 @@ type
   end;
 
   TKeyboardDriver = object(TObject)
-  private
+  {$IFDEF VER70}private{$ENDIF}
     FDriverInstalled: boolean;
     procedure InstallInterrupt;
     procedure UninstallInterrupt;
-  public
+  {$IFDEF VER70}public{$ENDIF}
     OnKeyInterrupt: PKeyInterruptProc;
     function KeyPressed: boolean;
     function GetKey: word;
@@ -493,7 +489,7 @@ end;
 
 procedure TKeyboardDriver.CursorOn;
 begin
-  asm
+   asm
     mov   AH, 3
     mov   BX, 0
     int   10h

@@ -1,8 +1,4 @@
-{$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O-,P+,Q+,R+,S+,T-,V-,X+}
-{$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O-,P+,Q+,R-,S-,T+,V-,X+}
-{$ENDIF}
+{$I COMPILER.INC}
 unit DirTxDrv;
 
 interface
@@ -26,10 +22,10 @@ type
   PDirectTextDriver = ^TDirectTextDriver;
 
   TDirectTextDriver = object(TTextDriver)
-  private
+  {$IFDEF VER70}private{$ENDIF}
     FStartMode: byte;
     function GetTextAttributes(AForeColor, ABackColor: byte; ABlink: boolean): byte; virtual;
-  public
+  {$IFDEF VER70}public{$ENDIF}
     procedure RenderText(AXPos, AYPos: byte; AText: PChar; ALength: word); virtual;
     procedure Write(const AText: string); virtual;
     procedure WriteLarge(AText: PChar); virtual;

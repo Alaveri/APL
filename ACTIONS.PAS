@@ -1,8 +1,4 @@
-{$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O-,P+,Q+,R+,S+,T-,V-,X+}
-{$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O-,P+,Q+,R-,S-,T+,V-,X+}
-{$ENDIF}
+{$I COMPILER.INC}
 unit Actions;
 
 interface
@@ -12,22 +8,22 @@ uses
   MouseDrv,
   StrUtils,
   AplTypes,
+  VeriType,
   Common,
   Lists;
 
 type
   PAction = ^TAction;
-  PActionListUpdateEventProc = ^TActionListUpdateEventProc;
+  PActionUpdateProc = ^TActionUpdateProc;
   PActionList = ^TActionList;
   PActionExecuteProc = ^TActionExecuteProc;
 
-  TActionListUpdateEventProc = procedure(ASender: PActionList);
-
-  TActionExecuteProc = procedure(AAction: PAction; AActionId: integer);
+  TActionUpdateProc = procedure(ASender: PObject; AAction: PAction; AActionId: integer);
+  TActionExecuteProc = procedure(ASender: PObject; AAction: PAction);
 
   TAction = object(TObject)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     ActionId: integer;
     Text: PChar;
     HelpText: PChar;
@@ -38,6 +34,7 @@ type
     OnExecute: PActionExecuteProc;
     ModalResult: TModalResult;
     Owner: PObject;
+    OnUpdate: PActionUpdateProc;
     constructor Create(AActionId: integer; AText: string; AShortcut: word);
     constructor CreateEmpty;
     procedure SetHelpText(AHelpText: string); virtual;
@@ -47,8 +44,7 @@ type
   end;
 
   TActionList = object(TObjectList)
-  public
-    OnUpdate: PActionListUpdateEventProc;
+  {$IFDEF VER70}public{$ENDIF}
     function IndexOf(AItem: PAction): integer;
     function NewAction(AActionId: integer; AText: string; AShortcut: word): PAction;
     function Add(AItem: PAction): integer;
@@ -181,7 +177,6 @@ end;
 procedure TActionList.Init;
 begin
   inherited Init;
-  OnUpdate := nil;
 end;
 
 procedure TActionList.Insert(AIndex: integer; AItem: PAction);

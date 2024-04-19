@@ -1,8 +1,4 @@
-{$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O-,P+,Q+,R+,S+,T-,V-,X+}
-{$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O-,P+,Q+,R-,S-,T+,V-,X+}
-{$ENDIF}
+{$I COMPILER.INC}
 unit Compress;
 
 interface
@@ -20,7 +16,7 @@ type
   TCompressProgressProc = procedure(ASender: PCompressor; AMax, ACurrent: longint);
 
   TCompressor = object(TExceptionObject)
-  private
+  {$IFDEF VER70}private{$ENDIF}
     FReadBufferSize: word;
     FWriteBufferSize: word;
     FSource, FDest: PStream;
@@ -34,7 +30,7 @@ type
     FReadPtr, FWritePtr: PByte;
     FProgressCounter: word;
     procedure SetBufferSize(AReadBufferSize, AWriteBufferSize: word);
-  public
+  {$IFDEF VER70}public{$ENDIF}
     OnProgress: PCompressProgressProc;
     Source, Dest: PStream;
     ProgressIncrement: word;

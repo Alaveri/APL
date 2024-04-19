@@ -1,8 +1,4 @@
-{$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O-,P+,Q+,R+,S+,T-,V-,X+}
-{$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O-,P+,Q+,R-,S-,T+,V-,X+}
-{$ENDIF}
+{$I COMPILER.INC}
 unit Vga8Drv;
 
 interface
@@ -25,9 +21,9 @@ type
   PVga8Driver = ^TVga8Driver;
 
   TVga8Driver = object(TGraphics8Driver)
-  private
+  {$IFDEF VER70}private{$ENDIF}
     function GetScreenPtr(AX, AY: integer; var AOffset: word): PByte;
-  public
+  {$IFDEF VER70}public{$ENDIF}
     function GetPixel(AX, AY: integer): byte; virtual;
     procedure GetImage(AX, AY, AWidth, AHeight: longint; ABuffer: PByte); virtual;
     procedure GetImageStream(AX, AY, AWidth, AHeight: longint; AStream: PStream); virtual;

@@ -1,8 +1,4 @@
-{$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O-,P+,Q+,R+,S+,T-,V-,X+}
-{$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O-,P+,Q+,R-,S-,T+,V-,X+}
-{$ENDIF}
+{$I COMPILER.INC}
 unit Files;
 
 interface
@@ -36,8 +32,8 @@ type
   TFileAttributes = set of TFileAttribute;
 
   TFile = object(TObject)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     Name: PChar;
     Attr: TFileAttributes;
     Time: TDateTime;
@@ -50,8 +46,8 @@ type
   TDirSortDirection = (dsAsc, dsDesc);
 
   TDirectoryContents = object(TFile)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     Files: PFileList;
     Path: string;
     Filter: string;
@@ -61,8 +57,8 @@ type
   end;
 
   TFileList = object(TObjectList)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     function GetItem(AIndex: longint): PFile;
     function IndexOf(AItem: PFile): longint;
     function Find(const AFilename: string): PFile;
@@ -71,10 +67,10 @@ type
   end;
 
   TDirectoryManager = object(TExceptionObject)
-  private
+  {$IFDEF VER70}private{$ENDIF}
     function HandleError(AError: integer): boolean;
     procedure SetFileInfo(AFile: PFile; ASearch: SearchRec);
-  public
+  {$IFDEF VER70}public{$ENDIF}
     DefaultFileAttributes: TFileAttributes;
     DefaultDirAttributes: TFileAttributes;
     procedure Init; virtual;
@@ -238,7 +234,6 @@ procedure TDirectoryManager.SetFileInfo(AFile: PFile; ASearch: SearchRec);
 var
   result: PFile;
   fileTime: Dos.DateTime;
-  s: double;
 begin
   AFile^.Name := TString.New(ASearch.Name);
   AFile^.Size := ASearch.Size;
@@ -246,7 +241,6 @@ begin
   UnpackTime(ASearch.Time, fileTime);
   AFile^.Time.CreateDateTime(fileTime.Year, fileTime.Month, fileTime.Day,
     fileTime.Hour, fileTime.Min, fileTime.Sec, 1);
-  s := AFile^.Time.Second;
 end;
 
 function TDirectoryManager.HandleError(AError: integer): boolean;

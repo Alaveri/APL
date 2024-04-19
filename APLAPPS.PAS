@@ -1,8 +1,4 @@
-{$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O-,P+,Q+,R+,S+,T-,V-,X+}
-{$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O-,P+,Q+,R-,S-,T+,V-,X+}
-{$ENDIF}
+{$I COMPILER.INC}
 unit AplApps;
 
 interface
@@ -26,8 +22,8 @@ type
   TApplicationErrorProc = procedure(ASender: pointer; ACode: word);
 
   TApplication = object(TObject)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     Closed: boolean;
     OnError: PApplicationErrorProc;
     procedure Init; virtual;

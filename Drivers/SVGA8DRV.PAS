@@ -1,8 +1,4 @@
-{$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O-,P+,Q+,R+,S+,T-,V-,X+}
-{$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O-,P+,Q+,R-,S-,T+,V-,X+}
-{$ENDIF}
+{$I COMPILER.INC}
 unit SVga8Drv;
 
 interface
@@ -25,19 +21,19 @@ type
   PSVga8Mode = ^TSvga8Mode;
 
   TSvga8Mode = object(TGraphicsMode)
-  private
+  {$IFDEF VER70}private{$ENDIF}
     FAttributes: TVbeModeAttributes;
     FWinSize: word;
     FWinFuncPtr: pointer;
     FGranularity: word;
-  public
+  {$IFDEF VER70}public{$ENDIF}
     procedure Init; virtual;
     procedure Assign(var ASource: TObject); virtual;
   end;
 
   PSVga8Driver = ^TSVga8Driver;
   TSVga8Driver = object(TGraphics8Driver)
-  private
+  {$IFDEF VER70}private{$ENDIF}
     FSVga8Driver: integer;
     FCurrentBank: integer;
     FWinSize: word;
@@ -45,7 +41,7 @@ type
     FBankShift: word;
     procedure SetBank(ABank: word);
     function GetScreenPtr(AX, AY: integer; var AOffset: longint): PByte;
-  public
+  {$IFDEF VER70}public{$ENDIF}
     function GetPixel(AX, AY: integer): byte; virtual;
     procedure GetImage(AX, AY, AWidth, AHeight: longint; ABuffer: PByte); virtual;
     procedure GetImageStream(AX, AY, AWidth, AHeight: longint; AStream: PStream); virtual;

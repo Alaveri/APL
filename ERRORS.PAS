@@ -1,8 +1,4 @@
-{$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O-,P+,Q+,R+,S+,T-,V-,X+}
-{$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O-,P+,Q+,R-,S-,T+,V-,X+}
-{$ENDIF}
+{$I COMPILER.INC}
 unit Errors;
 
 interface
@@ -105,8 +101,8 @@ type
   PExceptionObject = ^TExceptionObject;
 
   TException = object(TIdentifiable)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     Code: TExceptionCode;
     Severity: TExceptionSeverity;
     InnerException: PException;
@@ -118,8 +114,8 @@ type
   end;
 
   TExceptionObject = object(TIdentifiable)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     Exception: PException;
     procedure Init; virtual;
     {$IFDEF DOS}

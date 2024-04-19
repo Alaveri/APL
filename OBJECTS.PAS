@@ -1,16 +1,9 @@
-{$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O-,P+,Q+,R+,S+,T-,V-,X+}
-{$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O-,P+,Q+,R-,S-,T+,V-,X+}
-{$ENDIF}
+{$I COMPILER.INC}
 unit Objects;
 
 interface
 
 uses
-  {$IFDEF DOS}
-  Strings,
-  {$ENDIF}
   AplConst,
   StrUtils;
 
@@ -26,8 +19,8 @@ type
   TFunc = procedure;
 
   TObject = object
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     constructor Create;
     destructor Free; virtual;
     function ToString: string; virtual;
@@ -37,8 +30,8 @@ type
   end;
 
   TIdentifiable = object(TObject)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     Id: PChar;
     constructor CreateId(const AId: string);
     destructor Free; virtual;

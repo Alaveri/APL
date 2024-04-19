@@ -18,7 +18,7 @@ mono_crash.*
 
 # Build results
 [Dd]ebug/
-[Dd]ebugPublic/
+[Dd]ebug{$IFDEF VER70}public{$ENDIF}/
 [Rr]elease/
 [Rr]eleases/
 x64/

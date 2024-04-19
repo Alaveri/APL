@@ -1,8 +1,4 @@
-{$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O-,P+,Q+,R+,S+,T-,V-,X+}
-{$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O-,P+,Q+,R-,S-,T+,V-,X+}
-{$ENDIF}
+{$I COMPILER.INC}
 unit TextApp;
 
 interface
@@ -20,11 +16,11 @@ type
   PTextApplication = ^TTextApplication;
 
   TTextApplication = object(TApplication)
-  private
+  {$IFDEF VER70}private{$ENDIF}
     FDriverId: TTextDrivers;
     FModeId: string;
     procedure InitText(ADriverId: TTextDrivers);
-  public
+  {$IFDEF VER70}public{$ENDIF}
     constructor Create(ADriverId: TTextDrivers; AModeId: string);
     procedure Init; virtual;
     procedure ProcessEvents; virtual;

@@ -1,8 +1,4 @@
-{$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O-,P+,Q+,R+,S+,T-,V-,X+}
-{$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O-,P+,Q+,R-,S-,T+,V-,X+}
-{$ENDIF}
+{$I COMPILER.INC}
 unit Lists;
 
 interface
@@ -39,11 +35,11 @@ type
   TListBuffer = array[0..ListBufferSize] of pointer;
 
   TCollection = object(TExceptionObject)
-  private
+  {$IFDEF VER70}private{$ENDIF}
     FCapacity: integer;
     FBuffer: PListBuffer;
     procedure Grow;
-  public
+  {$IFDEF VER70}public{$ENDIF}
     Count: integer;
     constructor CreateCapacity(ACapacity: integer);
     destructor Free; virtual;
@@ -55,12 +51,12 @@ type
   end;
 
   TList = object(TCollection)
-  private
+  {$IFDEF VER70}private{$ENDIF}
     FSorted: boolean;
     FComparer: TComparer;
     function GetSortedIndex(AItem: pointer): integer;
     procedure QuickSort(AComparer: TComparer; ALowIndex, AHighIndex: integer);
-  public
+  {$IFDEF VER70}public{$ENDIF}
     constructor CreateSorted(AComparer: TComparer);
     procedure Init; virtual;
     function Add(AItem: pointer): integer;
@@ -82,7 +78,7 @@ type
   end;
 
   TLinkedList = object(TObject)
-  private
+  {$IFDEF VER70}private{$ENDIF}
     FHead: PListNode;
     FTail: PListNode;
     function GetSortedIndex(AItem: pointer): longint;
@@ -90,7 +86,7 @@ type
     procedure MergeSort(AComparer: TComparer; var AHead: PListNode);
     procedure FrontBackSplit(ASource: PListNode; var Afront, ABack: PListNode);
     procedure FreeNode(ANode: PListNode); virtual;
-  public
+  {$IFDEF VER70}public{$ENDIF}
     Count: longint;
     destructor Free; virtual;
     procedure Init; virtual;
@@ -107,14 +103,16 @@ type
   end;
 
   TObjectList = object(TList)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     DisposeObjects: boolean;
     destructor Free; virtual;
     function IndexOf(AItem: PObject): integer;
     function Add(AItem: PObject): integer;
+    function AddRange(AList: PObjectList; ACopy: boolean): integer; virtual;
     function GetItem(AIndex: integer): PObject;
     function SetItem(AIndex: integer; AItem: PObject): boolean;
+    function GetNewObject: PObject; virtual;
     procedure Init; virtual;
     procedure Insert(AIndex: integer; AItem: PObject);
     procedure Delete(AIndex: integer);
@@ -122,7 +120,7 @@ type
   end;
 
   TLinkedObjectList = object(TLinkedList)
-  public
+  {$IFDEF VER70}public{$ENDIF}
     DisposeObjects: boolean;
     procedure Init; virtual;
     function Add(AItem: PObject): PListNode;
@@ -134,8 +132,8 @@ type
   end;
 
   TStack = object(TList)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     procedure Init; virtual;
     function Push(AItem: pointer): integer;
     function Pop: pointer;
@@ -143,8 +141,8 @@ type
   end;
 
   TObjectStack = object(TObjectList)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     procedure Init; virtual;
     function Push(AObject: PObject): integer;
     function Pop: PObject;
@@ -153,15 +151,15 @@ type
 
 
   TQueue = object(TObjectList)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     procedure Init; virtual;
     function Enqueue(AObject: PObject): integer;
     function Dequeue: PObject;
   end;
 
   TStringList = object(TList)
-  public
+  {$IFDEF VER70}public{$ENDIF}
     DisposeStrings: boolean;
     destructor Free; virtual;
     function IndexOf(AItem: PChar): integer;
@@ -177,8 +175,8 @@ type
   end;
 
   TIdentifiableList = object(TObjectList)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     function IndexOf(AItem: PIdentifiable): integer;
     function Add(AItem: PIdentifiable): integer;
     function GetItemById(const AId: string): PIdentifiable;
@@ -188,13 +186,13 @@ type
   end;
 
   THeirarchy = object(TObject)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
   end;
 
   TStringComparer = object(TObject)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     function CaseSensitive: PComparer;
     function CaseInsensitive: PComparer;
   end;
@@ -256,6 +254,27 @@ begin
   if Assigned(FBuffer) then
     FreeMem(FBuffer, FCapacity * PointerSize);
   inherited Free;
+end;
+
+function TObjectList.GetNewObject: PObject;
+begin
+  GetNewObject := New(PObject, Create);
+end;
+
+function TObjectList.AddRange(AList: PObjectList; ACopy: boolean): integer;
+var
+  index: integer;
+  obj: PObject;
+begin
+  for index := 0 to Count - 1 do begin
+    if not ACopy then
+      AList^.Add(GetItem(index))
+    else begin
+      obj := GetNewObject;
+      obj^.Assign(GetItem(index)^);
+      AList^.Add(obj);
+    end;
+  end;
 end;
 
 procedure TCollection.Grow;
