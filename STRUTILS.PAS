@@ -1,22 +1,21 @@
-{$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
-{$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
-{$ENDIF}
+{$I COMPILER.INC}
 unit StrUtils;
 
 interface
 
+{$IFDEF DOS}
 uses
-  Strings;
+  Strings,
+  Dos;
+{$ENDIF}
 
 type
   TStringCompareOption = (scIgnoreCase);
   TStringCompareOptions = set of TStringCompareOption;
 
   TStringUtil = object
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     constructor Create;
     function New(ASource: string): PChar;
     function CompareLength(AStr1, AStr2: PChar; AMaxLength: word; ACompareOptions: TStringCompareOptions): integer;
@@ -28,7 +27,9 @@ type
     function CopyLength(ASource: PChar; AMaxLength: word): PChar;
     function EndString(AString: PChar): PChar;
     function EndCopy(ASource: PChar): PChar;
-    procedure Dispose(var AString: PChar);
+    function Get(ASource: PChar): string;
+    function Reassign(ADest, ASource: PChar): PChar;
+    procedure Free(var AString: PChar);
     procedure Assign(var ADest: PChar; ASource: string);
   end;
 
@@ -62,6 +63,8 @@ begin
   if not Assigned(AStr1) or (Length(AStr2) = 0) then
     exit;
   GetMem(str, StrLen(AStr1) + Length(AStr2) + 1);
+  if not Assigned(str) then
+    exit;
   short := AStr2 + #0;
   str := StrCat(AStr1, @short[1]);
   AppendShort := str;
@@ -77,13 +80,15 @@ begin
   str2Len := StrLen(AStr2);
   len := str1Len + str2Len + 1;
   GetMem(str, len);
+  if not Assigned(str) then
+    exit;
   FillChar(str^, len, 0);
   if Assigned(AStr1) then
     str := StrCat(AStr1, AStr2);
   Append := str;
 end;
 
-procedure TStringUtil.Dispose(var AString: PChar);
+procedure TStringUtil.Free(var AString: PChar);
 begin
   if not Assigned(AString) then
     exit;
@@ -133,6 +138,12 @@ begin
   Copy := dest;
 end;
 
+function TStringUtil.Reassign(ADest, ASource: PChar): PChar;
+begin
+  Free(ADest);
+  Reassign := Copy(ASource);
+end;
+
 function TStringUtil.CompareLength(AStr1, AStr2: PChar; AMaxLength: word; ACompareOptions: TStringCompareOptions): integer;
 begin
   if scIgnoreCase in ACompareOptions then
@@ -161,8 +172,15 @@ end;
 
 procedure TStringUtil.Assign(var ADest: PChar; ASource: string);
 begin
-  Dispose(ADest);
+  Free(ADest);
   ADest := New(ASource);
+end;
+
+function TStringUtil.Get(ASource: PChar): string;
+begin
+  Get := '';
+  if Assigned(ASource) then
+    Get := StrPas(ASource);
 end;
 
 begin

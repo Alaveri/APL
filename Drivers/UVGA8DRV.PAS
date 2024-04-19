@@ -1,28 +1,27 @@
-{$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
-{$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
-{$ENDIF}
+{$I COMPILER.INC}
 unit UVga8Drv;
 
 interface
 
 uses
+  {$IFDEF DOS}
+  Strings,
+  Dos,
+  {$ENDIF}
   Objects,
-  GraphDrv,
-  GrDrv8,
   Common,
   StrUtils,
   Streams,
-  Strings,
-  Drawing;
+  Drawing,
+  GraphDrv,
+  GrDrv8;
 
 type
   PVgaUnchainedDriver = ^TVgaUnchainedDriver;
   TVgaUnchainedDriver = object(TGraphics8Driver)
-  private
+  {$IFDEF VER70}private{$ENDIF}
     procedure DrawTextAny(x, y: integer; text: string; largeText: PChar); virtual;
-  public
+  {$IFDEF VER70}public{$ENDIF}
     function GetPixel(x, y: integer): byte; virtual;
     procedure GetImage(x, y, width, height: longint; buffer: PByte); virtual;
     procedure GetImageStream(x, y, width, height: longint; stream: PStream); virtual;

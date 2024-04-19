@@ -1,3 +1,7 @@
+unit SVgaType;
+
+interface
+
 const
   mmTextMode = $00;
   mmCgaGraphics = $01;
@@ -128,7 +132,7 @@ type
     LinRsvdMaskSize: byte; {Size of direct color reserved mask in linear modes}
     LinRsvdFieldPosition: byte; {Bit position of lsb of reserved mask}
     MaxPixelClock: longint; {Maximum pixel clock (in hz) for graphics modes}
-    Reserved4: array[0..188] of byte;
+    Reserved4: array[0..189] of byte;
   end;
 
   TVbeMode = record
@@ -136,3 +140,7 @@ type
     v2: TVbeModeInfo2;
     v3: TVbeModeInfo3;
   end;
+
+implementation
+
+end.

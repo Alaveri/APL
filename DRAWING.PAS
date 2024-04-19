@@ -1,14 +1,11 @@
-{$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
-{$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
-{$ENDIF}
+{$I COMPILER.INC}
 unit Drawing;
 
 interface
 
 uses
   Objects,
+  Lists,
   Common;
 
 type
@@ -16,9 +13,51 @@ type
   PPoint = ^TPoint;
   PRect = ^TRect;
   PSize = ^TSize;
+  PShape = ^TShape;
+  PShapeList = ^TShapeList;
+  PPointList = ^TPointList;
+  PRegion = ^TRegion;
 
-  TPoint = object(TObject)
-  public
+  TShape = object(TObject)
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
+    procedure Init; virtual;
+    procedure Assign(var ASource: TObject); virtual;
+    function GetNewObject: PObject; virtual;
+    function GetInversionPoints(AY, AStartX, AEndX: integer): PPointList; virtual;
+  end;
+
+  TRegion = object(TObjectList)
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
+    Shapes: PShapeList;
+    procedure Init; virtual;
+    procedure Assign(var ASource: TObject); virtual;
+    function GetInversionPoints(AY, AStartX, AEndX: integer): PPointList; virtual;
+  end;
+
+  TPointList = object(TObjectList)
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
+    function IndexOf(AItem: PPoint): integer;
+    function Add(AItem: PPoint): integer;
+    function GetItem(AIndex: integer): PPoint;
+    function SetItem(AIndex: integer; AItem: PPoint): boolean;
+    procedure Insert(AIndex: integer; AItem: PPoint);
+  end;
+
+  TShapeList = object(TObjectList)
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
+    function IndexOf(AItem: PShape): integer;
+    function Add(AItem: PShape): integer;
+    function GetItem(AIndex: integer): PShape;
+    function SetItem(AIndex: integer; AItem: PShape): boolean;
+    procedure Insert(AIndex: integer; AItem: PShape);
+  end;
+
+  TPoint = object(TShape)
+  {$IFDEF VER70}public{$ENDIF}
     X, Y: integer;
     constructor Create;
     constructor CreateCoords(AX, AY: longint);
@@ -34,8 +73,8 @@ type
   PLocation = ^TLocation;
   TLocation = TPoint;
 
-  TRect = object(TObject)
-  public
+  TRect = object(TShape)
+  {$IFDEF VER70}public{$ENDIF}
     X, Y: integer;
     Width, Height: integer;
     constructor CreateDims(AX, AY, AWidth, AHeight: integer);
@@ -52,6 +91,7 @@ type
     procedure Intersect(var ARect: TRect);
     procedure GetIntersection(ARect: TRect; var AResult: TRect);
     procedure Init; virtual;
+    function GetNewObject: PObject; virtual;
     function Equals(ARect: TRect): boolean;
     function EqualsCoords(AX, AY, AWidth, AHeight: integer): boolean;
     function IsEmpty: boolean;
@@ -60,10 +100,11 @@ type
     function IntersectsCoords(AX, AY: integer): boolean;
     function IntersectsPoint(APoint: TPoint): boolean;
     function IntersectsRect(ARect: TRect): boolean;
-  end;
+    function GetInversionPoints(AY, AStartX, AEndX: integer): PPointList; virtual;
+ end;
 
   TSize = object(TObject)
-  public
+  {$IFDEF VER70}public{$ENDIF}
     Width, Height: longint;
     constructor Create;
     constructor CreateDims(AWidth, AHeight: longint);
@@ -75,6 +116,17 @@ type
   end;
 
 implementation
+
+function PointXAscendingCompare(AItem1, AItem2: pointer): integer;
+var
+  result: integer;
+begin
+  result := 0;
+  if (PPoint(AItem1)^.X < PPoint(AItem2)^.X) then
+    result := -1
+  else if (PPoint(AItem1)^.X < PPoint(AItem2)^.X) then
+    result := 1;
+end;
 
 constructor TRect.CreateRect(ARect: TRect);
 begin
@@ -93,6 +145,12 @@ begin
   inherited Create;
   SetCoords(AX, AY, ARight, ABottom);
 end;
+
+function TRect.GetNewObject: PObject;
+begin
+  GetNewObject := New(PRect, Create);
+end;
+
 
 procedure TRect.SetRight(ARight: integer);
 begin
@@ -238,6 +296,29 @@ begin
     MinLong(Right, ARect.Right), MinLong(Bottom, ARect.Bottom));
 end;
 
+function TRect.GetInversionPoints(AY, AStartX, AEndX: integer): PPointList;
+var
+  result: PPointList;
+  index: integer;
+  point: PPoint;
+  inverse: boolean;
+  intersects: boolean;
+begin
+  result := New(PPointList, CreateCapacity(16));
+
+  inverse := false;
+  for index := AStartX to AEndX do begin
+    intersects := IntersectsCoords(index, AY);
+    if (intersects and not inverse) or (inverse and not intersects) then begin
+      point := New(PPoint, CreateCoords(index, AY));
+      result^.Add(point);
+      inverse := not inverse;
+    end;
+  end;
+
+  GetInversionPoints := result;
+end;
+
 constructor TPoint.Create;
 begin
   Init;
@@ -330,6 +411,120 @@ procedure TSize.Grow(ADW, ADH: longint);
 begin
   Inc(width, ADW);
   Inc(height, ADH);
+end;
+
+procedure TShape.Init;
+begin
+  inherited Init;
+end;
+
+function TPointList.IndexOf(AItem: PPoint): integer;
+begin
+  IndexOf := inherited IndexOf(AItem);
+end;
+
+function TPointList.Add(AItem: PPoint): integer;
+begin
+  Add := inherited Add(AItem);
+end;
+
+function TPointList.GetItem(AIndex: integer): PPoint;
+begin
+  GetItem := PPoint(inherited GetItem(AIndex));
+end;
+
+function TPointList.SetItem(AIndex: integer; AItem: PPoint): boolean;
+begin
+  SetItem := inherited SetItem(AIndex, AItem);
+end;
+
+procedure TPointList.Insert(AIndex: integer; AItem: PPoint);
+begin
+  inherited Insert(AIndex, AItem);
+end;
+
+function TShapeList.IndexOf(AItem: PShape): integer;
+begin
+  IndexOf := inherited IndexOf(AItem);
+end;
+
+function TShapeList.Add(AItem: PShape): integer;
+begin
+  Add := inherited Add(AItem);
+end;
+
+function TShapeList.GetItem(AIndex: integer): PShape;
+begin
+  GetItem := PShape(inherited GetItem(AIndex));
+end;
+
+function TShapeList.SetItem(AIndex: integer; AItem: PShape): boolean;
+begin
+  SetItem := inherited SetItem(AIndex, AItem);
+end;
+
+procedure TShapeList.Insert(AIndex: integer; AItem: PShape);
+begin
+  inherited Insert(AIndex, AItem);
+end;
+
+function TShape.GetNewObject: PObject;
+begin
+  GetNewObject := New(PShape, Create);
+end;
+
+function TShape.GetInversionPoints(AY, AStartX, AEndX: integer): PPointList;
+begin
+end;
+
+procedure TShape.Assign(var ASource: TObject);
+var
+  source: PShape;
+begin
+  inherited Assign(ASource);
+  source := PShape(@ASource);
+end;
+
+procedure TRegion.Init;
+begin
+  inherited Init;
+  Shapes := New(PShapeList, Create);
+end;
+
+procedure TRegion.Assign(var ASource: TObject);
+var
+  source: PRegion;
+  index: integer;
+  shape, sourceShape: PShape;
+begin
+  inherited Assign(ASource);
+  source := PRegion(@ASource);
+  if Assigned(Shapes) then
+    FreeAndNil(Shapes);
+  for index := 0 to source^.Shapes^.Count - 1 do begin
+    sourceShape := source^.Shapes^.GetItem(index);
+    shape := New(PShape, Create);
+    shape^.Assign(sourceShape^);
+    Shapes^.Add(shape);
+  end;
+end;
+
+function TRegion.GetInversionPoints(AY, AStartX, AEndX: integer): PPointList;
+var
+  index: integer;
+  result: PPointList;
+  shape: PShape;
+  shapePoints: PPointList;
+  point, newPoint: PPoint;
+begin
+  result := New(PPointList, CreateSorted(PointXAscendingCompare));
+  for index := 0 to Shapes^.Count - 1 do begin
+    shape := Shapes^.GetItem(index);
+    shapePoints := shape^.GetInversionPoints(AY, AStartX, AEndX);
+    result^.AddRange(shapePoints, true);
+    FreeAndNil(shapePoints);
+  end;
+  GetInversionPoints := result;
 end;
 
 end.

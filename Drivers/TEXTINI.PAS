@@ -1,8 +1,4 @@
-{$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
-{$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
-{$ENDIF}
+{$I COMPILER.INC}
 unit TextIni;
 
 interface
@@ -19,14 +15,20 @@ type
     tdAnsi
   );
 
-procedure CreateTextDriver(ADriverId: TTextDrivers);
+procedure InitTextDriver(ADriverId: TTextDrivers);
+procedure FreeTextDriver;
 
 implementation
 
-procedure CreateTextDriver(ADriverId: TTextDrivers);
+procedure FreeTextDriver;
+begin
+  FreeAndNil(TextDriver);
+end;
+
+procedure InitTextDriver(ADriverId: TTextDrivers);
 begin
   case ADriverId of
-    tdDirect: Text := New(PDirectTextDriver, Create);
+    tdDirect: TextDriver := New(PDirectTextDriver, Create);
     tdAnsi: ;
   end;
 end;

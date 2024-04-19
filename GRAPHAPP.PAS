@@ -1,8 +1,4 @@
-{$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
-{$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
-{$ENDIF}
+{$I COMPILER.INC}
 unit GraphApp;
 
 interface
@@ -10,8 +6,8 @@ interface
 uses
   Objects,
   Lists,
-  Except,
-  Apps,
+  Errors,
+  AplApps,
   GrDrv8,
   GraphDrv,
   Vga8Drv,
@@ -21,15 +17,13 @@ type
   PGraphApp = ^TGraphApp;
 
   TGraphApp = object(TApplication)
-  private
+  {$IFDEF VER70}private{$ENDIF}
     FDriverId: TGraphDrivers;
     FModeId: string;
-  public
+  {$IFDEF VER70}public{$ENDIF}
     constructor Create(ADriverId: TGraphDrivers; AModeId: string);
     procedure Init; virtual;
     procedure InitGraphics(ADriverId: TGraphDrivers);
-    procedure ProcessEvents; virtual;
-    destructor Free; virtual;
   end;
 
 var
@@ -59,7 +53,6 @@ begin
   WriteLn('Graphics initialized.');
   Graph^.SetMode(mode);
   if Graph^.HasException then begin
-    FreeAndNil(Graph);
     WriteLn(ErrorMessage(Graph^.Exception^.Code));
     Close;
   end;
@@ -69,17 +62,6 @@ procedure TGraphApp.Init;
 begin
   inherited Init;
   InitGraphics(FDriverId);
-end;
-
-destructor TGraphApp.Free;
-begin
-  FreeGraphicsDriver;
-  inherited Free;
-end;
-
-procedure TGraphApp.ProcessEvents;
-begin
-  inherited ProcessEvents;
 end;
 
 end.

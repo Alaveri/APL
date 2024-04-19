@@ -1,15 +1,10 @@
-{$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
-{$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
-{$ENDIF}
+{$I COMPILER.INC}
 unit Objects;
 
 interface
 
 uses
-  Consts,
-  Strings,
+  AplConst,
   StrUtils;
 
 type
@@ -17,31 +12,34 @@ type
   PPointer = ^pointer;
   PObject = ^TObject;
   PIdentifiable = ^TIdentifiable;
+  PFunc = ^TFunc;
 
   TComparer = function(AItem1, AItem2: pointer): integer;
   TPredicate = function(AItem: pointer; var AValue): boolean;
   TFunc = procedure;
 
   TObject = object
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     constructor Create;
     destructor Free; virtual;
     function ToString: string; virtual;
+    procedure Abstract; virtual;
     procedure Assign(var ASource: TObject); virtual;
     procedure Init; virtual;
   end;
 
   TIdentifiable = object(TObject)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     Id: PChar;
     constructor CreateId(const AId: string);
     destructor Free; virtual;
-    procedure SetId(const AId: string); virtual;
+    procedure SetId(const AId: string);
     procedure Assign(var ASource: TObject); virtual;
     procedure Init; virtual;
-    function GetId: string; virtual;
+    function GetId: string;
+    function ToString: string; virtual;
   end;
 
 procedure FreeAndNil(var AObject);
@@ -76,6 +74,12 @@ destructor TObject.Free;
 begin
 end;
 
+procedure TObject.Abstract;
+begin
+  WriteLn('Abstract method not implemented.');
+  RunError(301);
+end;
+
 function TObject.ToString: string;
 begin
   ToString := 'TObject';
@@ -93,7 +97,7 @@ end;
 
 destructor TIdentifiable.Free;
 begin
-  TString.Dispose(Id);
+  TString.Free(Id);
   inherited Free;
 end;
 
@@ -108,8 +112,7 @@ var
 begin
   inherited Assign(ASource);
   source := PIdentifiable(@ASource);
-  TString.Dispose(Id);
-  Id := TString.Copy(source^.Id);
+  Id := TString.Reassign(Id, source^.Id);
 end;
 
 procedure TIdentifiable.Init;
@@ -120,10 +123,12 @@ end;
 
 function TIdentifiable.GetId: string;
 begin
-  GetId := '';
-  if not Assigned(Id) then
-    exit;
-  GetId := StrPas(Id);
+  GetId := TString.Get(Id);
+end;
+
+function TIdentifiable.ToString: string;
+begin
+  ToString := GetId;
 end;
 
 end.

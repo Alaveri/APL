@@ -1,9 +1,5 @@
-{$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
-{$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
-{$ENDIF}
-unit Except;
+{$I COMPILER.INC}
+unit Errors;
 
 interface
 
@@ -96,6 +92,7 @@ const
   ecFileInvalidHandle = 1004;
   ecFileInvalidEnvironment = 1005;
   ecFileInvalidFormat = 1006;
+  ecDirChangeError = 1007;
 
   { User defined errors }
   ecUser = 5000;
@@ -104,8 +101,8 @@ type
   PExceptionObject = ^TExceptionObject;
 
   TException = object(TIdentifiable)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     Code: TExceptionCode;
     Severity: TExceptionSeverity;
     InnerException: PException;
@@ -117,11 +114,13 @@ type
   end;
 
   TExceptionObject = object(TIdentifiable)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     Exception: PException;
     procedure Init; virtual;
+    {$IFDEF DOS}
     procedure Raise(ACode: TExceptionCode);
+    {$ENDIF}
     procedure RaiseWarning(ACode: TExceptionCode);
     procedure RaiseHint(ACode: TExceptionCode);
     procedure ClearException;
@@ -192,6 +191,7 @@ begin
     ecFileInvalidHandle: ErrorMessage := 'Invalid file handle';
     ecFileInvalidEnvironment: ErrorMessage := 'Invalid environment';
     ecFileInvalidFormat: ErrorMessage := 'Invalid file format';
+    ecDirChangeError: ErrorMessage := 'Error changing directory';
     else begin
       if AErrorCode >= ecUser then begin
         if Assigned(CustomErrorMessage) then begin
@@ -276,6 +276,7 @@ begin
   NoException := not Assigned(Exception);
 end;
 
+{$IFDEF DOS}
 procedure TExceptionObject.Raise(ACode: TExceptionCode);
 var
   newException: PException;
@@ -292,6 +293,7 @@ begin
   Exception := newException;
   Exception^.InnerException := prev;
 end;
+{$ENDIF}
 
 procedure TExceptionObject.RaiseWarning(ACode: TExceptionCode);
 begin

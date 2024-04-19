@@ -1,14 +1,12 @@
-{$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
-{$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
-{$ENDIF}
+{$I COMPILER.INC}
 unit DateTime;
 
 interface
 
 uses
+  {$IFDEF DOS}
   Dos,
+  {$ENDIF}
   Objects,
   Common;
 
@@ -36,8 +34,8 @@ type
   TWeekDays = set of TWeekDay;
 
   TDateTime = object(TObject)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     Ticks: double; { 1/100th seconds since Jan 1, 0001 12:00 am }
     constructor CreateDateTime(AYear, AMonth, ADay, AHour, AMinute, ASecond,
       AHundredths: integer);
@@ -57,6 +55,7 @@ type
     procedure GetDateParts(var AYear: word; var AMonth: byte; var ADay: byte);
     procedure GetTimeParts(var AHour, AMinute, ASecond, AHundredth: byte);
     procedure SetNow;
+    procedure Assign(var ASource: TObject); virtual;
     function ToString: string; virtual;
     function ToStringFormat(const AFormat: string): string;
     function GetTicks(AYear, AMonth, ADay, AHour, AMinute, ASecond,
@@ -74,7 +73,7 @@ type
   end;
 
   TTimeSpan = object(TDateTime)
-  public
+  {$IFDEF VER70}public{$ENDIF}
     constructor CreateSpan(ATimeSpan: TTimeSpan);
     constructor CreateHours(AHours: double);
     constructor CreateMinutes(AMinutes: double);
@@ -97,12 +96,12 @@ type
     procedure AddDays(ADays: double);
     procedure Init; virtual;
     procedure GetDuration(var ATimeSpan: TTimeSpan);
-  public
+  {$IFDEF VER70}public{$ENDIF}
   end;
 
   TStopWatch = object(TObject)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     StartTime: TDateTime;
     EndTime: TDateTime;
     function ElapsedTicks: double;
@@ -424,6 +423,15 @@ end;
 function TDateTime.ToString: string;
 begin
   ToString := ToStringFormat(DateTimeFormat);
+end;
+
+procedure TDateTime.Assign(var ASource: TObject);
+var
+  source: PDateTime;
+begin
+  inherited Assign(ASource);
+  source := PDateTime(@ASource);
+  Ticks := source^.Ticks;
 end;
 
 function TDateTime.ToStringFormat(const AFormat: string): string;

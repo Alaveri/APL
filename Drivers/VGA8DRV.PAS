@@ -1,30 +1,29 @@
-{$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
-{$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
-{$ENDIF}
+{$I COMPILER.INC}
 unit Vga8Drv;
 
 interface
 
 uses
+  {$IFDEF DOS}
+  Strings,
+  Dos,
+  {$ENDIF}
   Objects,
-  GraphDrv,
-  GrDrv8,
   Common,
   StrUtils,
-  Strings,
   Streams,
+  Drawing,
   MouseDrv,
-  Drawing;
+  GraphDrv,
+  GrDrv8;
 
 type
   PVga8Driver = ^TVga8Driver;
 
   TVga8Driver = object(TGraphics8Driver)
-  private
+  {$IFDEF VER70}private{$ENDIF}
     function GetScreenPtr(AX, AY: integer; var AOffset: word): PByte;
-  public
+  {$IFDEF VER70}public{$ENDIF}
     function GetPixel(AX, AY: integer): byte; virtual;
     procedure GetImage(AX, AY, AWidth, AHeight: longint; ABuffer: PByte); virtual;
     procedure GetImageStream(AX, AY, AWidth, AHeight: longint; AStream: PStream); virtual;
@@ -46,7 +45,7 @@ type
 implementation
 
 uses
-  Except;
+  Errors;
 
 function TVga8Driver.GetPixel(AX, AY: integer): byte;
 var
@@ -74,7 +73,7 @@ begin
   end;
   State.FrameBuffer := Mode^.FrameBuffer;
   SetStandardPalette;
-  Mouse.XDiv := 1;
+  Mouse.XShift := 1;
 end;
 
 procedure TVga8Driver.SetPixel(AX, AY: integer);

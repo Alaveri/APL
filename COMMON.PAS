@@ -1,15 +1,13 @@
-{$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
-{$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
-{$ENDIF}
+{$I COMPILER.INC}
 unit Common;
 
 interface
 
 uses
-  Objects,
-  Strings;
+  {$IFDEF DOS}
+  Dos,
+  {$ENDIF}
+  Objects;
 
 type
   PByte = ^byte;
@@ -27,6 +25,7 @@ type
   TBits16 = set of TBit16;
   THexString = string[9];
   TByteArray = array[byte] of byte;
+  TCharSet = set of char;
 
   TLongLowHigh = record
     Low: word;
@@ -43,6 +42,7 @@ function Trim(AString: string): string;
 function IntToStr(ANum: longint): string;
 function IntToHex(ANum: longint): THexString;
 function IntToBool(ANum: longint): boolean;
+function IncludeBackSlash(const AString: string): string;
 function DoubleToStr(ADouble: double; ADigits: byte): string;
 function BoolToStr(ABool: boolean): string;
 function BoolToYN(ABool: boolean): string;
@@ -60,11 +60,15 @@ function MaxByte(ANum1, ANum2: byte): byte;
 function MaxWord(ANum1, ANum2: word): word;
 function MaxLong(ANum1, ANum2: longint): longint;
 function FileExists(const AFilename: string): boolean;
+function DirectoryExists(const ADir: string): boolean;
 function GetExtension(const AFilename: string): string;
 function UpperCase(const AString: string): string;
 function LowCase(const AChar: char): char;
 function LowerCase(const AString: string): string;
-function ExtractFilePath(const AFilename: string): string;
+function ExtractDirectory(const AFilename: string): string;
+function ExtractFilename(const AFilename: string): string;
+function ExtractFullName(const AFilename: string): string;
+function ExtractExtension(const AFilename: string): string;
 function Equal(var AVar1, AVar2; ASize: word): boolean;
 function Replace(const AString, APattern, AReplacePattern: string): string;
 function ZeroPad(AInt: longint; ALength: byte): string;
@@ -83,6 +87,15 @@ procedure CheckShortRange(var ANum: shortint; AMin, AMax: shortint);
 procedure CheckByteRange(var ANum: byte; AMin, AMax: byte);
 procedure CheckWordRange(var ANum: word; AMin, AMax: word);
 procedure CheckLongRange(var ANum: longint; AMin, AMax: longint);
+function EnsureRange(ANum: integer; AMin, AMax: integer): integer;
+function EnsureShortRange(ANum: shortint; AMin, AMax: shortint): shortint;
+function EnsureByteRange(ANum: byte; AMin, AMax: byte): byte;
+function EnsureWordRange(ANum: word; AMin, AMax: word): word;
+function EnsureLongRange(ANum: longint; AMin, AMax: longint): longint;
+function GetCurrentDirectory: string;
+function ChangeDirectory(const ADirectory: string): boolean;
+function StringsEqualInsensitive(const AString1, AString2: string): boolean;
+function HasWildcard(const AFilename: string): boolean;
 
 var
   WhiteSpaceChars: set of char;
@@ -90,8 +103,12 @@ var
 implementation
 
 uses
-  Dos,
-  MemDrv;
+  MemDrv,
+  Files;
+
+var
+  PreviousExitProc: PFunc;
+  LastDir: string;
 
 function StartsWith(const AString, AStartsWith: string): boolean;
 begin
@@ -191,23 +208,6 @@ begin
   temp := APointer1;
   APointer1 := APointer2;
   APointer2 := temp;
-end;
-
-function FileExists(const AFilename: string): boolean;
-var
-  testFile: file;
-begin
-  {$I-}
-  FileMode := 0;
-  Assign(testFile, AFilename);
-  Reset(testFile);
-  if IOResult = 0 then begin
-    FileExists := true;
-    Close(testFile);
-  end
-  else
-    FileExists := false;
-  {$I+}
 end;
 
 function GetExtension(const AFilename: string): string;
@@ -354,6 +354,51 @@ begin
   ANum := MaxLong(ANum, AMin);
 end;
 
+function EnsureRange(ANum: integer; AMin, AMax: integer): integer;
+var
+  result: integer;
+begin
+  result := Min(ANum, AMax);
+  result := Max(result, AMin);
+  EnsureRange := result;
+end;
+
+function EnsureShortRange(ANum: shortint; AMin, AMax: shortint): shortint;
+var
+  result: shortint;
+begin
+  result := MinShort(ANum, AMax);
+  result := MaxShort(result, AMin);
+  EnsureShortRange := result;
+end;
+
+function EnsureByteRange(ANum: byte; AMin, AMax: byte): byte;
+var
+  result: byte;
+begin
+  result := MinByte(ANum, AMax);
+  result := MaxByte(result, AMin);
+  EnsureByteRange := result;
+end;
+
+function EnsureWordRange(ANum: word; AMin, AMax: word): word;
+var
+  result: word;
+begin
+  result := MinWord(ANum, AMax);
+  result := MaxWord(result, AMin);
+  EnsureWordRange := result;
+end;
+
+function EnsureLongRange(ANum: longint; AMin, AMax: longint): longint;
+var
+  result: longint;
+begin
+  result := MinLong(ANum, AMax);
+  result := MaxLong(result, AMin);
+  EnsureLongRange := result;
+end;
+
 function IntToStr(ANum: longint): string;
 var
   result: string;
@@ -442,12 +487,60 @@ begin
   IntToHex := result;
 end;
 
-function ExtractFilePath(const AFilename: string): string;
+function ExtractDirectory(const AFilename: string): string;
 var
   dir, name, ext: string;
 begin
   FSplit(AFilename, dir, name, ext);
-  ExtractFilePath := dir;
+  ExtractDirectory := dir;
+end;
+
+function ExtractExtension(const AFilename: string): string;
+var
+  dir, name, ext: string;
+begin
+  FSplit(AFilename, dir, name, ext);
+  ExtractExtension := ext;
+end;
+
+function ExtractFilename(const AFilename: string): string;
+var
+  dir, name, ext: string;
+begin
+  FSplit(AFilename, dir, name, ext);
+  name := name;
+  ExtractFilename := name;
+end;
+
+function ExtractFullName(const AFilename: string): string;
+var
+  dir, name, ext: string;
+begin
+  FSplit(AFilename, dir, name, ext);
+  name := name + ext;
+  ExtractFullName := name;
+end;
+
+function GetCurrentDirectory: string;
+var
+  result: string;
+begin
+  GetDir(0, result);
+  result := FExpand(result);
+  GetCurrentDirectory := result;
+end;
+
+function ChangeDirectory(const ADirectory: string): boolean;
+var
+  result: boolean;
+begin
+  result := false;
+  {$I-}
+  ChDir(ADirectory);
+  if IOResult = 0 then
+    result := true;
+  {$I+}
+  ChangeDirectory := result;
 end;
 
 function Replace(const AString, APattern, AReplacePattern: string): string;
@@ -533,7 +626,114 @@ begin
   pointerPtr^ := nil;
 end;
 
+function FileExists(const AFilename: string): boolean;
+var
+  tempFile: file;
+  attributes: word;
+  error: integer;
+begin
+  Assign(tempFile, AFilename);
+  GetFAttr(tempFile, attributes);
+  error := DosError;
+  if (error = 0) and not (faDirectory in TFileAttributes(byte(attributes))) then
+    FileExists := true
+  else
+    FileExists := false;
+end;
+
+function DirectoryExists(const ADir: string): boolean;
+var
+  tempFile: file;
+  attributes: word;
+  error: integer;
+begin
+  Assign(tempFile, ADir);
+  GetFAttr(tempFile, attributes);
+  error := DosError;
+  if (error = 0) and (faDirectory in TFileAttributes(byte(attributes))) then
+    DirectoryExists := true
+  else
+    DirectoryExists := false;
+end;
+
+
+function IncludeBackslash(const AString: string): string;
+begin
+  if not EndsWith(AString, '\') then
+    IncludeBackslash := AString + '\'
+  else
+    IncludeBackslash := AString;
+end;
+
+function StringsEqualInsensitive(const AString1, AString2: string): boolean;
+begin
+  StringsEqualInsensitive := UpperCase(Trim(AString1)) = UpperCase(Trim(AString2));
+end;
+
+function IsValidFilename(const AFilename: string; AValidChars: TCharSet): boolean;
+var
+  charPos: byte;
+  result: boolean;
+  index: integer;
+  dir: string;
+  name: string;
+  ext: string;
+begin
+  result := true;
+  for index := 1 to Length(AFilename) do begin
+    if not (AFilename[index] in AValidChars) then begin
+      result := false;
+      exit;
+    end;
+  end;
+  charPos := Pos(':', AFilename);
+  if charPos > 2 then begin
+    result := false;
+    exit;
+  end;
+  FSplit(AFilename, dir, name, ext);
+  if Length(ext) > 4 then begin
+    result := false;
+    exit;
+  end;
+  if Length(name) > 8 then begin
+    result := false;
+    exit;
+  end;
+end;
+
+function HasWildcard(const AFilename: string): boolean;
+var
+  charPos: boolean;
+  found: boolean;
+  dir, name, ext: string;
+begin
+  FSplit(AFilename, dir, name, ext);
+  found :=
+    (
+      (Pos('*', ext) > 0)
+      or (Pos('?', ext) > 0)
+      or (Pos('*', name) > 0)
+      or (Pos('?', name) > 0)
+    )
+    and not
+    (
+      (Pos('*', dir) > 0)
+      or (Pos('?', dir) > 0)
+    );
+  HasWildCard := found;
+end;
+
+procedure CommonExitProc; far;
+begin
+  ExitProc := PreviousExitProc;
+  ChangeDirectory(LastDir);
+end;
+
 begin
  WhiteSpaceChars := [#32, #13, #10, #9];
  NumberSeparator := ',';
+ LastDir := GetCurrentDirectory;
+ PreviousExitProc := ExitProc;
+ ExitProc := @CommonExitProc;
 end.

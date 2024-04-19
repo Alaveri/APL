@@ -1,21 +1,18 @@
-{$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
-{$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
-{$ENDIF}
+{$I COMPILER.INC}
 unit Images;
 
 interface
 
 uses
   Objects,
-  Except,
+  Errors,
   Lists,
   Common,
-  Consts,
+  AplConst,
   Drawing,
   Streams,
   Lzw,
+
   GraphDrv;
 
 const
@@ -43,14 +40,14 @@ type
   end;
 
   TImage = object(TExceptionObject)
-  private
+  {$IFDEF VER70}private{$ENDIF}
     FHeader: TImageHeader;
     procedure InitHeader;
     procedure SaveToStreamLzw(ADest: PStream);
     procedure SaveToStreamRaw(ADest: PStream);
     procedure ReadHeader(ASource: PStream; var AHeader: TImageHeader);
     procedure WriteHeader(ADest: PStream);
-  public
+  {$IFDEF VER70}public{$ENDIF}
     Buffer: PMemoryStream;
     constructor Create;
     constructor CreateSize(AWidth, AHeight: word; ABpp: byte);
@@ -74,8 +71,8 @@ type
   end;
 
   TImageList = object(TObjectList)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     function GetItem(AIndex: integer): PImage;
     function IndexOf(AItem: PImage): integer;
     function Add(AItem: PImage): integer;
@@ -113,8 +110,7 @@ end;
 
 destructor TImage.Free;
 begin
-  if Assigned(Buffer) then
-    Dispose(Buffer, Free);
+  FreeAndNil(Buffer);
   inherited Free;
 end;
 
@@ -143,8 +139,7 @@ var
 begin
   if Assigned(Buffer) then begin
     if (AWidth <> FHeader.Width) or (AHeight <> FHeader.Height) then
-      Dispose(Buffer, Free);
-    Buffer := nil;
+      FreeAndNil(Buffer);
   end;
   if not Assigned(Buffer) then begin
     bytes := FHeader.Bpp div 8;
@@ -221,7 +216,7 @@ begin
   if FHeader.Bpp > 1 then
     bytes := FHeader.Bpp div 8;
   if Assigned(Buffer) then
-    Dispose(Buffer, Free);
+    FreeAndNil(Buffer);
   Buffer := New(PMemoryStream, Create(FHeader.Width * FHeader.Height * bytes));
   if not Assigned(Buffer) or Buffer^.HasException then begin
     Raise(ecNotEnoughMemory);

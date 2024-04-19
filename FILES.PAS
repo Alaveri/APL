@@ -1,24 +1,22 @@
-{$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
-{$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
-{$ENDIF}
-unit FileUtil;
+{$I COMPILER.INC}
+unit Files;
 
 interface
 
 uses
+  {$IFDEF DOS}
+  Strings,
+  Dos,
+  {$ENDIF}
   Objects,
   Lists,
-  Strings,
   StrUtils,
   Common,
   DateTime,
-  Except,
-  Dos;
+  Errors;
 
 type
-  PDirectory = ^TDirectory;
+  PDirectoryContents = ^TDirectoryContents;
   PFile = ^TFile;
   PFileList = ^TFileList;
 
@@ -34,11 +32,11 @@ type
   TFileAttributes = set of TFileAttribute;
 
   TFile = object(TObject)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     Name: PChar;
     Attr: TFileAttributes;
-    Time: DateTime.TDateTime;
+    Time: TDateTime;
     Size: Longint;
     procedure Init; virtual;
     destructor Free; virtual;
@@ -47,35 +45,36 @@ type
   TDirSort = (dsFilename, dsSize, dsTime);
   TDirSortDirection = (dsAsc, dsDesc);
 
-  TDirectory = object(TFile)
-  private
-  public
+  TDirectoryContents = object(TFile)
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     Files: PFileList;
-    constructor Create;
+    Path: string;
+    Filter: string;
     procedure Init; virtual;
     procedure Sort(ASort: TDirSort; ADirection: TDirSortDirection; ADirsFirst: boolean);
     destructor Free; virtual;
   end;
 
-  TFileList = object(TLinkedObjectList)
-  private
-  public
+  TFileList = object(TObjectList)
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     function GetItem(AIndex: longint): PFile;
     function IndexOf(AItem: PFile): longint;
-    function Add(AItem: PFile): PListNode;
+    function Find(const AFilename: string): PFile;
+    function Add(AItem: PFile): integer;
     procedure Insert(AIndex: longint; AItem: PFile);
   end;
 
   TDirectoryManager = object(TExceptionObject)
-  private
+  {$IFDEF VER70}private{$ENDIF}
     function HandleError(AError: integer): boolean;
     procedure SetFileInfo(AFile: PFile; ASearch: SearchRec);
-  public
+  {$IFDEF VER70}public{$ENDIF}
     DefaultFileAttributes: TFileAttributes;
     DefaultDirAttributes: TFileAttributes;
     procedure Init; virtual;
-    function GetDirectory(const APath: string): PDirectory;
-    function GetDirectoryWithAttr(const APath: string; AAttributes: TFileAttributes): PDirectory;
+    function GetDirectory(const APath: string): PDirectoryContents;
   end;
 
 const
@@ -87,14 +86,24 @@ const
     faDirectory
   ];
 
+  ValidDosChars = [
+    'A'..'Z',
+    'a'..'z',
+    '0'..'9',
+    '.',
+    '!', '#', '$', '%', '&', ',', '(', ')', '-', '@', '^', '_',
+    '`', '{', '}', '~', '*', '?'
+  ];
+
 var
-  Directory: TDirectoryManager;
+  TDirectory: TDirectoryManager;
 
 implementation
 
 var
   SortDirection: TDirSortDirection;
   SortDirsFirst: boolean;
+  PreviousExitProc: PFunc;
 
 function FilenameCompare(AItem1, AItem2: pointer): integer;
 var
@@ -219,15 +228,12 @@ end;
 procedure TDirectoryManager.Init;
 begin
   inherited Init;
-  DefaultDirAttributes := [faDirectory];
-  DefaultFileAttributes := [faReadOnly, faArchive];
 end;
 
 procedure TDirectoryManager.SetFileInfo(AFile: PFile; ASearch: SearchRec);
 var
   result: PFile;
   fileTime: Dos.DateTime;
-  s: double;
 begin
   AFile^.Name := TString.New(ASearch.Name);
   AFile^.Size := ASearch.Size;
@@ -235,7 +241,6 @@ begin
   UnpackTime(ASearch.Time, fileTime);
   AFile^.Time.CreateDateTime(fileTime.Year, fileTime.Month, fileTime.Day,
     fileTime.Hour, fileTime.Min, fileTime.Sec, 1);
-  s := AFile^.Time.Second;
 end;
 
 function TDirectoryManager.HandleError(AError: integer): boolean;
@@ -253,63 +258,70 @@ begin
   end;
 end;
 
-function TDirectoryManager.GetDirectory(const APath: string): PDirectory;
-begin
-  GetDirectory := GetDirectoryWithAttr(APath, [faDirectory]);
-end;
-
-function TDirectoryManager.GetDirectoryWithAttr(const APath: string; AAttributes: TFileAttributes): PDirectory;
+function TDirectoryManager.GetDirectory(const APath: string): PDirectoryContents;
 var
-  dirString: string;
   afile: PFile;
-  path: string;
   attributes: TFileAttributes;
-  result: PDirectory;
+  result: PDirectoryContents;
+  dirPath: string;
   search: SearchRec;
   more: boolean;
 begin
-  dirString := ExtractFilePath(APath);
-  attributes := AAttributes + [faDirectory];
-  path := dirString + '*.*';
-  result := New(PDirectory, Create);
-  result^.Name := TString.New(ExtractFilePath(FExpand(APath)));
-  GetDirectoryWithAttr := result;
-  FindFirst(path, byte(attributes), search);
+  result := New(PDirectoryContents, Create);
+  result^.Path := FExpand(Trim(APath));
+  result^.Filter := ExtractFullname(APath);
+  result^.Name := TString.New(ExtractDirectory(APath));
+  GetDirectory := result;
+  attributes := [];
+
+  FindFirst(result^.Path, byte(attributes), search);
   more := HandleError(DosError);
   if HasException then
     exit;
   while more do begin
-    if not ((faDirectory in TFileAttributes(search.Attr))
-      and (search.Name = '.')) then begin
-      afile := New(PFile, Create);
-      SetFileInfo(afile, search);
-      result^.Files^.Add(afile);
-    end;
+    afile := New(PFile, Create);
+    SetFileInfo(afile, search);
+    result^.Files^.Add(afile);
     FindNext(search);
     more := HandleError(DosError);
     if HasException then
       exit;
   end;
+  attributes := [faDirectory];
+  dirPath := ExtractDirectory(result^.Path) + '*.*';
+  FindFirst(dirPath, byte(attributes), search);
+  more := HandleError(DosError);
+  if HasException then
+    exit;
+  while more do begin
+    if (faDirectory in TFileAttributes(search.Attr))
+      and not ((search.Name = '..') and
+        (Length(ExtractDirectory(result^.Path)) <= 3))
+      and (search.Name <> '.') then begin
+      afile := New(PFile, Create);
+      SetFileInfo(afile, search);
+      result^.Files^.Add(afile);
+    end;
+    more := HandleError(DosError);
+    FindNext(search);
+  end;
 end;
 
-constructor TDirectory.Create;
-begin
-  inherited Create;
-  Files := New(PFileList, Create);
-end;
-
-procedure TDirectory.Init;
+procedure TDirectoryContents.Init;
 begin
   inherited Init;
+  Files := New(PFileList, Create);
+  Path := '';
+  Filter := '';
 end;
 
-destructor TDirectory.Free;
+destructor TDirectoryContents.Free;
 begin
   FreeAndNil(Files);
   inherited Free;
 end;
 
-procedure TDirectory.Sort(ASort: TDirSort; ADirection: TDirSortDirection; ADirsFirst: boolean);
+procedure TDirectoryContents.Sort(ASort: TDirSort; ADirection: TDirSortDirection; ADirsFirst: boolean);
 begin
   SortDirection := ADirection;
   SortDirsFirst := ADirsFirst;
@@ -331,7 +343,7 @@ end;
 
 destructor TFile.Free;
 begin
-  TString.Dispose(Name);
+  TString.Free(Name);
   inherited Free;
 end;
 
@@ -340,12 +352,29 @@ begin
   GetItem := PFile(inherited GetItem(AIndex));
 end;
 
+function TFileList.Find(const AFilename: string): PFile;
+var
+  index: integer;
+  aFile: PFile;
+  result: PFile;
+begin
+  result := nil;
+  for index := 0 to Count - 1 do begin
+    aFile := GetItem(index);
+    if not (faDirectory in aFile^.Attr)
+      and StringsEqualInsensitive(StrPas(aFile^.Name), AFilename) then begin
+      result := aFile;
+      exit;
+    end;
+  end;
+end;
+
 function TFileList.IndexOf(AItem: PFile): longint;
 begin
   IndexOf := inherited IndexOf(AItem);
 end;
 
-function TFileList.Add(AItem: PFile): PListNode;
+function TFileList.Add(AItem: PFile): integer;
 begin
   Add := inherited Add(AItem);
 end;
@@ -355,6 +384,14 @@ begin
   inherited Insert(AIndex, AItem);
 end;
 
+procedure DirectoryExitProc; far;
 begin
-  Directory.Create;
+  ExitProc := PreviousExitProc;
+  TDirectory.Free;
+end;
+
+begin
+  TDirectory.Create;
+  PreviousExitProc := ExitProc;
+  ExitProc := @DirectoryExitProc;
 end.

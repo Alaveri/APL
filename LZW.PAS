@@ -1,15 +1,11 @@
-{$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
-{$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
-{$ENDIF}
+{$I COMPILER.INC}
 unit Lzw;
 
 interface
 
 uses
   Compress,
-  Except,
+  Errors,
   Streams,
   Common;
 
@@ -24,7 +20,7 @@ type
   end;
 
   TLzw = object(TCompressor)
-  private
+  {$IFDEF VER70}private{$ENDIF}
     FDict: PDictEntry;
     FDictEntries: word;
     FDictSize: word;
@@ -43,7 +39,7 @@ type
     procedure DeallocateDecodeBuffer;
     procedure InitCoder;
     procedure InitCompression; virtual;
-  public
+  {$IFDEF VER70}public{$ENDIF}
     BitSize: byte;
     constructor CreateBitSize(ABitSize: byte);
     destructor Free; virtual;

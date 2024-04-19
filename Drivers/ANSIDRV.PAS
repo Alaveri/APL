@@ -1,29 +1,28 @@
-{$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
-{$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
-{$ENDIF}
+{$I COMPILER.INC}
 unit AnsiDrv;
 
 interface
 
 uses
+  {$IFDEF DOS}
+  Strings,
+  Dos,
+  {$ENDIF}
   Objects,
-  Collects,
+  Lists,
   Common,
   Drawing,
-  DosConst,
-  Strings,
+  AplDos,
   TextDrv;
 
 type
   PAnsiDriver = ^TAnsiDriver;
 
   TAnsiDriver = object(TTextDriver)
-  private
+  {$IFDEF VER70}private{$ENDIF}
     _startMode: byte;
     function GetTextAttributes(AForeColor, ABackColor: byte; ABlink: boolean): byte; virtual;
-  public
+  {$IFDEF VER70}public{$ENDIF}
     procedure Write(const AText: string); virtual;
     procedure WriteLarge(AText: PChar); virtual;
     procedure SetForeColor(AColor: byte); virtual;

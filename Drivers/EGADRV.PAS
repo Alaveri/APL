@@ -1,26 +1,25 @@
-{$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
-{$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
-{$ENDIF}
+{$I COMPILER.INC}
 unit EgaDrv;
 
 interface
 
 uses
+  {$IFDEF DOS}
+  Strings,
+  Dos,
+  {$ENDIF}
   Objects,
-  GraphDrv,
   Common,
   StrUtils,
-  Strings,
   Streams,
-  Drawing;
+  Drawing,
+  GraphDrv;
 
 type
   PEgaDriver = ^TEgaDriver;
   TEgaDriver = object(TGraphicsDriver)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     function GetPixel(AX, AY: integer): byte; virtual;
     procedure GetImage(AX, AY, AWidth, AHeight: longint; ABuffer: PByte); virtual;
     procedure GetImageStream(AX, AY, AWidth, AHeight: longint; AStream: PStream); virtual;
@@ -46,9 +45,6 @@ type
   end;
 
 implementation
-
-uses
-  Dos;
 
 procedure TEgaDriver.Init;
 begin

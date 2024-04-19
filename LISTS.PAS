@@ -1,17 +1,15 @@
-{$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
-{$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
-{$ENDIF}
+{$I COMPILER.INC}
 unit Lists;
 
 interface
 
 uses
-  Consts,
-  Common,
-  Except,
+  {$IFDEF DOS}
   Strings,
+  {$ENDIF}
+  AplConst,
+  Common,
+  Errors,
   StrUtils,
   Objects;
 
@@ -22,74 +20,43 @@ const
 type
   PObjectList = ^TObjectList;
   PList = ^TList;
-  PLinkedList = ^TLinkedList;
   PLinkedObjectList = ^TLinkedObjectList;
   PStack = ^TStack;
+  PObjectStack = ^TStack;
   PQueue = ^TQueue;
   PStringList = ^TStringList;
   PSortFunc = ^TSortFunc;
   PComparer = ^TComparer;
   PCollection = ^TCollection;
   PListBuffer = ^TListBuffer;
-  PEnumerator = ^TEnumerator;
-  PCollectionEnumerator = ^TEnumerator;
   PListNode = ^TListNode;
 
   TSortFunc = procedure(AList: PList; AComparer: TComparer);
   TListBuffer = array[0..ListBufferSize] of pointer;
 
-  TEnumerator = object(TObject)
-  private
-  public
-    Owner: PObject;
-    constructor Create(AOwner: PObject);
-    function MoveNext: boolean; virtual;
-    function Current: pointer; virtual;
-    procedure Init; virtual;
-    procedure Reset; virtual;
-  end;
-
-  TCollectionEnumerator = object(TEnumerator)
-  private
-    FIndex: integer;
-  public
-    function MoveNext: boolean; virtual;
-    function Current: pointer; virtual;
-    procedure Reset; virtual;
-    procedure Init; virtual;
-  end;
-
-  IEnumerable = object(TExceptionObject)
-  private
-  public
-    function GetEnumerator: PEnumerator; virtual;
-    procedure ForEach(AFunc: TFunc);
-  end;
-
-  TCollection = object(IEnumerable)
-  private
+  TCollection = object(TExceptionObject)
+  {$IFDEF VER70}private{$ENDIF}
     FCapacity: integer;
     FBuffer: PListBuffer;
     procedure Grow;
-  public
+  {$IFDEF VER70}public{$ENDIF}
     Count: integer;
     constructor CreateCapacity(ACapacity: integer);
     destructor Free; virtual;
     function Capacity: integer; virtual;
     function Add(AItem: pointer): integer;
-    function GetEnumerator: PEnumerator; virtual;
     procedure SetCapacity(ACapacity: integer);
     procedure Init; virtual;
     procedure Clear; virtual;
   end;
 
   TList = object(TCollection)
-  private
+  {$IFDEF VER70}private{$ENDIF}
     FSorted: boolean;
     FComparer: TComparer;
     function GetSortedIndex(AItem: pointer): integer;
     procedure QuickSort(AComparer: TComparer; ALowIndex, AHighIndex: integer);
-  public
+  {$IFDEF VER70}public{$ENDIF}
     constructor CreateSorted(AComparer: TComparer);
     procedure Init; virtual;
     function Add(AItem: pointer): integer;
@@ -97,7 +64,6 @@ type
     function GetItem(AIndex: integer): pointer;
     function SetItem(AIndex: integer; AItem: pointer): boolean;
     function IndexOf(AItem: pointer): integer;
-    function Where(APredicate: TPredicate; var AValue): PList;
     procedure SetComparer(AComparer: TComparer);
     procedure Swap(AIndex1, AIndex2: integer);
     procedure Sort(AComparer: TComparer); virtual;
@@ -112,7 +78,7 @@ type
   end;
 
   TLinkedList = object(TObject)
-  private
+  {$IFDEF VER70}private{$ENDIF}
     FHead: PListNode;
     FTail: PListNode;
     function GetSortedIndex(AItem: pointer): longint;
@@ -120,7 +86,7 @@ type
     procedure MergeSort(AComparer: TComparer; var AHead: PListNode);
     procedure FrontBackSplit(ASource: PListNode; var Afront, ABack: PListNode);
     procedure FreeNode(ANode: PListNode); virtual;
-  public
+  {$IFDEF VER70}public{$ENDIF}
     Count: longint;
     destructor Free; virtual;
     procedure Init; virtual;
@@ -129,7 +95,6 @@ type
     function GetNode(AIndex: longint): PListNode;
     function SetItem(AIndex: longint; AItem: pointer): boolean;
     function IndexOf(AItem: pointer): longint;
-    function Where(APredicate: TPredicate; var AValue): PLinkedList;
     procedure Swap(var AItem1, AItem2: PListNode);
     procedure Sort(AComparer: TComparer); virtual;
     procedure Insert(AIndex: longint; AItem: pointer);
@@ -138,14 +103,16 @@ type
   end;
 
   TObjectList = object(TList)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     DisposeObjects: boolean;
     destructor Free; virtual;
     function IndexOf(AItem: PObject): integer;
     function Add(AItem: PObject): integer;
+    function AddRange(AList: PObjectList; ACopy: boolean): integer; virtual;
     function GetItem(AIndex: integer): PObject;
     function SetItem(AIndex: integer; AItem: PObject): boolean;
+    function GetNewObject: PObject; virtual;
     procedure Init; virtual;
     procedure Insert(AIndex: integer; AItem: PObject);
     procedure Delete(AIndex: integer);
@@ -153,7 +120,7 @@ type
   end;
 
   TLinkedObjectList = object(TLinkedList)
-  public
+  {$IFDEF VER70}public{$ENDIF}
     DisposeObjects: boolean;
     procedure Init; virtual;
     function Add(AItem: PObject): PListNode;
@@ -164,25 +131,35 @@ type
     procedure FreeNode(ANode: PListNode); virtual;
   end;
 
-  TStack = object(TObjectList)
-  private
-  public
+  TStack = object(TList)
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
+    procedure Init; virtual;
+    function Push(AItem: pointer): integer;
+    function Pop: pointer;
+    function Peek: pointer;
+  end;
+
+  TObjectStack = object(TObjectList)
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     procedure Init; virtual;
     function Push(AObject: PObject): integer;
     function Pop: PObject;
     function Peek: PObject;
   end;
 
+
   TQueue = object(TObjectList)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     procedure Init; virtual;
     function Enqueue(AObject: PObject): integer;
     function Dequeue: PObject;
   end;
 
   TStringList = object(TList)
-  public
+  {$IFDEF VER70}public{$ENDIF}
     DisposeStrings: boolean;
     destructor Free; virtual;
     function IndexOf(AItem: PChar): integer;
@@ -198,8 +175,8 @@ type
   end;
 
   TIdentifiableList = object(TObjectList)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     function IndexOf(AItem: PIdentifiable): integer;
     function Add(AItem: PIdentifiable): integer;
     function GetItemById(const AId: string): PIdentifiable;
@@ -209,19 +186,26 @@ type
   end;
 
   THeirarchy = object(TObject)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
   end;
 
+  TStringComparer = object(TObject)
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
+    function CaseSensitive: PComparer;
+    function CaseInsensitive: PComparer;
+  end;
 
-function StringCompare(AItem1, AItem2: pointer): integer; far;
+var
+  TStringCompare: TStringComparer;
 
 implementation
 
 uses
   MemDrv;
 
-function StringCompare(AItem1, AItem2: pointer): integer;
+function StringCompare(AItem1, AItem2: pointer): integer; far;
 var
   str1: PChar;
   str2: PChar;
@@ -231,88 +215,24 @@ begin
   StringCompare := StrComp(str1, str2);
 end;
 
-function IEnumerable.GetEnumerator: PEnumerator;
-begin
-  GetEnumerator := nil;
-end;
-
-{function IEnumerable.Where(APredicate: TPredicate; var AValue)
+function CaseInsensitiveStringCompare(AItem1, AItem2: pointer): integer; far;
 var
-  item: pointer;
+  str1: PChar;
+  str2: PChar;
 begin
-{  item := GetItem();}
-{end;}
-
-procedure IEnumerable.ForEach(AFunc: TFunc);
-var
-  enumerator: PEnumerator;
-  item: pointer;
-begin
-  enumerator := GetEnumerator;
-  item := enumerator^.Current;
-  if not Assigned(item) then
-    exit;
-  repeat
-    AFunc;
-  until not enumerator^.MoveNext;
-  FreeAndnil(enumerator);
+  str1 := PChar(AItem1);
+  str2 := PChar(AItem2);
+  CaseInsensitiveStringCompare := StrIComp(str1, str2);
 end;
 
-constructor TEnumerator.Create(AOwner: PObject);
+function TStringComparer.CaseSensitive: PComparer;
 begin
-  inherited Create;
-  Owner := AOwner;
+  CaseSensitive := @StringCompare;
 end;
 
-function TEnumerator.MoveNext: boolean;
+function TStringComparer.CaseInsensitive: PComparer;
 begin
-end;
-
-procedure TEnumerator.Init;
-begin
-  inherited Init;
-  Owner := nil;
-end;
-
-function TEnumerator.Current: pointer;
-begin
-  Current := nil;
-end;
-
-procedure TEnumerator.Reset;
-begin
-end;
-
-procedure TCollectionEnumerator.Init;
-begin
-  inherited Init;
-  FIndex := 0;
-end;
-
-function TCollectionEnumerator.MoveNext: boolean;
-begin
-  MoveNext := true;
-  if FIndex >= PCollection(Owner)^.Count - 1 then begin
-    MoveNext := false;
-    exit;
-  end;
-  Inc(FIndex);
-end;
-
-procedure TCollectionEnumerator.Reset;
-begin
-  FIndex := 0;
-end;
-
-function TCollectionEnumerator.Current: pointer;
-var
-  collection: PCollection;
-begin
-  Current := nil;
-  collection := PCollection(Owner);
-  if (FIndex < 0) or (FIndex > collection^.Count - 1) then
-    exit;
-  Current := collection^.FBuffer^[FIndex];
+  CaseInsensitive := @CaseInsensitiveStringCompare;
 end;
 
 constructor TCollection.CreateCapacity(ACapacity: integer);
@@ -329,16 +249,32 @@ begin
   FCapacity := 0;
 end;
 
-function TCollection.GetEnumerator: PEnumerator;
-begin
-  GetEnumerator := New(PCollectionEnumerator, Create(@self));
-end;
-
 destructor TCollection.Free;
 begin
   if Assigned(FBuffer) then
     FreeMem(FBuffer, FCapacity * PointerSize);
   inherited Free;
+end;
+
+function TObjectList.GetNewObject: PObject;
+begin
+  GetNewObject := New(PObject, Create);
+end;
+
+function TObjectList.AddRange(AList: PObjectList; ACopy: boolean): integer;
+var
+  index: integer;
+  obj: PObject;
+begin
+  for index := 0 to Count - 1 do begin
+    if not ACopy then
+      AList^.Add(GetItem(index))
+    else begin
+      obj := GetNewObject;
+      obj^.Assign(GetItem(index)^);
+      AList^.Add(obj);
+    end;
+  end;
 end;
 
 procedure TCollection.Grow;
@@ -633,23 +569,8 @@ begin
   Inc(ptr, AIndex);
   next := ptr;
   Inc(next);
-  Move(next^, ptr^, (longint(Count) - AIndex - 1) * PointerSize);
+  Move(next^, ptr^, (Count - AIndex - 1) * PointerSize);
   Dec(Count);
-end;
-
-function TList.Where(APredicate: TPredicate; var AValue): PList;
-var
-  result: PList;
-  index: integer;
-  item: pointer;
-begin
-  result := New(PList, Create);
-  Where := result;
-  for index := 0 to Count - 1 do begin
-    item := GetItem(index);
-    if APredicate(item, AValue) then
-      result^.Add(item);
-  end;
 end;
 
 procedure TObjectList.Init;
@@ -729,18 +650,18 @@ begin
   Delete(0);
 end;
 
-procedure TStack.Init;
+procedure TObjectStack.Init;
 begin
   inherited Init;
   DisposeObjects := false;
 end;
 
-function TStack.Push(AObject: PObject): integer;
+function TObjectStack.Push(AObject: PObject): integer;
 begin
   Push := Add(AObject);
 end;
 
-function TStack.Pop: PObject;
+function TObjectStack.Pop: PObject;
 var
   result: PObject;
 begin
@@ -751,7 +672,36 @@ begin
   Delete(Count - 1);
 end;
 
-function TStack.Peek: PObject;
+function TObjectStack.Peek: PObject;
+begin
+  Peek := nil;
+  if Count = 0 then
+    exit;
+  Peek := GetItem(Count - 1);
+end;
+
+procedure TStack.Init;
+begin
+  inherited Init;
+end;
+
+function TStack.Push(AItem: pointer): integer;
+begin
+  Push := Add(AItem);
+end;
+
+function TStack.Pop: pointer;
+var
+  result: pointer;
+begin
+  result := Peek;
+  Pop := result;
+  if (Count = 0) or not Assigned(result) then
+    exit;
+  Delete(Count - 1);
+end;
+
+function TStack.Peek: pointer;
 begin
   Peek := nil;
   if Count = 0 then
@@ -801,7 +751,7 @@ begin
     exit;
   st := GetItem(AIndex);
   if DisposeStrings then
-    TString.Dispose(st);
+    TString.Free(st);
   inherited Delete(AIndex);
 end;
 
@@ -812,7 +762,7 @@ end;
 
 procedure TStringList.SortStrings;
 begin
-  Sort(StringCompare);
+  Sort(TStringCompare.CaseInsensitive^);
 end;
 
 procedure TStringList.Clear;
@@ -968,22 +918,6 @@ begin
     current := current^.Next;
   end;
   IndexOf := index;
-end;
-
-function TLinkedList.Where(APredicate: TPredicate; var AValue): PLinkedList;
-var
-  result: PLinkedList;
-  current: PListNode;
-  item: pointer;
-begin
-  result := New(PLinkedList, Create);
-  Where := result;
-  current := FHead;
-  while Assigned(current) do begin
-    if APredicate(current^.Item, AValue) then
-      result^.Add(item);
-    current := current^.Next;
-  end;
 end;
 
 procedure TLinkedList.Swap(var AItem1, AItem2: PListNode);
@@ -1160,4 +1094,6 @@ begin
   inherited FreeNode(ANode);
 end;
 
+begin
+  TStringCompare.Create;
 end.

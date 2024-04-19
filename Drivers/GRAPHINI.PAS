@@ -1,21 +1,17 @@
-{$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
-{$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
-{$ENDIF}
+{$I COMPILER.INC}
 unit GraphIni;
 
 interface
 
 uses
- Objects,
- GraphDrv,
- Svga8Drv,
- Vga8Drv,
- EgaDrv,
- HercDrv,
- CgaDrv,
- UVga8Drv;
+  Objects,
+  GraphDrv,
+  Svga8Drv,
+  Vga8Drv,
+  EgaDrv,
+  HercDrv,
+  CgaDrv,
+  UVga8Drv;
 
 type
   TGraphDrivers =
@@ -29,7 +25,6 @@ type
   );
 
 procedure InitGraphicsDriver(ADriverId: TGraphDrivers);
-procedure FreeGraphicsDriver;
 
 implementation
 
@@ -43,11 +38,6 @@ begin
     gdSVga8: Graph := New(PSVga8Driver, Create);
     gdVgaUnchained: Graph := New(PVgaUnchainedDriver, Create);
   end;
-end;
-
-procedure FreeGraphicsDriver;
-begin
-  FreeAndNil(Graph);
 end;
 
 end.

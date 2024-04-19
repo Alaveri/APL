@@ -1,42 +1,39 @@
-{$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
-{$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
-{$ENDIF}
+{$I COMPILER.INC}
 unit SVga8Drv;
 
 interface
 
 uses
+  {$IFDEF DOS}
+  Strings,
+  {$ENDIF}
   Objects,
-  Except,
-  GraphDrv,
-  GrDrv8,
+  Errors,
+  Drawing,
   Common,
   StrUtils,
-  Strings,
   Streams,
-  Drawing;
-
-{$I SVGA8.inc}
+  GraphDrv,
+  GrDrv8,
+  SVgaType;
 
 type
   PSVga8Mode = ^TSvga8Mode;
 
   TSvga8Mode = object(TGraphicsMode)
-  private
+  {$IFDEF VER70}private{$ENDIF}
     FAttributes: TVbeModeAttributes;
     FWinSize: word;
     FWinFuncPtr: pointer;
     FGranularity: word;
-  public
+  {$IFDEF VER70}public{$ENDIF}
     procedure Init; virtual;
     procedure Assign(var ASource: TObject); virtual;
   end;
 
   PSVga8Driver = ^TSVga8Driver;
   TSVga8Driver = object(TGraphics8Driver)
-  private
+  {$IFDEF VER70}private{$ENDIF}
     FSVga8Driver: integer;
     FCurrentBank: integer;
     FWinSize: word;
@@ -44,7 +41,7 @@ type
     FBankShift: word;
     procedure SetBank(ABank: word);
     function GetScreenPtr(AX, AY: integer; var AOffset: longint): PByte;
-  public
+  {$IFDEF VER70}public{$ENDIF}
     function GetPixel(AX, AY: integer): byte; virtual;
     procedure GetImage(AX, AY, AWidth, AHeight: longint; ABuffer: PByte); virtual;
     procedure GetImageStream(AX, AY, AWidth, AHeight: longint; AStream: PStream); virtual;
@@ -66,7 +63,6 @@ type
 implementation
 
 uses
-  Dos,
   MouseDrv;
 
 procedure TSVga8Mode.Init;
@@ -129,7 +125,7 @@ begin
     end;
     recordPtr := @vbeMode;
     asm
-      mov ax, $4F01
+      mov ax, 4F01h
       les di, recordPtr
       mov cx, [vbeModeIndex]
       int 10h
@@ -209,7 +205,7 @@ begin
     mov   bx, [selectedMode]
     int   10h
   end;
-  Mouse.SetMouseResolution(AMode^.Width, AMode^.Height);
+  Mouse.SetMouseResolution(AMode^.Width - 1, AMode^.Height - 1);
   if HasException then
     exit;
   State.FrameBuffer := AMode^.FrameBuffer;
@@ -623,7 +619,13 @@ end;
 
 procedure TSVga8Driver.WaitForVSync;
 begin
-  while Port[$3DA] and $08 = $08 do;
+  asm
+    mov dx, 3DAh
+    @end:
+    in al, dx
+    test al, 8h
+    jz @end
+  end;
 end;
 
 destructor TSVga8Driver.Free;

@@ -1,24 +1,22 @@
-{$IFDEF debug}
-  {$A-,B-,D+,F+,G-,I+,L+,N+,O+,P+,Q+,R+,S+,T-,V-,X+,Y+}
-{$ELSE}
-  {$A-,B-,D-,F+,G-,I+,L-,N+,O+,P+,Q-,R-,S-,T-,V-,X+,Y-}
-{$ENDIF}
+{$I COMPILER.INC}
 unit GraphDrv;
 
 interface
 
 uses
-  Objects,
-  Except,
-  Common,
-  Drawing,
-  Lists,
-  Consts,
-  StrUtils,
-  MemDrv,
+  {$IFDEF DOS}
   Strings,
   Dos,
-  Streams;
+  {$ENDIF}
+  Objects,
+  Errors,
+  Common,
+  Streams,
+  Drawing,
+  Lists,
+  AplConst,
+  StrUtils,
+  MemDrv;
 
 const
   FontMajorVersion = 1;
@@ -36,8 +34,8 @@ type
   PProportionalFont = ^TProportionalFont;
 
   TGraphicsMode = object(TIdentifiable)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     Description: PChar;
     Width, Height: integer;
     MaxX, MaxY: integer;
@@ -53,13 +51,12 @@ type
   end;
 
   TGraphicsModeList = object(TIdentifiableList)
-  public
+  {$IFDEF VER70}public{$ENDIF}
     function IndexOf(AItem: PGraphicsMode): integer;
     function GetItemById(const AId: string): PGraphicsMode;
     function IndexOfId(const AId: string): integer;
     function Add(AItem: PGraphicsMode): integer;
     function GetItem(AIndex: integer): PGraphicsMode;
-    function Where(APredicate: TPredicate; var AValue): PGraphicsModeList;
     procedure Insert(AIndex: integer; AItem: PGraphicsMode);
   end;
 
@@ -79,10 +76,10 @@ type
   end;
 
   TFont = object(TExceptionObject)
-  private
+  {$IFDEF VER70}private{$ENDIF}
     FFontData: PByte;
     FFontDataSize: word;
-  public
+  {$IFDEF VER70}public{$ENDIF}
     Version: real;
     TransparentColor: longint;
     Transparent: boolean;
@@ -108,16 +105,16 @@ type
   end;
 
   TMonospaceFont = object(TFont)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     procedure Init; virtual;
     procedure Assign(var ASource: TObject); virtual;
     destructor Free; virtual;
   end;
 
   TProportionalFont = object(TFont)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     CharWidths: TFontWidthArray;
     constructor CreateSize(AMaxWidth, AHeight: byte);
     procedure Init; virtual;
@@ -134,8 +131,8 @@ type
   end;
 
   TSystemFont = object(TMonospaceFont)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     function CharWidth(AChar: char): integer; virtual;
     function TextWidthAny(AText: PChar; ALength: word): longint; virtual;
     procedure Init; virtual;
@@ -143,8 +140,8 @@ type
   end;
 
   TGraphicsState = object(TObject)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     ForeColor: longint;
     BackColor: longint;
     XPos, YPos: integer;
@@ -156,13 +153,13 @@ type
   end;
 
   TGraphicsDriver = object(TExceptionObject)
-  private
+  {$IFDEF VER70}private{$ENDIF}
     FOldMode: byte;
     FDrawBuffer: PByte;
     FDrawBufferSize: word;
-  public
+  {$IFDEF VER70}public{$ENDIF}
     State: TGraphicsState;
-    StateStack: TStack;
+    StateStack: TObjectStack;
     Modes: TGraphicsModeList;
     Mode: PGraphicsMode;
     function GetPixel(AX, AY: integer): byte; virtual;
@@ -211,7 +208,7 @@ type
   end;
 
   TFontList = Object(TIdentifiableList)
-  public
+  {$IFDEF VER70}public{$ENDIF}
     function ToString: string; virtual;
     function IndexOf(AItem: PFont): integer;
     function GetItemById(AId: string): PFont;
@@ -229,6 +226,9 @@ implementation
 uses
   Compress,
   Lzw;
+
+var
+  PreviousExitProc: PFunc;
 
 procedure TGraphicsDriver.Init;
 var
@@ -348,7 +348,7 @@ procedure TGraphicsDriver.FillRect(ARect: TRect);
 var
   index: integer;
   tempColor: longint;
-  bounds: TRect;
+  rect: PRect;
 begin
   tempColor := State.ForeColor;
   State.ForeColor := State.BackColor;
@@ -535,8 +535,8 @@ end;
 
 destructor TGraphicsMode.Free;
 begin
-  TString.Dispose(HelpText);
-  TString.Dispose(Description);
+  TString.Free(HelpText);
+  TString.Free(Description);
   inherited Free;
 end;
 
@@ -553,9 +553,9 @@ begin
   Bounds.SetRect(mode^.Bounds);
   Bpp := mode^.Bpp;
   ModeIndex := mode^.ModeIndex;
-  TString.Dispose(Description);
-  TString.Dispose(HelpText);
-  TString.Dispose(Id);
+  TString.Free(Description);
+  TString.Free(HelpText);
+  TString.Free(Id);
   Description := TString.Copy(mode^.Description);
   HelpText:= TString.Copy(mode^.HelpText);
   BytesPerScanLine := mode^.BytesPerScanLine;
@@ -590,11 +590,6 @@ end;
 procedure TGraphicsModeList.Insert(AIndex: integer; AItem: PGraphicsMode);
 begin
   inherited Insert(AIndex, AItem);
-end;
-
-function TGraphicsModeList.Where(APredicate: TPredicate; var AValue): PGraphicsModeList;
-begin
-  Where := PGraphicsModeList(TList.Where(APredicate, AValue));
 end;
 
 destructor TFont.Free;
@@ -655,6 +650,9 @@ function TFont.TextWidth(const AText: string): longint;
 var
   textPtr: PChar;
 begin
+  TextWidth := 0;
+  if Length(AText) = 0 then
+    exit;
   textPtr := @AText[1];
   TextWidth := TextWidthAny(textPtr, Length(AText));
 end;
@@ -1021,4 +1019,16 @@ begin
   inherited Insert(AIndex, AItem);
 end;
 
+procedure GraphDriverExitProc; far;
+begin
+  ExitProc := PreviousExitProc;
+  if Assigned(Graph) then
+    FreeAndNil(Graph);
+  WriteLn('Graphics driver uninstalled.');
+end;
+
+begin
+  Graph := nil;
+  PreviousExitProc := ExitProc;
+  ExitProc := @GraphDriverExitProc;
 end.
