@@ -228,7 +228,7 @@ uses
   Lzw;
 
 var
-  PreviousExitProc: PFunc;
+  PreviousExitProc: PProc;
 
 procedure TGraphicsDriver.Init;
 var
@@ -1019,7 +1019,7 @@ begin
   inherited Insert(AIndex, AItem);
 end;
 
-procedure GraphDriverExitProc; far;
+procedure Finalize; far;
 begin
   ExitProc := PreviousExitProc;
   if Assigned(Graph) then
@@ -1030,5 +1030,5 @@ end;
 begin
   Graph := nil;
   PreviousExitProc := ExitProc;
-  ExitProc := @GraphDriverExitProc;
+  ExitProc := @Finalize;
 end.

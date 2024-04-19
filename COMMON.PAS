@@ -107,7 +107,7 @@ uses
   Files;
 
 var
-  PreviousExitProc: PFunc;
+  PreviousExitProc: PProc;
   LastDir: string;
 
 function StartsWith(const AString, AStartsWith: string): boolean;
@@ -724,7 +724,7 @@ begin
   HasWildCard := found;
 end;
 
-procedure CommonExitProc; far;
+procedure Finalize; far;
 begin
   ExitProc := PreviousExitProc;
   ChangeDirectory(LastDir);
@@ -735,5 +735,5 @@ begin
  NumberSeparator := ',';
  LastDir := GetCurrentDirectory;
  PreviousExitProc := ExitProc;
- ExitProc := @CommonExitProc;
+ ExitProc := @Finalize;
 end.

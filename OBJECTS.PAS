@@ -12,11 +12,11 @@ type
   PPointer = ^pointer;
   PObject = ^TObject;
   PIdentifiable = ^TIdentifiable;
-  PFunc = ^TFunc;
+  PProc = ^TProc;
 
   TComparer = function(AItem1, AItem2: pointer): integer;
   TPredicate = function(AItem: pointer; var AValue): boolean;
-  TFunc = procedure;
+  TProc = procedure;
 
   TObject = object
   {$IFDEF VER70}private{$ENDIF}

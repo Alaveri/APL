@@ -120,14 +120,16 @@ var
   OutOfMemoryException: PException;
   XmsControl: pointer;
   MoveRecord: TXmsMoveRecord;
+  NilPointer: pointer;
 
 implementation
 
 uses
-  AplConst;
+  AplConst,
+  StrUtils;
 
 var
-  PreviousExitProc: PFunc;
+  PreviousExitProc: PProc;
 
 const
   HiWord = 1;
@@ -647,7 +649,7 @@ begin
   inherited Insert(AIndex, AItem);
 end;
 
-procedure MemoryDriverExitProc; far;
+procedure Finalize; far;
 begin
   ExitProc := PreviousExitProc;
   Memory.Free;
@@ -802,8 +804,9 @@ begin
 end;
 
 begin
+  NilPointer := nil;
   Memory.Create;
   WriteLn('Memory driver installed.');
   PreviousExitProc := ExitProc;
-  ExitProc := @MemoryDriverExitProc;
+  ExitProc := @Finalize;
 end.

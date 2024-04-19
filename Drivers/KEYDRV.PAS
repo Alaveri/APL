@@ -265,7 +265,7 @@ var
   KeyboardTail: byte absolute $0040:$001C;
   KeyDown: array[byte] of boolean;
   {$ENDIF}
-  PreviousExitProc: PFunc;
+  PreviousExitProc: PProc;
 
 (*
 procedure KeyboardHandler(Flags, CS, IP, AX, BX, CX, DX, SI, DI, DS, ES, BP: Word); {$IFDEF DOS}interrupt;{$ENDIF}
@@ -632,7 +632,7 @@ begin
   inherited Free;
 end;
 
-procedure KeyboardDriverExitProc; far;
+procedure Finalize; far;
 begin
   ExitProc := PreviousExitProc;
   Keyboard.Free;
@@ -643,5 +643,5 @@ begin
   Keyboard.Create;
   WriteLn('Keyboard driver installed.');
   PreviousExitProc := ExitProc;
-  ExitProc := @KeyboardDriverExitProc;
+  ExitProc := @Finalize;
 end.

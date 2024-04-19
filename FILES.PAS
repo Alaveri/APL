@@ -103,7 +103,7 @@ implementation
 var
   SortDirection: TDirSortDirection;
   SortDirsFirst: boolean;
-  PreviousExitProc: PFunc;
+  PreviousExitProc: PProc;
 
 function FilenameCompare(AItem1, AItem2: pointer): integer;
 var
@@ -384,7 +384,7 @@ begin
   inherited Insert(AIndex, AItem);
 end;
 
-procedure DirectoryExitProc; far;
+procedure Finalize; far;
 begin
   ExitProc := PreviousExitProc;
   TDirectory.Free;
@@ -393,5 +393,5 @@ end;
 begin
   TDirectory.Create;
   PreviousExitProc := ExitProc;
-  ExitProc := @DirectoryExitProc;
+  ExitProc := @Finalize;
 end.

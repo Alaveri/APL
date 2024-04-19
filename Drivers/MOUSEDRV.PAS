@@ -65,7 +65,7 @@ uses
   AplDos;
 
 var
-  PreviousExitProc: PFunc;
+  PreviousExitProc: PProc;
 
 procedure TMouseState.Init;
 begin
@@ -278,7 +278,7 @@ begin
     Include(State.ButtonState, bsRight);
 end;
 
-procedure MouseDriverExitProc; far;
+procedure Finalize; far;
 begin
   ExitProc := PreviousExitProc;
   Mouse.Free;
@@ -289,5 +289,5 @@ begin
   Mouse.Create;
   WriteLn('Mouse driver installed.');
   PreviousExitProc := ExitProc;
-  ExitProc := @MouseDriverExitProc;
+  ExitProc := @Finalize;
 end.

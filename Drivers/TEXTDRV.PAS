@@ -113,7 +113,7 @@ var
 implementation
 
 var
-  PreviousExitProc: PFunc;
+  PreviousExitProc: PProc;
 
 procedure TTextState.Init;
 begin
@@ -417,5 +417,5 @@ end;
 begin
   TextDriver := nil;
   PreviousExitProc := ExitProc;
-  ExitProc := @TextDriverExitProc;
+  ExitProc := @Finalize @TextDriverExitProc;
 end.
