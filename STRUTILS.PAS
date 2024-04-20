@@ -14,8 +14,8 @@ type
   TStringCompareOptions = set of TStringCompareOption;
 
   TStringUtil = object
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     constructor Create;
     function New(ASource: string): PChar;
     function CompareLength(AStr1, AStr2: PChar; AMaxLength: word; ACompareOptions: TStringCompareOptions): integer;

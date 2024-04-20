@@ -39,7 +39,7 @@ type
     FCapacity: integer;
     FBuffer: PListBuffer;
     procedure Grow;
-  public
+  {$IFDEF VER70}public{$ENDIF}
     Count: integer;
     constructor CreateCapacity(ACapacity: integer);
     destructor Free; virtual;
@@ -51,12 +51,12 @@ type
   end;
 
   TList = object(TCollection)
-  private
+  {$IFDEF VER70}private{$ENDIF}
     FSorted: boolean;
     FComparer: TComparer;
     function GetSortedIndex(AItem: pointer): integer;
     procedure QuickSort(AComparer: TComparer; ALowIndex, AHighIndex: integer);
-  public
+  {$IFDEF VER70}public{$ENDIF}
     constructor CreateSorted(AComparer: TComparer);
     procedure Init; virtual;
     function Add(AItem: pointer): integer;
@@ -78,7 +78,7 @@ type
   end;
 
   TLinkedList = object(TObject)
-  private
+  {$IFDEF VER70}private{$ENDIF}
     FHead: PListNode;
     FTail: PListNode;
     function GetSortedIndex(AItem: pointer): longint;
@@ -86,7 +86,7 @@ type
     procedure MergeSort(AComparer: TComparer; var AHead: PListNode);
     procedure FrontBackSplit(ASource: PListNode; var Afront, ABack: PListNode);
     procedure FreeNode(ANode: PListNode); virtual;
-  public
+  {$IFDEF VER70}public{$ENDIF}
     Count: longint;
     destructor Free; virtual;
     procedure Init; virtual;
@@ -103,8 +103,8 @@ type
   end;
 
   TObjectList = object(TList)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     DisposeObjects: boolean;
     destructor Free; virtual;
     function IndexOf(AItem: PObject): integer;
@@ -120,7 +120,7 @@ type
   end;
 
   TLinkedObjectList = object(TLinkedList)
-  public
+  {$IFDEF VER70}public{$ENDIF}
     DisposeObjects: boolean;
     procedure Init; virtual;
     function Add(AItem: PObject): PListNode;
@@ -151,15 +151,15 @@ type
 
 
   TQueue = object(TObjectList)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     procedure Init; virtual;
     function Enqueue(AObject: PObject): integer;
     function Dequeue: PObject;
   end;
 
   TStringList = object(TList)
-  public
+  {$IFDEF VER70}public{$ENDIF}
     DisposeStrings: boolean;
     destructor Free; virtual;
     function IndexOf(AItem: PChar): integer;
@@ -175,8 +175,8 @@ type
   end;
 
   TIdentifiableList = object(TObjectList)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     function IndexOf(AItem: PIdentifiable): integer;
     function Add(AItem: PIdentifiable): integer;
     function GetItemById(const AId: string): PIdentifiable;
@@ -186,8 +186,8 @@ type
   end;
 
   THeirarchy = object(TObject)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
   end;
 
   TStringComparer = object(TObject)

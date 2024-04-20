@@ -34,8 +34,8 @@ type
   TWeekDays = set of TWeekDay;
 
   TDateTime = object(TObject)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     Ticks: double; { 1/100th seconds since Jan 1, 0001 12:00 am }
     constructor CreateDateTime(AYear, AMonth, ADay, AHour, AMinute, ASecond,
       AHundredths: integer);
@@ -73,7 +73,7 @@ type
   end;
 
   TTimeSpan = object(TDateTime)
-  public
+  {$IFDEF VER70}public{$ENDIF}
     constructor CreateSpan(ATimeSpan: TTimeSpan);
     constructor CreateHours(AHours: double);
     constructor CreateMinutes(AMinutes: double);
@@ -96,12 +96,12 @@ type
     procedure AddDays(ADays: double);
     procedure Init; virtual;
     procedure GetDuration(var ATimeSpan: TTimeSpan);
-  public
+  {$IFDEF VER70}public{$ENDIF}
   end;
 
   TStopWatch = object(TObject)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     StartTime: TDateTime;
     EndTime: TDateTime;
     function ElapsedTicks: double;

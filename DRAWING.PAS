@@ -104,7 +104,7 @@ type
  end;
 
   TSize = object(TObject)
-  public
+  {$IFDEF VER70}public{$ENDIF}
     Width, Height: longint;
     constructor Create;
     constructor CreateDims(AWidth, AHeight: longint);

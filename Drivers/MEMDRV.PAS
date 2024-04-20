@@ -26,8 +26,8 @@ type
   TMemoryAllocErrorProc = function(ASize: word): boolean;
 
   TReferenceList = object(TList)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     destructor Free; virtual;
     function Add(AItem: PReference): integer;
     function GetItem(AIndex: integer): PReference;
@@ -51,7 +51,7 @@ type
   end;
 
   TMemoryDriver = object(TExceptionObject)
-  private
+  {$IFDEF VER70}private{$ENDIF}
     FXmsSupported: boolean;
     FReferences: PReferenceList;
     FCurrentReference: PReference;
@@ -64,7 +64,7 @@ type
     procedure MoveReference(AMoveRecord: PXmsMoveRecord);
     procedure MoveToConventional(AReference: PReference);
     procedure PurgeConventional(ASize: longint);
-  public
+  {$IFDEF VER70}public{$ENDIF}
     OnAllocError: PMemoryAllocErrorProc;
     constructor Create;
     destructor Free; virtual;

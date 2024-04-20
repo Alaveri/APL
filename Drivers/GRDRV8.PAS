@@ -68,10 +68,10 @@ type
   TRgbPalette = array[byte] of TRgbColor;
 
   TMouseCursor = object(TIdentifiable)
-  private
+  {$IFDEF VER70}private{$ENDIF}
     FBackData: PByte;
     FBackBuffer: PByte;
-  public
+  {$IFDEF VER70}public{$ENDIF}
     Visible: boolean;
     X, Y: integer;
     OffsetX, OffsetY: integer;
@@ -88,7 +88,7 @@ type
   end;
 
   TGraphics8Driver = object(TGraphicsDriver)
-  public
+  {$IFDEF VER70}public{$ENDIF}
     MouseCursor: PMouseCursor;
     Palette: PRgbPalette;
     procedure Init; virtual;
@@ -110,8 +110,8 @@ type
   end;
 
   TMouseCursorList = object(TIdentifiableList)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     function IndexOf(AItem: PMouseCursor): integer;
     function Add(AItem: PMouseCursor): integer;
     function GetItem(AIndex: integer): PMouseCursor;

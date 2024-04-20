@@ -34,8 +34,8 @@ type
   PProportionalFont = ^TProportionalFont;
 
   TGraphicsMode = object(TIdentifiable)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     Description: PChar;
     Width, Height: integer;
     MaxX, MaxY: integer;
@@ -52,7 +52,7 @@ type
   end;
 
   TGraphicsModeList = object(TIdentifiableList)
-  public
+  {$IFDEF VER70}public{$ENDIF}
     function IndexOf(AItem: PGraphicsMode): integer;
     function GetItemById(const AId: string): PGraphicsMode;
     function IndexOfId(const AId: string): integer;
@@ -77,10 +77,10 @@ type
   end;
 
   TFont = object(TExceptionObject)
-  private
+  {$IFDEF VER70}private{$ENDIF}
     FFontData: PByte;
     FFontDataSize: word;
-  public
+  {$IFDEF VER70}public{$ENDIF}
     Version: real;
     TransparentColor: longint;
     Transparent: boolean;
@@ -106,16 +106,16 @@ type
   end;
 
   TMonospaceFont = object(TFont)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     procedure Init; virtual;
     procedure Assign(var ASource: TObject); virtual;
     destructor Free; virtual;
   end;
 
   TProportionalFont = object(TFont)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     CharWidths: TFontWidthArray;
     constructor CreateSize(AMaxWidth, AHeight: byte);
     procedure Init; virtual;
@@ -132,8 +132,8 @@ type
   end;
 
   TSystemFont = object(TMonospaceFont)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     function CharWidth(AChar: char): integer; virtual;
     function TextWidthAny(AText: PChar; ALength: word): longint; virtual;
     procedure Init; virtual;
@@ -141,8 +141,8 @@ type
   end;
 
   TGraphicsState = object(TObject)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     ForeColor: longint;
     BackColor: longint;
     XPos, YPos: integer;
@@ -154,11 +154,11 @@ type
   end;
 
   TGraphicsDriver = object(TExceptionObject)
-  private
+  {$IFDEF VER70}private{$ENDIF}
     FOldMode: byte;
     FDrawBuffer: PByte;
     FDrawBufferSize: word;
-  public
+  {$IFDEF VER70}public{$ENDIF}
     State: TGraphicsState;
     StateStack: TObjectStack;
     Modes: TGraphicsModeList;
@@ -209,7 +209,7 @@ type
   end;
 
   TFontList = Object(TIdentifiableList)
-  public
+  {$IFDEF VER70}public{$ENDIF}
     function ToString: string; virtual;
     function IndexOf(AItem: PFont): integer;
     function GetItemById(AId: string): PFont;

@@ -22,7 +22,7 @@ type
   PDirectTextDriver = ^TDirectTextDriver;
 
   TDirectTextDriver = object(TTextDriver)
-  private
+  {$IFDEF VER70}private{$ENDIF}
     FStartMode: byte;
     function GetTextAttributes(AForeColor, ABackColor: byte; ABlink: boolean): byte; virtual;
   public

@@ -19,8 +19,8 @@ type
   TProc = procedure;
 
   TObject = object
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     constructor Create;
     destructor Free; virtual;
     function ToString: string; virtual;
@@ -30,8 +30,8 @@ type
   end;
 
   TIdentifiable = object(TObject)
-  private
-  public
+  {$IFDEF VER70}private{$ENDIF}
+  {$IFDEF VER70}public{$ENDIF}
     Id: PChar;
     constructor CreateId(const AId: string);
     destructor Free; virtual;
