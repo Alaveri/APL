@@ -40,14 +40,14 @@ type
   end;
 
   TImage = object(TExceptionObject)
-  {$IFDEF VER70}private{$ENDIF}
+  private
     FHeader: TImageHeader;
     procedure InitHeader;
     procedure SaveToStreamLzw(ADest: PStream);
     procedure SaveToStreamRaw(ADest: PStream);
     procedure ReadHeader(ASource: PStream; var AHeader: TImageHeader);
     procedure WriteHeader(ADest: PStream);
-  {$IFDEF VER70}public{$ENDIF}
+  public
     Buffer: PMemoryStream;
     constructor Create;
     constructor CreateSize(AWidth, AHeight: word; ABpp: byte);
@@ -71,8 +71,8 @@ type
   end;
 
   TImageList = object(TObjectList)
-  {$IFDEF VER70}private{$ENDIF}
-  {$IFDEF VER70}public{$ENDIF}
+  private
+  public
     function GetItem(AIndex: integer): PImage;
     function IndexOf(AItem: PImage): integer;
     function Add(AItem: PImage): integer;

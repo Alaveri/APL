@@ -22,10 +22,10 @@ type
   PDirectTextDriver = ^TDirectTextDriver;
 
   TDirectTextDriver = object(TTextDriver)
-  {$IFDEF VER70}private{$ENDIF}
+  private
     FStartMode: byte;
     function GetTextAttributes(AForeColor, ABackColor: byte; ABlink: boolean): byte; virtual;
-  {$IFDEF VER70}public{$ENDIF}
+  public
     procedure RenderText(AXPos, AYPos: byte; AText: PChar; ALength: word); virtual;
     procedure Write(const AText: string); virtual;
     procedure WriteLarge(AText: PChar); virtual;

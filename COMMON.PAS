@@ -20,8 +20,24 @@ type
   Int64 = comp;
   TBit = (bit0, bit1, bit2, bit3, bit4, bit5, bit6, bit7);
   TBits = set of TBit;
-  TBit16 = (sbit0, sbit1, sbit2, sbit3, sbit4, sbit5, sbit6, sbit7, sbit8,
-   sbit9, sbit10, sbit11, sbit12, sbit13, sbit14, sbit15);
+  TBit16 = (
+    wbit0,
+    wbit1,
+    wbit2,
+    wbit3,
+    wbit4,
+    wbit5,
+    wbit6,
+    wbit7,
+    wbit8,
+    wbit9,
+    wbit10,
+    wbit11,
+    wbit12,
+    wbit13,
+    wbit14,
+    wbit15
+  );
   TBits16 = set of TBit16;
   THexString = string[9];
   TByteArray = array[byte] of byte;

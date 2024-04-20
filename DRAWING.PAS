@@ -19,8 +19,8 @@ type
   PRegion = ^TRegion;
 
   TShape = object(TObject)
-  {$IFDEF VER70}private{$ENDIF}
-  {$IFDEF VER70}public{$ENDIF}
+  private
+  public
     procedure Init; virtual;
     procedure Assign(var ASource: TObject); virtual;
     function GetNewObject: PObject; virtual;
@@ -28,8 +28,8 @@ type
   end;
 
   TRegion = object(TObjectList)
-  {$IFDEF VER70}private{$ENDIF}
-  {$IFDEF VER70}public{$ENDIF}
+  private
+  public
     Shapes: PShapeList;
     procedure Init; virtual;
     procedure Assign(var ASource: TObject); virtual;
@@ -37,8 +37,8 @@ type
   end;
 
   TPointList = object(TObjectList)
-  {$IFDEF VER70}private{$ENDIF}
-  {$IFDEF VER70}public{$ENDIF}
+  private
+  public
     function IndexOf(AItem: PPoint): integer;
     function Add(AItem: PPoint): integer;
     function GetItem(AIndex: integer): PPoint;
@@ -47,8 +47,8 @@ type
   end;
 
   TShapeList = object(TObjectList)
-  {$IFDEF VER70}private{$ENDIF}
-  {$IFDEF VER70}public{$ENDIF}
+  private
+  public
     function IndexOf(AItem: PShape): integer;
     function Add(AItem: PShape): integer;
     function GetItem(AIndex: integer): PShape;
@@ -57,7 +57,7 @@ type
   end;
 
   TPoint = object(TShape)
-  {$IFDEF VER70}public{$ENDIF}
+  public
     X, Y: integer;
     constructor Create;
     constructor CreateCoords(AX, AY: longint);
@@ -74,7 +74,7 @@ type
   TLocation = TPoint;
 
   TRect = object(TShape)
-  {$IFDEF VER70}public{$ENDIF}
+  public
     X, Y: integer;
     Width, Height: integer;
     constructor CreateDims(AX, AY, AWidth, AHeight: integer);
@@ -104,7 +104,7 @@ type
  end;
 
   TSize = object(TObject)
-  {$IFDEF VER70}public{$ENDIF}
+  public
     Width, Height: longint;
     constructor Create;
     constructor CreateDims(AWidth, AHeight: longint);

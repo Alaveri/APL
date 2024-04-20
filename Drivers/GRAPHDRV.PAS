@@ -34,8 +34,8 @@ type
   PProportionalFont = ^TProportionalFont;
 
   TGraphicsMode = object(TIdentifiable)
-  {$IFDEF VER70}private{$ENDIF}
-  {$IFDEF VER70}public{$ENDIF}
+  private
+  public
     Description: PChar;
     Width, Height: integer;
     MaxX, MaxY: integer;
@@ -45,13 +45,14 @@ type
     ModeIndex: word;
     BytesPerScanLine: word;
     FrameBuffer: pointer;
+    NumPages: byte;
     procedure Assign(var ASource: TObject); virtual;
     procedure Init; virtual;
     destructor Free; virtual;
   end;
 
   TGraphicsModeList = object(TIdentifiableList)
-  {$IFDEF VER70}public{$ENDIF}
+  public
     function IndexOf(AItem: PGraphicsMode): integer;
     function GetItemById(const AId: string): PGraphicsMode;
     function IndexOfId(const AId: string): integer;
@@ -76,10 +77,10 @@ type
   end;
 
   TFont = object(TExceptionObject)
-  {$IFDEF VER70}private{$ENDIF}
+  private
     FFontData: PByte;
     FFontDataSize: word;
-  {$IFDEF VER70}public{$ENDIF}
+  public
     Version: real;
     TransparentColor: longint;
     Transparent: boolean;
@@ -105,16 +106,16 @@ type
   end;
 
   TMonospaceFont = object(TFont)
-  {$IFDEF VER70}private{$ENDIF}
-  {$IFDEF VER70}public{$ENDIF}
+  private
+  public
     procedure Init; virtual;
     procedure Assign(var ASource: TObject); virtual;
     destructor Free; virtual;
   end;
 
   TProportionalFont = object(TFont)
-  {$IFDEF VER70}private{$ENDIF}
-  {$IFDEF VER70}public{$ENDIF}
+  private
+  public
     CharWidths: TFontWidthArray;
     constructor CreateSize(AMaxWidth, AHeight: byte);
     procedure Init; virtual;
@@ -131,8 +132,8 @@ type
   end;
 
   TSystemFont = object(TMonospaceFont)
-  {$IFDEF VER70}private{$ENDIF}
-  {$IFDEF VER70}public{$ENDIF}
+  private
+  public
     function CharWidth(AChar: char): integer; virtual;
     function TextWidthAny(AText: PChar; ALength: word): longint; virtual;
     procedure Init; virtual;
@@ -140,8 +141,8 @@ type
   end;
 
   TGraphicsState = object(TObject)
-  {$IFDEF VER70}private{$ENDIF}
-  {$IFDEF VER70}public{$ENDIF}
+  private
+  public
     ForeColor: longint;
     BackColor: longint;
     XPos, YPos: integer;
@@ -153,11 +154,11 @@ type
   end;
 
   TGraphicsDriver = object(TExceptionObject)
-  {$IFDEF VER70}private{$ENDIF}
+  private
     FOldMode: byte;
     FDrawBuffer: PByte;
     FDrawBufferSize: word;
-  {$IFDEF VER70}public{$ENDIF}
+  public
     State: TGraphicsState;
     StateStack: TObjectStack;
     Modes: TGraphicsModeList;
@@ -208,7 +209,7 @@ type
   end;
 
   TFontList = Object(TIdentifiableList)
-  {$IFDEF VER70}public{$ENDIF}
+  public
     function ToString: string; virtual;
     function IndexOf(AItem: PFont): integer;
     function GetItemById(AId: string): PFont;
@@ -524,6 +525,7 @@ begin
   MaxX := 0;
   MaxY := 0;
   Bpp := 0;
+  NumPages := 1;
   Bounds.Create;
   ModeIndex := 0;
   BytesPerScanLine := 0;
@@ -548,6 +550,7 @@ begin
   mode := PGraphicsMode(@ASource);
   Width := mode^.Width;
   Height := mode^.Height;
+  NumPages := mode^.NumPages;
   MaxX := mode^.MaxX;
   MaxY := mode^.MaxY;
   Bounds.SetRect(mode^.Bounds);

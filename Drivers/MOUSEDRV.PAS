@@ -20,7 +20,7 @@ type
   TButtonStates = set of TButtonState;
 
   TMouseState = object(TObject)
-  {$IFDEF VER70}public{$ENDIF}
+  public
     X: integer;
     Y: integer;
     ButtonState: TButtonStates;
@@ -34,10 +34,10 @@ type
   end;
 
   TMouseDriver = object(TObject)
-  {$IFDEF VER70}private{$ENDIF}
+  private
     FMouseWheelSupported: boolean;
     function CheckMouseWheelSupported: boolean;
-  {$IFDEF VER70}public{$ENDIF}
+  public
     State: TMouseState;
     StateStack: TObjectStack;
     UseSystemCursor: boolean;

@@ -16,11 +16,11 @@ type
   PTextApplication = ^TTextApplication;
 
   TTextApplication = object(TApplication)
-  {$IFDEF VER70}private{$ENDIF}
+  private
     FDriverId: TTextDrivers;
     FModeId: string;
     procedure InitText(ADriverId: TTextDrivers);
-  {$IFDEF VER70}public{$ENDIF}
+  public
     constructor Create(ADriverId: TTextDrivers; AModeId: string);
     procedure Init; virtual;
     procedure ProcessEvents; virtual;

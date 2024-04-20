@@ -16,7 +16,7 @@ type
   TCompressProgressProc = procedure(ASender: PCompressor; AMax, ACurrent: longint);
 
   TCompressor = object(TExceptionObject)
-  {$IFDEF VER70}private{$ENDIF}
+  private
     FReadBufferSize: word;
     FWriteBufferSize: word;
     FSource, FDest: PStream;
@@ -30,7 +30,7 @@ type
     FReadPtr, FWritePtr: PByte;
     FProgressCounter: word;
     procedure SetBufferSize(AReadBufferSize, AWriteBufferSize: word);
-  {$IFDEF VER70}public{$ENDIF}
+  public
     OnProgress: PCompressProgressProc;
     Source, Dest: PStream;
     ProgressIncrement: word;

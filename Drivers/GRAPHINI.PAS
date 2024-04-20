@@ -11,7 +11,7 @@ uses
   EgaDrv,
   HercDrv,
   CgaDrv,
-  UVga8Drv;
+  VgaXDrv;
 
 type
   TGraphDrivers =
@@ -21,7 +21,7 @@ type
     gdEga,
     gdCga,
     gdHercules,
-    gdVgaUnchained
+    gdVgaModeX
   );
 
 procedure InitGraphicsDriver(ADriverId: TGraphDrivers);
@@ -36,7 +36,7 @@ begin
     gdEga: Graph := New(PEgaDriver, Create);
     gdVga8: Graph := New(PVga8Driver, Create);
     gdSVga8: Graph := New(PSVga8Driver, Create);
-    gdVgaUnchained: Graph := New(PVgaUnchainedDriver, Create);
+    gdVgaModeX: Graph := New(PVgaModeXDriver, Create);
   end;
 end;
 

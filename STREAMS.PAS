@@ -35,10 +35,10 @@ type
   );
 
   TStream = object(TExceptionObject)
-  {$IFDEF VER70}private{$ENDIF}
+  private
     FStatus: TStreamStatus;
     FClosed: boolean;
-  {$IFDEF VER70}public{$ENDIF}
+  public
     Position: longint;
     Size: longint;
     destructor Free; virtual;
@@ -67,9 +67,9 @@ type
   end;
 
   TMemoryStream = object(TStream)
-  {$IFDEF VER70}private{$ENDIF}
+  private
     FReferences: PReferenceList;
-  {$IFDEF VER70}public{$ENDIF}
+  public
     constructor Create(ASize: longint);
     destructor Free; virtual;
     function Read(ABuffer: PByte; ACount: longint): longint; virtual;
@@ -91,14 +91,14 @@ type
   );
 
   TFileStream = object(TStream)
-  {$IFDEF VER70}private{$ENDIF}
+  private
     FMode: TFileStreamMode;
     FFile: file;
     FOpen: boolean;
     FFilename: string;
     function CheckRead: boolean;
     function CheckWrite: boolean;
-  {$IFDEF VER70}public{$ENDIF}
+  public
     BufferSize: word;
     constructor Create(AFilename: string; AMode: TFileStreamMode);
     constructor CreateBufferSize(AFilename: string; AMode: TFileStreamMode; ABufferSize: word);
@@ -125,17 +125,17 @@ type
   end;
 
   TStreamReader = object(TExceptionObject)
-  {$IFDEF VER70}private{$ENDIF}
+  private
     FStream: PStream;
-  {$IFDEF VER70}public{$ENDIF}
+  public
     constructor Create(AStream: PStream);
     destructor Free; virtual;
     procedure Init; virtual;
   end;
 
   TTextReader = object(TStreamReader)
-  {$IFDEF VER70}private{$ENDIF}
-  {$IFDEF VER70}public{$ENDIF}
+  private
+  public
     procedure Init; virtual;
     destructor Free; virtual;
     function ReadLine: string;

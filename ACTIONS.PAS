@@ -22,8 +22,8 @@ type
   TActionExecuteProc = procedure(ASender: PObject; AAction: PAction);
 
   TAction = object(TObject)
-  {$IFDEF VER70}private{$ENDIF}
-  {$IFDEF VER70}public{$ENDIF}
+  private
+  public
     ActionId: integer;
     Text: PChar;
     HelpText: PChar;
@@ -44,7 +44,7 @@ type
   end;
 
   TActionList = object(TObjectList)
-  {$IFDEF VER70}public{$ENDIF}
+  public
     function IndexOf(AItem: PAction): integer;
     function NewAction(AActionId: integer; AText: string; AShortcut: word): PAction;
     function Add(AItem: PAction): integer;

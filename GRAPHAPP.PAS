@@ -17,10 +17,10 @@ type
   PGraphApp = ^TGraphApp;
 
   TGraphApp = object(TApplication)
-  {$IFDEF VER70}private{$ENDIF}
+  private
     FDriverId: TGraphDrivers;
     FModeId: string;
-  {$IFDEF VER70}public{$ENDIF}
+  public
     constructor Create(ADriverId: TGraphDrivers; AModeId: string);
     procedure Init; virtual;
     procedure InitGraphics(ADriverId: TGraphDrivers);

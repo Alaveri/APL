@@ -230,11 +230,11 @@ type
   end;
 
   TKeyboardDriver = object(TObject)
-  {$IFDEF VER70}private{$ENDIF}
+  private
     FDriverInstalled: boolean;
     procedure InstallInterrupt;
     procedure UninstallInterrupt;
-  {$IFDEF VER70}public{$ENDIF}
+  public
     OnKeyInterrupt: PKeyInterruptProc;
     function KeyPressed: boolean;
     function GetKey: word;

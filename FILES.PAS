@@ -32,8 +32,8 @@ type
   TFileAttributes = set of TFileAttribute;
 
   TFile = object(TObject)
-  {$IFDEF VER70}private{$ENDIF}
-  {$IFDEF VER70}public{$ENDIF}
+  private
+  public
     Name: PChar;
     Attr: TFileAttributes;
     Time: TDateTime;
@@ -46,8 +46,8 @@ type
   TDirSortDirection = (dsAsc, dsDesc);
 
   TDirectoryContents = object(TFile)
-  {$IFDEF VER70}private{$ENDIF}
-  {$IFDEF VER70}public{$ENDIF}
+  private
+  public
     Files: PFileList;
     Path: string;
     Filter: string;
@@ -57,8 +57,8 @@ type
   end;
 
   TFileList = object(TObjectList)
-  {$IFDEF VER70}private{$ENDIF}
-  {$IFDEF VER70}public{$ENDIF}
+  private
+  public
     function GetItem(AIndex: longint): PFile;
     function IndexOf(AItem: PFile): longint;
     function Find(const AFilename: string): PFile;
@@ -67,10 +67,10 @@ type
   end;
 
   TDirectoryManager = object(TExceptionObject)
-  {$IFDEF VER70}private{$ENDIF}
+  private
     function HandleError(AError: integer): boolean;
     procedure SetFileInfo(AFile: PFile; ASearch: SearchRec);
-  {$IFDEF VER70}public{$ENDIF}
+  public
     DefaultFileAttributes: TFileAttributes;
     DefaultDirAttributes: TFileAttributes;
     procedure Init; virtual;
