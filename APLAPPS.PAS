@@ -22,8 +22,8 @@ type
   TApplicationErrorProc = procedure(ASender: pointer; ACode: word);
 
   TApplication = object(TObject)
-  {$IFDEF VER70}private{$ENDIF}
-  {$IFDEF VER70}public{$ENDIF}
+  private
+  public
     Closed: boolean;
     OnError: PApplicationErrorProc;
     procedure Init; virtual;

@@ -101,8 +101,8 @@ type
   PExceptionObject = ^TExceptionObject;
 
   TException = object(TIdentifiable)
-  {$IFDEF VER70}private{$ENDIF}
-  {$IFDEF VER70}public{$ENDIF}
+  private
+  public
     Code: TExceptionCode;
     Severity: TExceptionSeverity;
     InnerException: PException;
@@ -114,8 +114,8 @@ type
   end;
 
   TExceptionObject = object(TIdentifiable)
-  {$IFDEF VER70}private{$ENDIF}
-  {$IFDEF VER70}public{$ENDIF}
+  private
+  public
     Exception: PException;
     procedure Init; virtual;
     {$IFDEF DOS}
