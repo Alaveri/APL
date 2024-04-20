@@ -20,7 +20,7 @@ type
   end;
 
   TLzw = object(TCompressor)
-  {$IFDEF VER70}private{$ENDIF}
+  private
     FDict: PDictEntry;
     FDictEntries: word;
     FDictSize: word;
@@ -39,7 +39,7 @@ type
     procedure DeallocateDecodeBuffer;
     procedure InitCoder;
     procedure InitCompression; virtual;
-  {$IFDEF VER70}public{$ENDIF}
+  public
     BitSize: byte;
     constructor CreateBitSize(ABitSize: byte);
     destructor Free; virtual;

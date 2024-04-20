@@ -30,7 +30,7 @@ type
   end;
 
   TTextState = object(TObject)
-  {$IFDEF VER70}public{$ENDIF}
+  public
     ForeColor, BackColor: byte;
     Blink: boolean;
     X, Y: integer;
@@ -42,8 +42,8 @@ type
   end;
 
   TTextMode = Object(TIdentifiable)
-  {$IFDEF VER70}private{$ENDIF}
-  {$IFDEF VER70}public{$ENDIF}
+  private
+  public
     Width, Height, MaxX, MaxY: integer;
     Name: string50;
     AdditionalData: integer;
@@ -54,8 +54,8 @@ type
   end;
 
   TTextModeList = object(TIdentifiableList)
-  {$IFDEF VER70}private{$ENDIF}
-  {$IFDEF VER70}public{$ENDIF}
+  private
+  public
     function GetItem(AIndex: integer): PTextMode;    function GetItemById(const AId: string): PTextMode;
     function IndexOfId(const AId: string): integer;
     function IndexOf(AItem: PTextMode): integer;
@@ -65,7 +65,7 @@ type
 
   TTextDriver = Object(TExceptionObject)
     FStateStack: PStack;
-  {$IFDEF VER70}public{$ENDIF}
+  public
     Mode: PTextMode;
     Modes: PTextModeList;
     State: PTextState;

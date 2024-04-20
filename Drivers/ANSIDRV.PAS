@@ -19,10 +19,10 @@ type
   PAnsiDriver = ^TAnsiDriver;
 
   TAnsiDriver = object(TTextDriver)
-  {$IFDEF VER70}private{$ENDIF}
+  private
     _startMode: byte;
     function GetTextAttributes(AForeColor, ABackColor: byte; ABlink: boolean): byte; virtual;
-  {$IFDEF VER70}public{$ENDIF}
+  public
     procedure Write(const AText: string); virtual;
     procedure WriteLarge(AText: PChar); virtual;
     procedure SetForeColor(AColor: byte); virtual;

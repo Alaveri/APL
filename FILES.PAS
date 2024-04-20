@@ -32,8 +32,8 @@ type
   TFileAttributes = set of TFileAttribute;
 
   TFile = object(TObject)
-  {$IFDEF VER70}private{$ENDIF}
-  {$IFDEF VER70}public{$ENDIF}
+  private
+  public
     Name: PChar;
     Attr: TFileAttributes;
     Time: TDateTime;
@@ -67,10 +67,10 @@ type
   end;
 
   TDirectoryManager = object(TExceptionObject)
-  {$IFDEF VER70}private{$ENDIF}
+  private
     function HandleError(AError: integer): boolean;
     procedure SetFileInfo(AFile: PFile; ASearch: SearchRec);
-  {$IFDEF VER70}public{$ENDIF}
+  public
     DefaultFileAttributes: TFileAttributes;
     DefaultDirAttributes: TFileAttributes;
     procedure Init; virtual;

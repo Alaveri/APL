@@ -7,11 +7,12 @@ uses
   {$IFDEF DOS}
   Dos,
   Strings,
+
+  Lines,
   {$ENDIF}
   Objects,
   Lists,
   Common,
-  Lines,
   Drawing,
   AplTypes,
   AplDos,
@@ -22,7 +23,7 @@ type
   PDirectTextDriver = ^TDirectTextDriver;
 
   TDirectTextDriver = object(TTextDriver)
-  {$IFDEF VER70}private{$ENDIF}
+  private
     FStartMode: byte;
     function GetTextAttributes(AForeColor, ABackColor: byte; ABlink: boolean): byte; virtual;
   public

@@ -21,9 +21,9 @@ type
   PVga8Driver = ^TVga8Driver;
 
   TVga8Driver = object(TGraphics8Driver)
-  {$IFDEF VER70}private{$ENDIF}
+  private
     function GetScreenPtr(AX, AY: integer; var AOffset: word): PByte;
-  {$IFDEF VER70}public{$ENDIF}
+  public
     function GetPixel(AX, AY: integer): byte; virtual;
     procedure GetImage(AX, AY, AWidth, AHeight: longint; ABuffer: PByte); virtual;
     procedure GetImageStream(AX, AY, AWidth, AHeight: longint; AStream: PStream); virtual;
