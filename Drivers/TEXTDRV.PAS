@@ -15,8 +15,7 @@ uses
   Common,
   Errors,
   Drawing,
-  MouseDrv,
-  Lines;
+  MouseDrv;
 
 type
   PTextDriver = ^TTextDriver;
@@ -406,7 +405,7 @@ procedure TTextDriver.ScrollText;
 begin
 end;
 
-procedure TextDriverExitProc; far;
+procedure Finalize; far;
 begin
   ExitProc := PreviousExitProc;
   if Assigned(TextDriver) then
@@ -417,5 +416,5 @@ end;
 begin
   TextDriver := nil;
   PreviousExitProc := ExitProc;
-  ExitProc := @Finalize @TextDriverExitProc;
+  ExitProc := @Finalize;
 end.
