@@ -87,6 +87,7 @@ type
     procedure SetRight(ARight: integer);
     procedure SetBottom(ABottom: integer);
     procedure Translate(ADX, ADY: integer);
+    procedure TranslateToOrigin;
     procedure Grow(ADW, ADH: integer);
     procedure Intersect(var ARect: TRect);
     procedure GetIntersection(ARect: TRect; var AResult: TRect);
@@ -109,7 +110,10 @@ type
     constructor Create;
     constructor CreateDims(AWidth, AHeight: longint);
     constructor CreateSize(ASize: TSize);
+    constructor CreateRect(ARect: TRect);
+    procedure Assign(var ASource: TObject); virtual;
     procedure SetDims(AWidth, AHeight: longint);
+    procedure SetRect(ARect: TRect);
     procedure SetSize(ASize: TSize);
     procedure Grow(ADW, ADH: longint);
     procedure Init; virtual;
@@ -176,6 +180,13 @@ begin
   Inc(X, ADX);
   Inc(Y, ADY);
 end;
+
+procedure TRect.TranslateToOrigin;
+begin
+  X := 0;
+  Y := 0;
+end;
+
 
 procedure TRect.Assign(var ASource: TObject);
 var
@@ -388,11 +399,27 @@ begin
   SetSize(ASize);
 end;
 
+constructor TSize.CreateRect(ARect: TRect);
+begin
+  Init;
+  SetRect(ARect);
+end;
+
 procedure TSize.Init;
 begin
   inherited Init;
   Width := 0;
   Height := 0;
+end;
+
+procedure TSize.Assign(var ASource: TObject);
+var
+  source: PSize;
+begin
+  inherited Assign(ASource);
+  source := PSize(@ASource);
+  Width := source^.Width;
+  Height := source^.Height;
 end;
 
 procedure TSize.SetDims(AWidth, AHeight: longint);
@@ -405,6 +432,12 @@ procedure TSize.SetSize(ASize: TSize);
 begin
   Width := ASize.Width;
   Height := ASize.Height;
+end;
+
+procedure TSize.SetRect(ARect: TRect);
+begin
+  Width := ARect.Width;
+  Height := ARect.Height;
 end;
 
 procedure TSize.Grow(ADW, ADH: longint);

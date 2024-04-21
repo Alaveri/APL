@@ -32,6 +32,9 @@ type
   PSystemFont = ^TSystemFont;
   PMonospaceFont = ^TMonospaceFont;
   PProportionalFont = ^TProportionalFont;
+  PGetScreenPointerFunc = ^TGetScreenPointerFunc;
+
+  TGetScreenPointerFunc = function(ADriver: PGraphicsDriver; AX, AY: integer; var AOffset: longint): PByte;
 
   TGraphicsMode = object(TIdentifiable)
   private
@@ -148,6 +151,7 @@ type
     XPos, YPos: integer;
     Font: PFont;
     ViewPort: TRect;
+    GetScreenPointer: PGetScreenPointerFunc;
     FrameBuffer: PByte;
     procedure Init; virtual;
     procedure Assign(var ASource: TObject); virtual;
@@ -168,6 +172,7 @@ type
     function BackColor: longint; virtual;
     function XPos: byte; virtual;
     function YPos: byte; virtual;
+    function GetScreenPointer(AX, AY: integer; var AOffset: longint): PByte;
     function BeginDrawBuffer(var ABounds: TRect; ABuffer: PByte): PByte; virtual;
     procedure GetImage(AX, AY, AWidth, AHeight: longint; ABuffer: PByte); virtual;
     procedure GetImageRect(ARect: TRect; ABuffer: PByte); virtual;
@@ -253,6 +258,11 @@ end;
 
 procedure TGraphicsDriver.RenderText(AX, AY, ALength: integer; AText: PChar);
 begin
+end;
+
+function TGraphicsDriver.GetScreenPointer(AX, AY: integer; var AOffset: longint): PByte;
+begin
+  GetScreenPointer := TGetScreenPointerFunc(State.GetScreenPointer)(@self, AX, AY, AOffset);
 end;
 
 function TGraphicsDriver.ForeColor: longint;
@@ -476,7 +486,7 @@ begin
   GetMem(FDrawBuffer, FDrawBufferSize);
   if not Assigned(FDrawBuffer) then
     exit;
-  ABounds.Translate(-ABounds.X, -ABounds.Y);
+  ABounds.TranslateToOrigin;
   State.ViewPort.SetRect(ABounds);
   State.FrameBuffer := FDrawBuffer;
   BeginDrawBuffer := FDrawBuffer;
@@ -487,6 +497,7 @@ begin
   if not Assigned(FDrawBuffer) then
     exit;
   FreeMem(FDrawBuffer, FDrawBufferSize);
+  State.FrameBuffer := Mode^.FrameBuffer;
   FDrawBuffer := nil;
 end;
 
@@ -970,6 +981,7 @@ begin
   Font := nil;
   ViewPort.Create;
   FrameBuffer := nil;
+  GetScreenPointer := nil;
 end;
 
 procedure TGraphicsState.Assign(var ASource: TObject);
@@ -985,6 +997,7 @@ begin
   Font := state^.Font;
   FrameBuffer := state^.FrameBuffer;
   ViewPort.SetRect(state^.ViewPort);
+  GetScreenPointer := state^.GetScreenPointer;
 end;
 
 function TFontList.ToString: string;
