@@ -32,9 +32,6 @@ type
   PSystemFont = ^TSystemFont;
   PMonospaceFont = ^TMonospaceFont;
   PProportionalFont = ^TProportionalFont;
-  PGetScreenPointerFunc = ^TGetScreenPointerFunc;
-
-  TGetScreenPointerFunc = function(ADriver: PGraphicsDriver; AX, AY: integer; var AOffset: longint): PByte;
 
   TGraphicsMode = object(TIdentifiable)
   private
@@ -151,8 +148,9 @@ type
     XPos, YPos: integer;
     Font: PFont;
     ViewPort: TRect;
-    GetScreenPointer: PGetScreenPointerFunc;
     FrameBuffer: PByte;
+    BufferMode: boolean;
+    BufferRect: TRect;
     procedure Init; virtual;
     procedure Assign(var ASource: TObject); virtual;
   end;
@@ -172,7 +170,9 @@ type
     function BackColor: longint; virtual;
     function XPos: byte; virtual;
     function YPos: byte; virtual;
-    function GetScreenPointer(AX, AY: integer; var AOffset: longint): PByte;
+    function GetScreenPointer(AX, AY: integer; var AOffset: longint): PByte; virtual;
+    function GetBufferPointer(AX, AY: integer; var AOffset: longint): PByte; virtual;
+    function GetDrawPointer(AX, AY: integer; var AOffset: longint): PByte;
     function BeginDrawBuffer(var ABounds: TRect; ABuffer: PByte): PByte; virtual;
     procedure GetImage(AX, AY, AWidth, AHeight: longint; ABuffer: PByte); virtual;
     procedure GetImageRect(ARect: TRect; ABuffer: PByte); virtual;
@@ -207,6 +207,7 @@ type
     procedure PushState; virtual;
     procedure PopState; virtual;
     procedure EndDrawBuffer; virtual;
+    procedure FreeDrawBuffer; virtual;
     procedure Init; virtual;
     procedure WaitForVSync; virtual;
     procedure ResetMode; virtual;
@@ -262,7 +263,24 @@ end;
 
 function TGraphicsDriver.GetScreenPointer(AX, AY: integer; var AOffset: longint): PByte;
 begin
-  GetScreenPointer := TGetScreenPointerFunc(State.GetScreenPointer)(@self, AX, AY, AOffset);
+end;
+
+function TGraphicsDriver.GetBufferPointer(AX, AY: integer; var AOffset: longint): PByte;
+var
+  screen: PByte;
+begin
+  screen := State.FrameBuffer;
+  AOffset := AY * State.BufferRect.Width + AX;
+  Inc(screen, AOffset);
+  GetBufferPointer := screen;
+end;
+
+function TGraphicsDriver.GetDrawPointer(AX, AY: integer; var AOffset: longint): PByte;
+begin
+  if State.BufferMode then
+    GetDrawPointer := GetBufferPointer(AX, AY, AOffset)
+  else
+    GetDrawPointer := GetScreenPointer(AX, AY, AOffset);
 end;
 
 function TGraphicsDriver.ForeColor: longint;
@@ -479,6 +497,7 @@ end;
 
 function TGraphicsDriver.BeginDrawBuffer(var ABounds: TRect; ABuffer: PByte): PByte;
 begin
+  PushState;
   BeginDrawBuffer := nil;
   if Assigned(FDrawBuffer) then
     FreeMem(FDrawBuffer, FDrawBufferSize);
@@ -487,18 +506,25 @@ begin
   if not Assigned(FDrawBuffer) then
     exit;
   ABounds.TranslateToOrigin;
-  State.ViewPort.SetRect(ABounds);
+  State.BufferRect.SetRect(ABounds);
   State.FrameBuffer := FDrawBuffer;
+  State.BufferMode := true;
   BeginDrawBuffer := FDrawBuffer;
 end;
 
 procedure TGraphicsDriver.EndDrawBuffer;
 begin
-  if not Assigned(FDrawBuffer) then
-    exit;
-  FreeMem(FDrawBuffer, FDrawBufferSize);
+  State.BufferMode := false;
   State.FrameBuffer := Mode^.FrameBuffer;
+  PopState;
+end;
+
+procedure TGraphicsDriver.FreeDrawBuffer;
+begin
+  if Assigned(FDrawBuffer) then
+    FreeMem(FDrawBuffer, FDrawBufferSize);
   FDrawBuffer := nil;
+  FDrawBufferSize := 0;
 end;
 
 procedure TGraphicsDriver.PopState;
@@ -980,8 +1006,9 @@ begin
   YPos := 0;
   Font := nil;
   ViewPort.Create;
+  BufferMode := false;
+  BufferRect.Create;
   FrameBuffer := nil;
-  GetScreenPointer := nil;
 end;
 
 procedure TGraphicsState.Assign(var ASource: TObject);
@@ -997,7 +1024,8 @@ begin
   Font := state^.Font;
   FrameBuffer := state^.FrameBuffer;
   ViewPort.SetRect(state^.ViewPort);
-  GetScreenPointer := state^.GetScreenPointer;
+  BufferMode := state^.BufferMode;
+  BufferRect.SetRect(state^.BufferRect);
 end;
 
 function TFontList.ToString: string;

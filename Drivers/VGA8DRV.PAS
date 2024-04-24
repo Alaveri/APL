@@ -22,8 +22,8 @@ type
 
   TVga8Driver = object(TGraphics8Driver)
   private
-    function GetScreenPtr(AX, AY: integer; var AOffset: word): PByte;
   public
+    function GetScreenPointer(AX, AY: integer; var AOffset: longint): PByte; virtual;
     function GetPixel(AX, AY: integer): byte; virtual;
     procedure GetImage(AX, AY, AWidth, AHeight: longint; ABuffer: PByte); virtual;
     procedure GetImageStream(AX, AY, AWidth, AHeight: longint; AStream: PStream); virtual;
@@ -47,20 +47,14 @@ implementation
 uses
   Errors;
 
-function TVga8Driver.GetPixel(AX, AY: integer): byte;
+function TVga8Driver.GetScreenPointer(AX, AY: integer; var AOffset: longint): PByte;
 var
-  offset: longint;
-  ptr: PByte;
-  drawRect: TRect;
+  result: PByte;
 begin
-  GetPixel := 0;
-  Mode^.Bounds.GetIntersection(State.ViewPort, drawRect);
-  if not drawRect.IntersectsCoords(AX, AY) then
-    exit;
-  offset := AX + longint(AY) * Mode^.BytesPerScanLine;
-  ptr := State.FrameBuffer;
-  Inc(ptr, offset);
-  GetPixel := ptr^;
+  AOffset := longint(AY) * Mode^.BytesPerScanLine + AX;
+  result := Mode^.FrameBuffer;
+  Inc(result, AOffset);
+  GetScreenPointer := result;
 end;
 
 procedure TVga8Driver.SetMode(AMode: PGraphicsMode);
@@ -85,28 +79,22 @@ begin
   Mode^.Bounds.GetIntersection(State.ViewPort, drawRect);
   if not drawRect.IntersectsCoords(AX, AY) then
     exit;
-  ptr := State.FrameBuffer;
-  offset := AX + longint(AY) * Mode^.BytesPerScanLine;
-  Inc(ptr, offset);
+  ptr := GetDrawPointer(AX, AY, offset);
   ptr^ := State.ForeColor;
 end;
 
-function TVga8Driver.GetScreenPtr(AX, AY: integer; var AOffset: word): PByte;
+function TVga8Driver.GetPixel(AX, AY: integer): byte;
 var
-  bank: integer;
-  screen: PByte;
+  offset: longint;
+  ptr: PByte;
+  drawRect: TRect;
 begin
-  if State.FrameBuffer <> Mode^.FrameBuffer then begin
-    screen := State.FrameBuffer;
-    AOffset := AY * State.ViewPort.Width + AX;
-    Inc(screen, AOffset);
-    GetScreenPtr := screen;
+  GetPixel := 0;
+  Mode^.Bounds.GetIntersection(State.ViewPort, drawRect);
+  if not drawRect.IntersectsCoords(AX, AY) then
     exit;
-  end;
-  AOffset := AY * Mode^.BytesPerScanLine + AX;
-  screen := Mode^.FrameBuffer;
-  Inc(screen, AOffset);
-  GetScreenPtr := screen;
+  ptr := GetDrawPointer(AX, AY, offset);
+  GetPixel := ptr^;
 end;
 
 procedure TVga8Driver.RenderText(AX, AY, ALength: integer; AText: PChar);
@@ -122,7 +110,7 @@ var
   height: integer;
   screen: PByte;
   fore: byte;
-  offset: word;
+  offset: longint;
   currentLine: byte;
 begin
   if HasException then
@@ -161,28 +149,27 @@ begin
       end;
       if sy > drawRect.Bottom then
         break;
-      screen := GetScreenPtr(sx + minX, sy, offset);
+      screen := GetDrawPointer(sx + minX, sy, offset);
       count := maxX - minX + 1;
       asm
-        les di, screen
-        mov cx, count
-        mov dl, minx
-        mov ah, fore
-        mov bh, currentLine
+        les di, screen { Load screen pointer into ES:DI }
+        mov cx, count { Load count into CX as the loop counter }
+        mov dl, minx { Load starting x index into DL }
+        mov ah, fore { Load ForeColor into AH }
+        mov bh, currentLine { Load current character line into BH }
         @loop:
-          mov al, bh
-          push cx
-          mov cl, dl
-          mov bl, 128
-          shr bl, cl
-          pop cx
-          and al, bl
-          jz @next
-          mov al, ah
-          mov [es:di], al
+          mov al, bh { Load current character line into AL }
+          push cx { Save loop counter }
+          mov cl, dl { Load x index into CL }
+          mov bl, 128 { Load 128 into BL }
+          shr bl, cl { Shift 128 right by x index to get the mask }
+          pop cx { Restore loop counter }
+          and al, bl { Check if the character pixel is set }
+          jz @next { If the pixel is not set, skip to the next pixel }
+          mov [es:di], ah { Set the screen pixel to the ForeColor }
           @next:
-          inc dl
-          inc di
+          inc dl { Increment the x index }
+          inc di { Increment the screen pointer }
         loop @loop
       end;
       Inc(linePtr);
@@ -311,7 +298,7 @@ procedure TVga8Driver.HLine(AX, AY, AWidth: integer);
 var
   screen: PByte;
   lineWidth: integer;
-  offset: word;
+  offset: longint;
   color: byte;
   drawRect: TRect;
 begin
@@ -324,8 +311,8 @@ begin
   AWidth := MinLong(drawRect.Width, AWidth);
   if AWidth <= 0 then
     exit;
-  screen := GetScreenPtr(AX, AY, offset);
-  color := byte(ForeColor);
+  screen := GetDrawPointer(AX, AY, offset);
+  color := byte(State.ForeColor);
   asm
     mov cx, AWidth
     mov al, color
@@ -335,28 +322,42 @@ begin
       inc di
     loop @loop
   end;
-  FillChar(screen^, AWidth, color);
 end;
 
 procedure TVga8Driver.VLine(AX, AY, AHeight: integer);
 var
   index: integer;
-  offset: word;
+  offset: longint;
   screen: PByte;
   drawRect: TRect;
+  min, max: integer;
+  color: byte;
+  screenWidth: word;
 begin
   if HasException then
     exit;
   Mode^.Bounds.GetIntersection(State.ViewPort, drawRect);
   if (AX < drawRect.X) or (AX > drawRect.Right) then
     exit;
-  CheckRange(AY, drawRect.Y, drawRect.Bottom);
+  AY := EnsureRange(AY, drawRect.Y, drawRect.Bottom);
   AHeight := MinLong(drawRect.Height, AHeight);
   if AHeight <= 0 then
     exit;
-  for index := MaxLong(AY, 0) to MinLong(AY + AHeight - 1, Mode^.MaxY) do begin
-    screen := GetScreenPtr(AX, index, offset);
-    screen^ := ForeColor;
+  screen := GetDrawPointer(AX, AY, offset);
+  color := ForeColor;
+  if State.BufferMode then
+    screenWidth := State.ViewPort.Width
+  else
+    screenWidth := Mode^.BytesPerScanLine;
+  asm
+    mov ax, screenWidth
+    mov cx, AHeight
+    mov bl, color
+    les di, screen
+    @loop:
+      mov [es:di], bl
+      add di, ax
+    loop @loop
   end;
 end;
 
@@ -365,7 +366,7 @@ var
   imageRect, drawRect: TRect;
   yIndex: integer;
   screen, image: PByte;
-  offset: word;
+  offset: longint;
   sy: word;
   lineWidth: word;
 begin
@@ -377,7 +378,7 @@ begin
   sy := drawRect.Y;
   lineWidth := drawRect.Width;
   for yIndex := 0 to drawRect.Height - 1 do begin
-    screen := GetScreenPtr(drawRect.X, sy, offset);
+    screen := GetDrawPointer(drawRect.X, sy, offset);
     image := AImage;
     Inc(image, (yIndex + imageRect.Y) * imageRect.Width + imageRect.X);
     asm
@@ -388,7 +389,6 @@ begin
       rep movsb
       pop ds
     end;
-    Inc(image, lineWidth);
     Inc(sy);
   end;
 end;
@@ -398,7 +398,7 @@ var
   imageRect, drawRect: TRect;
   xIndex, yIndex: integer;
   sy: longint;
-  offset: word;
+  offset: longint;
   screen, image: PByte;
   width: word;
 begin
@@ -410,7 +410,7 @@ begin
   sy := drawRect.Y;
   width := drawRect.Width;
   for yIndex := 0 to drawRect.Height - 1 do begin
-    screen := GetScreenPtr(drawRect.X, sy, offset);
+    screen := GetDrawPointer(drawRect.X, sy, offset);
     image := AImage;
     Inc(image, (yIndex + imageRect.Y) * imageRect.Width + imageRect.X);
     asm
@@ -441,7 +441,7 @@ var
   imageRect, drawRect: TRect;
   yIndex: integer;
   screen: PByte;
-  offset: word;
+  offset: longint;
   sy: longint;
   lineWidth: integer;
   streamStart: longint;
@@ -455,7 +455,7 @@ begin
   lineWidth := drawRect.Width;
   streamStart := AStream^.Position;
   for yIndex := 0 to drawRect.Height - 1 do begin
-    screen := GetScreenPtr(drawRect.X, sy, offset);
+    screen := GetDrawPointer(drawRect.X, sy, offset);
     AStream^.Seek((yIndex + imageRect.Y) * imageRect.Width + imageRect.X, soFromBeginning);
     AStream^.Read(screen, lineWidth);
   end;
@@ -468,7 +468,7 @@ var
   imageRect, drawRect: TRect;
   xIndex, yIndex: integer;
   screen: PByte;
-  offset: word;
+  offset: longint;
   imageLine: PByte;
   streamStart: longint;
   sy: integer;
@@ -489,7 +489,7 @@ begin
   sy := drawRect.Y;
   AStream^.Seek((yIndex + imageRect.Y) * AWidth + imageRect.X, soFromPosition);
   for yIndex := 0 to drawRect.Height - 1 do begin
-    screen := GetScreenPtr(drawRect.X, drawRect.Y + yIndex, offset);
+    screen := GetDrawPointer(drawRect.X, drawRect.Y + yIndex, offset);
     AStream^.Seek(yIndex * imageRect.Width + imageRect.X, soFromBeginning);
     AStream^.Read(imageLine, lineWidth);
     asm
@@ -523,7 +523,7 @@ var
   imageRect, drawRect: TRect;
   yIndex: integer;
   screen, image: PByte;
-  offset: word;
+  offset: longint;
   sy: longint;
   lineWidth: integer;
 begin
@@ -535,7 +535,7 @@ begin
   sy := drawRect.Y;
   lineWidth := drawRect.Width;
   for yIndex := 0 to drawRect.Height - 1 do begin
-    screen := GetScreenPtr(drawRect.X, sy, offset);
+    screen := GetDrawPointer(drawRect.X, sy, offset);
     image := ABuffer;
     Inc(image, (yIndex + imageRect.Y) * imageRect.Width);
     asm
@@ -556,7 +556,7 @@ var
   imageRect, drawRect: TRect;
   yIndex: integer;
   screen: PByte;
-  offset: word;
+  offset: longint;
   sy: longint;
   lineWidth: integer;
   streamStart: longint;
@@ -570,7 +570,7 @@ begin
   lineWidth := drawRect.Width;
   streamStart := AStream^.Position;
   for yIndex := 0 to drawRect.Height - 1 do begin
-    screen := GetScreenPtr(drawRect.X, sy, offset);
+    screen := GetDrawPointer(drawRect.X, sy, offset);
     AStream^.Seek((yIndex + imageRect.Y) * imageRect.Width + imageRect.X, soFromBeginning);
     AStream^.Write(screen, lineWidth);
     Inc(sy);
