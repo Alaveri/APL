@@ -147,7 +147,7 @@ begin
 
   { Purge conventional references until there is ASize avail + enough space
   for at least 1 reference to be swapped }
-  minSize := longint(Size) + MaxVarSize + SizeOf(TReference) + PointerSize;
+  minSize := MaxVarSize;
   Memory.PurgeConventional(minSize);
 
   { If enough could not be purged, try custom OnAllocError function.  If this

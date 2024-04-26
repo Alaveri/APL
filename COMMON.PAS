@@ -59,6 +59,7 @@ function IntToStr(ANum: longint): string;
 function IntToHex(ANum: longint): THexString;
 function IntToBool(ANum: longint): boolean;
 function IncludeBackSlash(const AString: string): string;
+function ExcludeBackSlash(const AString: string): string;
 function DoubleToStr(ADouble: double; ADigits: byte): string;
 function BoolToStr(ABool: boolean): string;
 function BoolToYN(ABool: boolean): string;
@@ -548,15 +549,15 @@ end;
 
 function ChangeDirectory(const ADirectory: string): boolean;
 var
-  result: boolean;
+  result: integer;
 begin
-  result := false;
+  ChangeDirectory := false;
   {$I-}
   ChDir(ADirectory);
-  if IOResult = 0 then
-    result := true;
+  result := IOResult;
+  if result = 0 then
+    ChangeDirectory := true;
   {$I+}
-  ChangeDirectory := result;
 end;
 
 function Replace(const AString, APattern, AReplacePattern: string): string;
@@ -679,6 +680,14 @@ begin
     IncludeBackslash := AString + '\'
   else
     IncludeBackslash := AString;
+end;
+
+function ExcludeBackSlash(const AString: string): string;
+begin
+  if EndsWith(AString, '\') then
+    ExcludeBackslash := Copy(AString, 1, Length(AString) - 1)
+  else
+    ExcludeBackslash := AString;
 end;
 
 function StringsEqualInsensitive(const AString1, AString2: string): boolean;

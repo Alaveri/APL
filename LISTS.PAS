@@ -58,6 +58,7 @@ type
     procedure QuickSort(AComparer: TComparer; ALowIndex, AHighIndex: integer);
   public
     constructor CreateSorted(AComparer: TComparer);
+    constructor CreateSortedCapacity(AComparer: TComparer; ACapacity: integer);
     procedure Init; virtual;
     function Add(AItem: pointer): integer;
     function Sorted: boolean; virtual;
@@ -417,6 +418,13 @@ end;
 constructor TList.CreateSorted(AComparer: TComparer);
 begin
   inherited Create;
+  FComparer := AComparer;
+  FSorted := true;
+end;
+
+constructor TList.CreateSortedCapacity(AComparer: TComparer; ACapacity: integer);
+begin
+  inherited CreateCapacity(ACapacity);
   FComparer := AComparer;
   FSorted := true;
 end;

@@ -10,9 +10,11 @@ uses
 type
   PWord = ^word;
   PPointer = ^pointer;
+  PBoolean = ^boolean;
   PObject = ^TObject;
   PIdentifiable = ^TIdentifiable;
   PProc = ^TProc;
+  PComparer = ^TComparer;
 
   TComparer = function(AItem1, AItem2: pointer): integer;
   TPredicate = function(AItem: pointer; var AValue): boolean;

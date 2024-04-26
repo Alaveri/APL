@@ -33,6 +33,9 @@ type
   PMonospaceFont = ^TMonospaceFont;
   PProportionalFont = ^TProportionalFont;
 
+  TFontWidthArray = array[byte] of byte;
+  TFontCompression = (fcNone, fcLzw);
+
   TGraphicsMode = object(TIdentifiable)
   private
   public
@@ -61,9 +64,6 @@ type
     procedure Insert(AIndex: integer; AItem: PGraphicsMode);
   end;
 
-  TFontWidthArray = array[byte] of byte;
-  TFontCompression = (fcNone, fcLzw);
-
   TFontHeader = record
     MajorVersion: integer;
     MinorVersion: integer;
@@ -84,7 +84,6 @@ type
     Version: real;
     TransparentColor: longint;
     Transparent: boolean;
-    Initialized: boolean;
     Height: byte;
     MaxWidth: byte;
     AverageWidth: integer;
@@ -150,7 +149,8 @@ type
     ViewPort: TRect;
     FrameBuffer: PByte;
     BufferMode: boolean;
-    BufferRect: TRect;
+    Region: PRegion;
+    RegionMode: TRegionMode;
     procedure Init; virtual;
     procedure Assign(var ASource: TObject); virtual;
   end;
@@ -158,8 +158,8 @@ type
   TGraphicsDriver = object(TExceptionObject)
   private
     FOldMode: byte;
-    FDrawBuffer: PByte;
-    FDrawBufferSize: word;
+    FBackBuffer: PByte;
+    FBackBufferSize: word;
   public
     State: TGraphicsState;
     StateStack: TObjectStack;
@@ -173,7 +173,7 @@ type
     function GetScreenPointer(AX, AY: integer; var AOffset: longint): PByte; virtual;
     function GetBufferPointer(AX, AY: integer; var AOffset: longint): PByte; virtual;
     function GetDrawPointer(AX, AY: integer; var AOffset: longint): PByte;
-    function BeginDrawBuffer(var ABounds: TRect; ABuffer: PByte): PByte; virtual;
+    function BeginDrawBuffer(var ABounds: TRect): PByte; virtual;
     procedure GetImage(AX, AY, AWidth, AHeight: longint; ABuffer: PByte); virtual;
     procedure GetImageRect(ARect: TRect; ABuffer: PByte); virtual;
     procedure GetImageStream(AX, AY, AWidth, AHeight: longint; AStream: PStream); virtual;
@@ -207,7 +207,6 @@ type
     procedure PushState; virtual;
     procedure PopState; virtual;
     procedure EndDrawBuffer; virtual;
-    procedure FreeDrawBuffer; virtual;
     procedure Init; virtual;
     procedure WaitForVSync; virtual;
     procedure ResetMode; virtual;
@@ -242,18 +241,22 @@ var
   oldMode: byte;
 begin
   inherited Init;
+  GetMem(FBackBuffer, MaxVarSize);
+  if not Assigned(FBackBuffer) then begin
+    Raise(ecNotEnoughMemory);
+    exit;
+  end;
   asm
     mov ah, 0Fh
     int 10h
     mov [oldMode], al
   end;
   FOldMode := oldMode;
-  FDrawBuffer := nil;
-  FDrawBufferSize := 0;
   Modes.Create;
   Mode := nil;
   State.Create;
   StateStack.Create;
+  FBackBufferSize := MaxVarSize;
   MoveTo(0, 0);
 end;
 
@@ -270,7 +273,7 @@ var
   screen: PByte;
 begin
   screen := State.FrameBuffer;
-  AOffset := AY * State.BufferRect.Width + AX;
+  AOffset := longint(AY) * State.ViewPort.Width + AX;
   Inc(screen, AOffset);
   GetBufferPointer := screen;
 end;
@@ -495,21 +498,15 @@ begin
   StateStack.Push(newState);
 end;
 
-function TGraphicsDriver.BeginDrawBuffer(var ABounds: TRect; ABuffer: PByte): PByte;
+function TGraphicsDriver.BeginDrawBuffer(var ABounds: TRect): PByte;
 begin
   PushState;
   BeginDrawBuffer := nil;
-  if Assigned(FDrawBuffer) then
-    FreeMem(FDrawBuffer, FDrawBufferSize);
-  FDrawBufferSize := ABounds.Width * ABounds.Height;
-  GetMem(FDrawBuffer, FDrawBufferSize);
-  if not Assigned(FDrawBuffer) then
-    exit;
   ABounds.TranslateToOrigin;
-  State.BufferRect.SetRect(ABounds);
-  State.FrameBuffer := FDrawBuffer;
+  State.ViewPort.SetRect(ABounds);
+  State.FrameBuffer := FBackBuffer;
   State.BufferMode := true;
-  BeginDrawBuffer := FDrawBuffer;
+  BeginDrawBuffer := FBackBuffer;
 end;
 
 procedure TGraphicsDriver.EndDrawBuffer;
@@ -517,14 +514,6 @@ begin
   State.BufferMode := false;
   State.FrameBuffer := Mode^.FrameBuffer;
   PopState;
-end;
-
-procedure TGraphicsDriver.FreeDrawBuffer;
-begin
-  if Assigned(FDrawBuffer) then
-    FreeMem(FDrawBuffer, FDrawBufferSize);
-  FDrawBuffer := nil;
-  FDrawBufferSize := 0;
 end;
 
 procedure TGraphicsDriver.PopState;
@@ -545,8 +534,7 @@ begin
   State.Free;
   StateStack.DisposeObjects := true;
   StateStack.Free;
-  if Assigned(FDrawBuffer) then
-    FreeMem(FDrawBuffer, FDrawBufferSize);
+  FreeMem(FBackBuffer, MaxVarSize);
   inherited Free;
 end;
 
@@ -648,7 +636,6 @@ begin
   Version := source^.Version;
   TransparentColor := source^.TransparentColor;
   Transparent := source^.Transparent;
-  Initialized := source^.Initialized;
   Height := source^.Height;
   MaxWidth := source^.MaxWidth;
   if Assigned(FFontData) then
@@ -664,7 +651,6 @@ begin
   Version := 1.0;
   TransparentColor := 0;
   Transparent := true;
-  Initialized := true;
   Height := 0;
   AverageWidth := 0;
   MaxWidth := 0;
@@ -1007,8 +993,9 @@ begin
   Font := nil;
   ViewPort.Create;
   BufferMode := false;
-  BufferRect.Create;
   FrameBuffer := nil;
+  Region := nil;
+  RegionMode := rmInclude;
 end;
 
 procedure TGraphicsState.Assign(var ASource: TObject);
@@ -1025,7 +1012,8 @@ begin
   FrameBuffer := state^.FrameBuffer;
   ViewPort.SetRect(state^.ViewPort);
   BufferMode := state^.BufferMode;
-  BufferRect.SetRect(state^.BufferRect);
+  Region := state^.Region;
+  RegionMode := state^.RegionMode;
 end;
 
 function TFontList.ToString: string;

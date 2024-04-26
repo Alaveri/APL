@@ -15,6 +15,7 @@ uses
   Streams,
   GraphDrv,
   GrDrv8,
+  MemDrv,
   SVgaType;
 
 type
@@ -186,7 +187,7 @@ var
   bank: integer;
   screen: PByte;
 begin
-  AOffset := longint(AY) * Mode^.BytesPerScanLine + AX;
+  AOffset := AY * Mode^.BytesPerScanLine + AX;
   screen := Mode^.FrameBuffer;
   bank := AOffset shr 16;
   AOffset := AOffset and FWinSize;
@@ -473,7 +474,7 @@ begin
   streamStart := AStream^.Position;
   for yIndex := 0 to drawRect.Height - 1 do begin
     screen := GetDrawPointer(drawRect.X, sy, offset);
-    AStream^.Seek((yIndex + imageRect.Y) * imageRect.Width + imageRect.X, soFromBeginning);
+    AStream^.Seek((yIndex + imageRect.Y) * longint(imageRect.Width) + imageRect.X, soFromBeginning);
     if offset + lineWidth > FWinSize then begin
       partialWidth := FWinSize - offset + 1;
       AStream^.Read(screen, partialWidth);
@@ -594,7 +595,7 @@ begin
   streamStart := AStream^.Position;
   for yIndex := 0 to drawRect.Height - 1 do begin
     screen := GetDrawPointer(drawRect.X, sy, offset);
-    AStream^.Seek((yIndex + imageRect.Y) * imageRect.Width + imageRect.X, soFromBeginning);
+    AStream^.Seek((yIndex + imageRect.Y) * longint(imageRect.Width) + imageRect.X, soFromBeginning);
     if offset + lineWidth > FWinSize then begin
       partialWidth := FWinSize - offset + 1;
       AStream^.Write(screen, partialWidth);

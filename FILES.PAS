@@ -266,6 +266,7 @@ var
   dirPath: string;
   search: SearchRec;
   more: boolean;
+  error: integer;
 begin
   result := New(PDirectoryContents, Create);
   result^.Path := FExpand(Trim(APath));
@@ -279,11 +280,14 @@ begin
   if HasException then
     exit;
   while more do begin
-    afile := New(PFile, Create);
-    SetFileInfo(afile, search);
-    result^.Files^.Add(afile);
+    if not (faDirectory in TFileAttributes(search.Attr)) then begin
+      afile := New(PFile, Create);
+      SetFileInfo(afile, search);
+      result^.Files^.Add(afile);
+    end;
     FindNext(search);
-    more := HandleError(DosError);
+    error := DosError;
+    more := HandleError(error);
     if HasException then
       exit;
   end;
@@ -302,8 +306,9 @@ begin
       SetFileInfo(afile, search);
       result^.Files^.Add(afile);
     end;
-    more := HandleError(DosError);
     FindNext(search);
+    error := DosError;
+    more := HandleError(error);
   end;
 end;
 

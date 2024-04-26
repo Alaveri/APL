@@ -9,32 +9,18 @@ uses
   Common;
 
 type
-
   PPoint = ^TPoint;
   PRect = ^TRect;
   PSize = ^TSize;
-  PShape = ^TShape;
-  PShapeList = ^TShapeList;
+  PRectList = ^TRectList;
   PPointList = ^TPointList;
   PRegion = ^TRegion;
+  PInversionPoint = ^TInversionPoint;
+  PInversionPointList = ^TInversionPointList;
+  PHorzSegment = ^THorzSegment;
+  PHorzSegmentList = ^THorzSegmentList;
 
-  TShape = object(TObject)
-  private
-  public
-    procedure Init; virtual;
-    procedure Assign(var ASource: TObject); virtual;
-    function GetNewObject: PObject; virtual;
-    function GetInversionPoints(AY, AStartX, AEndX: integer): PPointList; virtual;
-  end;
-
-  TRegion = object(TObjectList)
-  private
-  public
-    Shapes: PShapeList;
-    procedure Init; virtual;
-    procedure Assign(var ASource: TObject); virtual;
-    function GetInversionPoints(AY, AStartX, AEndX: integer): PPointList; virtual;
-  end;
+  TRegionMode = (rmInclude, rmExclude);
 
   TPointList = object(TObjectList)
   private
@@ -46,17 +32,48 @@ type
     procedure Insert(AIndex: integer; AItem: PPoint);
   end;
 
-  TShapeList = object(TObjectList)
+  TInversionPoint = object(TObject)
   private
   public
-    function IndexOf(AItem: PShape): integer;
-    function Add(AItem: PShape): integer;
-    function GetItem(AIndex: integer): PShape;
-    function SetItem(AIndex: integer; AItem: PShape): boolean;
-    procedure Insert(AIndex: integer; AItem: PShape);
+    On: boolean;
+    Position: integer;
+    constructor CreatePoint(AOn: boolean; APosition: integer);
+    procedure Init; virtual;
+    procedure Assign(var ASource: TObject); virtual;
   end;
 
-  TPoint = object(TShape)
+  TRectList = object(TObjectList)
+  private
+  public
+    function IndexOf(AItem: PRect): integer;
+    function Add(AItem: PRect): integer;
+    function GetItem(AIndex: integer): PRect;
+    function SetItem(AIndex: integer; AItem: PRect): boolean;
+    procedure Insert(AIndex: integer; AItem: PRect);
+  end;
+
+  TRegion = object(TRectList)
+  private
+  public
+    procedure Init; virtual;
+    procedure Assign(var ASource: TObject); virtual;
+    function GetInversionPoints(AMode: TRegionMode;
+      AY, AStartX, AEndX: integer): PInversionPointList;
+    function GetHorzSegments(AMode: TRegionMode; AY, AStartX, AEndX: integer): PHorzSegmentList;
+    function IntersectsCoords(AX, AY: integer): boolean;
+  end;
+
+  TInversionPointList = object(TObjectList)
+  private
+  public
+    function IndexOf(AItem: PInversionPoint): integer;
+    function Add(AItem: PInversionPoint): integer;
+    function GetItem(AIndex: integer): PInversionPoint;
+    function SetItem(AIndex: integer; AItem: PInversionPoint): boolean;
+    procedure Insert(AIndex: integer; AItem: PInversionPoint);
+  end;
+
+  TPoint = object(TObject)
   public
     X, Y: integer;
     constructor Create;
@@ -73,7 +90,7 @@ type
   PLocation = ^TLocation;
   TLocation = TPoint;
 
-  TRect = object(TShape)
+  TRect = object(TObject)
   public
     X, Y: integer;
     Width, Height: integer;
@@ -92,6 +109,10 @@ type
     procedure Intersect(var ARect: TRect);
     procedure GetIntersection(ARect: TRect; var AResult: TRect);
     procedure Init; virtual;
+    procedure GetInversionPoints(AList: PInversionPointList;
+      AMode: TRegionMode; AY, AStartX, AEndX: integer);
+    procedure GetHorzSegments(AList: PHorzSegmentList;
+      AMode: TRegionMode; AY, AStartX, AEndX: integer);
     function GetNewObject: PObject; virtual;
     function Equals(ARect: TRect): boolean;
     function EqualsCoords(AX, AY, AWidth, AHeight: integer): boolean;
@@ -101,8 +122,26 @@ type
     function IntersectsCoords(AX, AY: integer): boolean;
     function IntersectsPoint(APoint: TPoint): boolean;
     function IntersectsRect(ARect: TRect): boolean;
-    function GetInversionPoints(AY, AStartX, AEndX: integer): PPointList; virtual;
- end;
+  end;
+
+  THorzSegment = object(TObject)
+  private
+  public
+    X1, X2: integer;
+    constructor CreateSegment(AX1, AX2: integer);
+    procedure Init; virtual;
+    procedure Assign(var ASource: TObject); virtual;
+  end;
+
+  THorzSegmentList = object(TObjectList)
+  private
+  public
+    function IndexOf(AItem: PHorzSegment): integer;
+    function Add(AItem: PHorzSegment): integer;
+    function GetItem(AIndex: integer): PHorzSegment;
+    function SetItem(AIndex: integer; AItem: PHorzSegment): boolean;
+    procedure Insert(AIndex: integer; AItem: PHorzSegment);
+  end;
 
   TSize = object(TObject)
   public
@@ -121,15 +160,19 @@ type
 
 implementation
 
-function PointXAscendingCompare(AItem1, AItem2: pointer): integer;
+function InversionCompare(AItem1, AItem2: pointer): integer; far;
 var
-  result: integer;
+  item1, item2: PInversionPoint;
 begin
-  result := 0;
-  if (PPoint(AItem1)^.X < PPoint(AItem2)^.X) then
-    result := -1
-  else if (PPoint(AItem1)^.X < PPoint(AItem2)^.X) then
-    result := 1;
+  item1 := PInversionPoint(AItem1);
+  item2 := PInversionPoint(AItem2);
+  InversionCompare := 0;
+  if item1^.Position = item2^.Position then
+    exit;
+  if item1^.Position < item2^.Position then
+    InversionCompare := -1
+  else if item1^.Position > item2^.Position then
+    InversionCompare := 1;
 end;
 
 constructor TRect.CreateRect(ARect: TRect);
@@ -154,7 +197,6 @@ function TRect.GetNewObject: PObject;
 begin
   GetNewObject := New(PRect, Create);
 end;
-
 
 procedure TRect.SetRight(ARight: integer);
 begin
@@ -307,27 +349,75 @@ begin
     MinLong(Right, ARect.Right), MinLong(Bottom, ARect.Bottom));
 end;
 
-function TRect.GetInversionPoints(AY, AStartX, AEndX: integer): PPointList;
+procedure TRect.GetHorzSegments(AList: PHorzSegmentList;
+  AMode: TRegionMode; AY, AStartX, AEndX: integer);
 var
-  result: PPointList;
-  index: integer;
-  point: PPoint;
-  inverse: boolean;
-  intersects: boolean;
+  point: PInversionPoint;
+  startMode, endMode: boolean;
+  startPoint: PInversionPoint;
+  endPoint: PInversionPoint;
+  segment: PHorzSegment;
+  rect: TRect;
 begin
-  result := New(PPointList, CreateCapacity(16));
-
-  inverse := false;
-  for index := AStartX to AEndX do begin
-    intersects := IntersectsCoords(index, AY);
-    if (intersects and not inverse) or (inverse and not intersects) then begin
-      point := New(PPoint, CreateCoords(index, AY));
-      result^.Add(point);
-      inverse := not inverse;
+  startPoint := nil;
+  endPoint := nil;
+  if AMode = rmInclude then begin
+    rect.CreateDims(AStartX, AY, AEndX, 1);
+    if not IntersectsRect(rect) then
+      exit;
+    if IntersectsCoords(AStartX, AY) then
+      startPoint := New(PInversionPoint, CreatePoint(true, X));
+    if IntersectsCoords(AEndX, AY) then
+      endPoint := New(PInversionPoint, CreatePoint(true, X));
+    if not Assigned(startPoint) then
+      startPoint := New(PInversionPoint, CreatePoint(true, AStartX));
+    if not Assigned(endPoint) then
+      endPoint := New(PInversionPoint, CreatePoint(true, AEndX));
+    segment := New(PHorzSegment, CreateSegment(startPoint^.Position, endPoint^.Position));
+    AList^.Add(segment);
+  end
+  else begin
+    if (X >= AStartX) and (Right <= AEndX) then
+      exit;
+    if (X < AStartX) and (Right <= AEndX) then begin
+      segment := New(PHorzSegment, CreateSegment(X, AStartX));
+      AList^.Add(segment);
+    end
+    else if (X >= AStartX) and (Right > AEndX) then begin
+      segment := New(PHorzSegment, CreateSegment(AEndX, Right));
+      AList^.Add(segment);
+    end
+    else if (X < AStartX) and (Right > AEndX) then begin
+      segment := New(PHorzSegment, CreateSegment(X, AStartX));
+      AList^.Add(segment);
+      segment := New(PHorzSegment, CreateSegment(AEndX, Right));
+      AList^.Add(segment);
     end;
   end;
+  FreeAndNil(startPoint);
+  FreeAndNil(endPoint);
+end;
 
-  GetInversionPoints := result;
+procedure TRect.GetInversionPoints(AList: PInversionPointList;
+  AMode: TRegionMode; AY, AStartX, AEndX: integer);
+var
+  point: PInversionPoint;
+  startMode, endMode: boolean;
+begin
+  startMode := true;
+  endMode := false;
+  if AMode = rmExclude then begin
+    startMode := false;
+    endMode := true;
+  end;
+  if IntersectsCoords(AStartX, AY) then begin
+    point := New(PInversionPoint, CreatePoint(startMode, X));
+    AList^.Add(point);
+  end;
+  if IntersectsCoords(AEndX, AY) then begin
+    point := New(PInversionPoint, CreatePoint(endMode, Right));
+    AList^.Add(point);
+  end;
 end;
 
 constructor TPoint.Create;
@@ -446,11 +536,6 @@ begin
   Inc(height, ADH);
 end;
 
-procedure TShape.Init;
-begin
-  inherited Init;
-end;
-
 function TPointList.IndexOf(AItem: PPoint): integer;
 begin
   IndexOf := inherited IndexOf(AItem);
@@ -476,88 +561,189 @@ begin
   inherited Insert(AIndex, AItem);
 end;
 
-function TShapeList.IndexOf(AItem: PShape): integer;
+function TRectList.IndexOf(AItem: PRect): integer;
 begin
   IndexOf := inherited IndexOf(AItem);
 end;
 
-function TShapeList.Add(AItem: PShape): integer;
+function TRectList.Add(AItem: PRect): integer;
 begin
   Add := inherited Add(AItem);
 end;
 
-function TShapeList.GetItem(AIndex: integer): PShape;
+function TRectList.GetItem(AIndex: integer): PRect;
 begin
-  GetItem := PShape(inherited GetItem(AIndex));
+  GetItem := PRect(inherited GetItem(AIndex));
 end;
 
-function TShapeList.SetItem(AIndex: integer; AItem: PShape): boolean;
+function TRectList.SetItem(AIndex: integer; AItem: PRect): boolean;
 begin
   SetItem := inherited SetItem(AIndex, AItem);
 end;
 
-procedure TShapeList.Insert(AIndex: integer; AItem: PShape);
+procedure TRectList.Insert(AIndex: integer; AItem: PRect);
 begin
   inherited Insert(AIndex, AItem);
-end;
-
-function TShape.GetNewObject: PObject;
-begin
-  GetNewObject := New(PShape, Create);
-end;
-
-function TShape.GetInversionPoints(AY, AStartX, AEndX: integer): PPointList;
-begin
-end;
-
-procedure TShape.Assign(var ASource: TObject);
-var
-  source: PShape;
-begin
-  inherited Assign(ASource);
-  source := PShape(@ASource);
 end;
 
 procedure TRegion.Init;
 begin
   inherited Init;
-  Shapes := New(PShapeList, Create);
 end;
 
 procedure TRegion.Assign(var ASource: TObject);
 var
   source: PRegion;
   index: integer;
-  shape, sourceShape: PShape;
+  rect, sourceRect: PRect;
 begin
   inherited Assign(ASource);
   source := PRegion(@ASource);
-  if Assigned(Shapes) then
-    FreeAndNil(Shapes);
-  for index := 0 to source^.Shapes^.Count - 1 do begin
-    sourceShape := source^.Shapes^.GetItem(index);
-    shape := New(PShape, Create);
-    shape^.Assign(sourceShape^);
-    Shapes^.Add(shape);
+  Clear;
+  for index := 0 to source^.Count - 1 do begin
+    sourceRect := source^.GetItem(index);
+    rect := New(PRect, Create);
+    rect^.Assign(sourceRect^);
+    Add(rect);
   end;
 end;
 
-function TRegion.GetInversionPoints(AY, AStartX, AEndX: integer): PPointList;
+function TRegion.IntersectsCoords(AX, AY: integer): boolean;
 var
   index: integer;
-  result: PPointList;
-  shape: PShape;
-  shapePoints: PPointList;
-  point, newPoint: PPoint;
+  rect: PRect;
 begin
-  result := New(PPointList, CreateSorted(PointXAscendingCompare));
-  for index := 0 to Shapes^.Count - 1 do begin
-    shape := Shapes^.GetItem(index);
-    shapePoints := shape^.GetInversionPoints(AY, AStartX, AEndX);
-    result^.AddRange(shapePoints, true);
-    FreeAndNil(shapePoints);
+  IntersectsCoords := false;
+  for index := 0 to Count - 1 do begin
+    rect := GetItem(index);
+    if rect^.IntersectsCoords(AX, AY) then begin
+      IntersectsCoords := true;
+      exit;
+    end;
+  end;
+end;
+
+function TRegion.GetHorzSegments(AMode: TRegionMode; AY, AStartX, AEndX: integer): PHorzSegmentList;
+var
+  list: PHorzSegmentList;
+  result: PHorzSegmentList;
+begin
+  list := New(PHorzSegmentList, CreateCapacity(16));
+  result := New(PHorzSegmentList, CreateCapacity(16));
+  GetHorzSegments := result;
+end;
+
+function TRegion.GetInversionPoints(AMode: TRegionMode;
+  AY, AStartX, AEndX: integer): PInversionPointList;
+var
+  result: PInversionPointList;
+  index: integer;
+  rect: PRect;
+begin
+  result := New(PInversionPointList, CreateSortedCapacity(InversionCompare, 16));
+  for index := 0 to Count - 1 do begin
+    rect := GetItem(index);
+    rect^.GetInversionPoints(result, AMode, AY, AStartX, AEndX);
   end;
   GetInversionPoints := result;
+end;
+
+constructor TInversionPoint.CreatePoint(AOn: boolean; APosition: integer);
+begin
+  inherited Create;
+  On := AOn;
+  Position := APosition;
+end;
+
+procedure TInversionPoint.Init;
+begin
+  inherited Init;
+  Position := 0;
+  On := true;
+end;
+
+procedure TInversionPoint.Assign(var ASource: TObject);
+var
+  source: PInversionPoint;
+begin
+  inherited Assign(ASource);
+  source := PInversionPoint(@ASource);
+  Position := source^.Position;
+  On := source^.On;
+end;
+
+function TInversionPointList.IndexOf(AItem: PInversionPoint): integer;
+begin
+  IndexOf := inherited IndexOf(AItem);
+end;
+
+function TInversionPointList.Add(AItem: PInversionPoint): integer;
+begin
+  Add := inherited Add(AItem);
+end;
+
+function TInversionPointList.GetItem(AIndex: integer): PInversionPoint;
+begin
+  GetItem := PInversionPoint(inherited GetItem(AIndex));
+end;
+
+function TInversionPointList.SetItem(AIndex: integer; AItem: PInversionPoint): boolean;
+begin
+  SetItem := inherited SetItem(AIndex, AItem);
+end;
+
+procedure TInversionPointList.Insert(AIndex: integer; AItem: PInversionPoint);
+begin
+  inherited Insert(AIndex, AItem);
+end;
+
+constructor THorzSegment.CreateSegment(AX1, AX2: integer);
+begin
+  Create;
+  X1 := AX1;
+  X2 := AX2;
+end;
+
+procedure THorzSegment.Init;
+begin
+  inherited Init;
+  X1 := 0;
+  X2 := 0;
+end;
+
+procedure THorzSegment.Assign(var ASource: TObject);
+var
+  source: PHorzSegment;
+begin
+  inherited Assign(ASource);
+  source := PHorzSegment(@ASource);
+  X1 := source^.X1;
+  X2 := source^.X2;
+end;
+
+function THorzSegmentList.IndexOf(AItem: PHorzSegment): integer;
+begin
+  IndexOf := inherited IndexOf(AItem);
+end;
+
+function THorzSegmentList.Add(AItem: PHorzSegment): integer;
+begin
+  Add := inherited Add(AItem);
+end;
+
+function THorzSegmentList.GetItem(AIndex: integer): PHorzSegment;
+begin
+  GetItem := PHorzSegment(inherited GetItem(AIndex));
+end;
+
+function THorzSegmentList.SetItem(AIndex: integer; AItem: PHorzSegment): boolean;
+begin
+  inherited SetItem(AIndex, AItem);
+end;
+
+procedure THorzSegmentList.Insert(AIndex: integer; AItem: PHorzSegment);
+begin
+  inherited Insert(AIndex, AItem);
 end;
 
 end.
