@@ -81,6 +81,7 @@ function DirectoryExists(const ADir: string): boolean;
 function GetExtension(const AFilename: string): string;
 function UpperCase(const AString: string): string;
 function LowCase(const AChar: char): char;
+function FirstUpper(const AString: string): string;
 function LowerCase(const AString: string): string;
 function ExtractDirectory(const AFilename: string): string;
 function ExtractFilename(const AFilename: string): string;
@@ -273,6 +274,16 @@ begin
   for index := 1 to Length(AString) do
     result[index] := UpCase(result[index]);
   UpperCase := result;
+end;
+
+function FirstUpper(const AString: string): string;
+var
+  result: string;
+begin
+  result := LowerCase(AString);
+  if Length(result) > 1 then
+    result[1] := UpCase(result[1]);
+  FirstUpper := result;
 end;
 
 function Min(ANum1, ANum2: integer): integer;

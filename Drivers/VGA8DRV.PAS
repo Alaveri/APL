@@ -307,8 +307,10 @@ begin
   Mode^.Bounds.GetIntersection(State.ViewPort, drawRect);
   if (AY < drawRect.Y) or (AY > drawRect.Bottom) then
     exit;
-  CheckRange(AX, drawRect.X, drawRect.Right);
-  AWidth := MinLong(drawRect.Width, AWidth);
+  if AX < drawRect.X then
+    AX := drawRect.X;
+  if AX + AWidth > drawRect.Right then
+    AWidth := drawRect.Right - AX + 1;
   if AWidth <= 0 then
     exit;
   screen := GetDrawPointer(AX, AY, offset);
