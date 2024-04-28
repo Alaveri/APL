@@ -150,7 +150,6 @@ type
     function Peek: PObject;
   end;
 
-
   TQueue = object(TObjectList)
   private
   public
@@ -558,7 +557,7 @@ begin
     Add(AItem);
     exit;
   end;
-  ptr := pointer(FBuffer);
+    ptr := pointer(FBuffer);
   Inc(ptr, AIndex);
   next := ptr;
   Inc(next);

@@ -256,19 +256,23 @@ end;
 function LowerCase(const AString: string): string;
 var
   index: integer;
+  result: string;
 begin
-  LowerCase := AString;
+  result := AString;
   for index := 1 to Length(AString) do
-    LowerCase[index] := LowCase(AString[index]);
+    result[index] := LowCase(result[index]);
+  LowerCase := result;
 end;
 
 function UpperCase(const AString: string): string;
 var
   index: integer;
+  result: string;
 begin
-  UpperCase := AString;
+  result := AString;
   for index := 1 to Length(AString) do
-    UpperCase[index] := UpCase(AString[index]);
+    result[index] := UpCase(result[index]);
+  UpperCase := result;
 end;
 
 function Min(ANum1, ANum2: integer): integer;

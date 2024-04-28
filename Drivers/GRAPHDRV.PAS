@@ -158,8 +158,6 @@ type
   TGraphicsDriver = object(TExceptionObject)
   private
     FOldMode: byte;
-    FBackBuffer: PByte;
-    FBackBufferSize: word;
   public
     State: TGraphicsState;
     StateStack: TObjectStack;
@@ -173,7 +171,7 @@ type
     function GetScreenPointer(AX, AY: integer; var AOffset: longint): PByte; virtual;
     function GetBufferPointer(AX, AY: integer; var AOffset: longint): PByte; virtual;
     function GetDrawPointer(AX, AY: integer; var AOffset: longint): PByte;
-    function BeginDrawBuffer(var ABounds: TRect): PByte; virtual;
+    procedure BeginDrawBuffer(var ABuffer: PByte; var ABounds: TRect); virtual;
     procedure GetImage(AX, AY, AWidth, AHeight: longint; ABuffer: PByte); virtual;
     procedure GetImageRect(ARect: TRect; ABuffer: PByte); virtual;
     procedure GetImageStream(AX, AY, AWidth, AHeight: longint; AStream: PStream); virtual;
@@ -241,11 +239,6 @@ var
   oldMode: byte;
 begin
   inherited Init;
-  GetMem(FBackBuffer, MaxVarSize);
-  if not Assigned(FBackBuffer) then begin
-    Raise(ecNotEnoughMemory);
-    exit;
-  end;
   asm
     mov ah, 0Fh
     int 10h
@@ -256,7 +249,6 @@ begin
   Mode := nil;
   State.Create;
   StateStack.Create;
-  FBackBufferSize := MaxVarSize;
   MoveTo(0, 0);
 end;
 
@@ -498,22 +490,26 @@ begin
   StateStack.Push(newState);
 end;
 
-function TGraphicsDriver.BeginDrawBuffer(var ABounds: TRect): PByte;
+procedure TGraphicsDriver.BeginDrawBuffer(var ABuffer: PByte; var ABounds: TRect);
+var
+  size: word;
 begin
-  PushState;
-  BeginDrawBuffer := nil;
+  size := ABounds.Width * ABounds.Height;
+  GetMem(ABuffer, size);
+  if not Assigned(ABuffer) then begin
+    Raise(ecNotEnoughMemory);
+    exit;
+  end;
   ABounds.TranslateToOrigin;
-  State.ViewPort.SetRect(ABounds);
-  State.FrameBuffer := FBackBuffer;
+  State.FrameBuffer := ABuffer;
+  State.ViewPort.Assign(ABounds);
   State.BufferMode := true;
-  BeginDrawBuffer := FBackBuffer;
 end;
 
 procedure TGraphicsDriver.EndDrawBuffer;
 begin
   State.BufferMode := false;
   State.FrameBuffer := Mode^.FrameBuffer;
-  PopState;
 end;
 
 procedure TGraphicsDriver.PopState;
@@ -534,7 +530,6 @@ begin
   State.Free;
   StateStack.DisposeObjects := true;
   StateStack.Free;
-  FreeMem(FBackBuffer, MaxVarSize);
   inherited Free;
 end;
 
