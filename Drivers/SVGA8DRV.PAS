@@ -271,12 +271,12 @@ var
   ch: char;
   sx, sy, minX, maxX: integer;
   width: integer;
-  linePtr: PByte;
-  height: integer;
+  linePtr: PWord;
+  height: word;
   screen: PByte;
   fore: byte;
   offset: longint;
-  currentLine: byte;
+  currentLine: word;
 begin
   if HasException then
     exit;
@@ -316,7 +316,7 @@ begin
         break;
       screen := GetDrawPointer(sx + minX, sy, offset);
       for xIndex := minX to maxX do begin
-        if (currentLine and (128 shr xIndex)) > 0 then
+        if (currentLine and (32768 shr xIndex)) > 0 then
           screen^ := fore;
         Inc(screen);
         Inc(offset);

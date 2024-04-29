@@ -106,12 +106,12 @@ var
   sx, sy: integer;
   minX, maxX: byte;
   width: integer;
-  linePtr: PByte;
+  linePtr: PWord;
   height: integer;
   screen: PByte;
   fore: byte;
   offset: longint;
-  currentLine: byte;
+  currentLine: word;
 begin
   if HasException then
     exit;
@@ -155,19 +155,20 @@ begin
         les di, screen { Load screen pointer into ES:DI }
         mov cx, count { Load count into CX as the loop counter }
         mov dl, minx { Load starting x index into DL }
-        mov ah, fore { Load ForeColor into AH }
-        mov bh, currentLine { Load current character line into BH }
+        mov dh, fore { Load foreground color into DH }
+        mov ax, currentLine { Load current character line into AX }
         @loop:
-          mov al, bh { Load current character line into AL }
           push cx { Save loop counter }
           mov cl, dl { Load x index into CL }
-          mov bl, 128 { Load 128 into BL }
-          shr bl, cl { Shift 128 right by x index to get the mask }
+          mov bx, 8000h { Load 32768 into BX }
+          shr bx, cl { Shift 32768 right by x index to get the mask }
           pop cx { Restore loop counter }
-          and al, bl { Check if the character pixel is set }
+          push ax
+          and ax, bx { Check if the character pixel is set }
           jz @next { If the pixel is not set, skip to the next pixel }
-          mov [es:di], ah { Set the screen pixel to the ForeColor }
+          mov [es:di], dh { Set the screen pixel to the ForeColor }
           @next:
+          pop ax
           inc dl { Increment the x index }
           inc di { Increment the screen pointer }
         loop @loop

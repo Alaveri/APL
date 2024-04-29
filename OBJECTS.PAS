@@ -24,6 +24,7 @@ type
   private
   public
     constructor Create;
+    constructor CreateAssign(var ASource: TObject);
     destructor Free; virtual;
     function ToString: string; virtual;
     procedure Abstract; virtual;
@@ -66,6 +67,12 @@ end;
 constructor TObject.Create;
 begin
   Init;
+end;
+
+constructor TObject.CreateAssign(var ASource: TObject);
+begin
+  Create;
+  Assign(ASource);
 end;
 
 procedure TObject.Init;

@@ -33,7 +33,7 @@ type
   PMonospaceFont = ^TMonospaceFont;
   PProportionalFont = ^TProportionalFont;
 
-  TFontWidthArray = array[byte] of byte;
+  TFontWidthArray = array[byte] of word;
   TFontCompression = (fcNone, fcLzw);
 
   TGraphicsMode = object(TIdentifiable)
@@ -78,7 +78,7 @@ type
 
   TFont = object(TExceptionObject)
   private
-    FFontData: PByte;
+    FFontData: PWord;
     FFontDataSize: word;
   public
     Version: real;
@@ -100,7 +100,7 @@ type
     function TextWidth(const AText: string): longint; virtual;
     function TextWidthLarge(AText: PChar): longint; virtual;
     function Proportional: boolean; virtual;
-    function FontData: PByte; virtual;
+    function FontData: PWord; virtual;
     function FontDataSize: word; virtual;
   end;
 
@@ -115,7 +115,7 @@ type
   TProportionalFont = object(TFont)
   private
   public
-    CharWidths: TFontWidthArray;
+    CharWidths: TByteArray;
     constructor CreateSize(AMaxWidth, AHeight: byte);
     procedure Init; virtual;
     procedure Assign(var ASource: TObject); virtual;
@@ -683,7 +683,7 @@ begin
   TextWidthLarge := TextWidthAny(AText, StrLen(AText));
 end;
 
-function TFont.FontData: PByte;
+function TFont.FontData: PWord;
 begin
   FontData := FFontData;
 end;
@@ -735,7 +735,7 @@ begin
   MaxWidth := AMaxWidth;
   Height := AHeight;
   FillChar(CharWidths, SizeOf(CharWidths), MaxWidth);
-  FFontDataSize := Height * 256;
+  FFontDataSize := Height * 256 * 2;
   GetMem(FFontData, FontDataSize);
   FillChar(FFontData^, FontDataSize, 0);
 end;
@@ -790,11 +790,11 @@ end;
 procedure TProportionalFont.SetCharWidths;
 var
   charIndex, xIndex, yIndex: integer;
-  linePtr: PByte;
+  linePtr: PWord;
   total: integer;
   avgCount: integer;
   avgTotal: integer;
-  width: byte;
+  width: word;
 begin
   total := 0;
   avgCount := 0;
@@ -805,7 +805,7 @@ begin
     Inc(linePtr, charIndex * Height);
     for yIndex := 0 to Height - 1 do begin
       for xIndex := 0 to MaxWidth - 1 do begin
-        if (linePtr^ and (128 shr xIndex)) > 0 then
+        if (linePtr^ and (32768 shr xIndex)) > 0 then
           width := MaxWord(xIndex + 1, width);
       end;
       Inc(linePtr);
@@ -820,7 +820,10 @@ begin
     CharWidths[charIndex] := width;
     Inc(total, width);
   end;
-  AverageWidth := Round(avgCount / avgTotal);
+  if AvgTotal = 0 then
+    AverageWidth := MaxWidth
+  else
+    AverageWidth := Round(avgCount / avgTotal);
   CharWidths[32] := Trunc(total / High(byte)) div 2;
   CharWidths[0] := CharWidths[32];
 end;
@@ -845,7 +848,7 @@ begin
   SetCharWidths;
 
   stream.Create(FFontDataSize);
-  stream.Write(FFontData, FFontDataSize);
+  stream.Write(PByte(FFontData), FFontDataSize);
   stream.Seek(0, soFromBeginning);
   if stream.HasException then
     Raise(stream.Exception^.Code)
@@ -877,6 +880,9 @@ var
   header: TFontHeader;
   stream: TMemoryStream;
   lzw: TLzw;
+  index: integer;
+  lineIndex: integer;
+  ptr: PByte;
 begin
   AStream^.Read(@header, SizeOf(header));
   if AStream^.HasException then begin
@@ -912,14 +918,14 @@ begin
           Raise(lzw.Exception^.Code);
         lzw.Free;
         stream.Seek(0, soFromBeginning);
-        stream.Read(FFontData, header.DataSize);
+        stream.Read(PByte(FFontData), header.DataSize);
         if stream.HasException then
           Raise(stream.Exception^.Code)
         else begin
           Height := header.Height;
           Spacing := header.Spacing;
-          SetCharWidths;
           MaxWidth := header.MaxWidth;
+          SetCharWidths;
         end;
       end
       else
