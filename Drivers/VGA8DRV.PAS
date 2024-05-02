@@ -24,11 +24,9 @@ type
   private
   public
     function GetScreenPointer(AX, AY: integer; var AOffset: longint): PByte; virtual;
-    function GetPixel(AX, AY: integer): byte; virtual;
     procedure GetImage(AX, AY, AWidth, AHeight: longint; ABuffer: PByte); virtual;
     procedure GetImageStream(AX, AY, AWidth, AHeight: longint; AStream: PStream); virtual;
     procedure SetMode(AMode: PGraphicsMode); virtual;
-    procedure SetPixel(AX, AY: integer); virtual;
     procedure Line(AX1, AY1, AX2, AY2: integer); virtual;
     procedure HLine(AX, AY, AWidth: integer); virtual;
     procedure VLine(AX, AY, AHeight: integer); virtual;
@@ -68,33 +66,6 @@ begin
   State.FrameBuffer := Mode^.FrameBuffer;
   SetStandardPalette;
   Mouse.XShift := 1;
-end;
-
-procedure TVga8Driver.SetPixel(AX, AY: integer);
-var
-  offset: longint;
-  ptr: PByte;
-  drawRect: TRect;
-begin
-  Mode^.Bounds.GetIntersection(State.ViewPort, drawRect);
-  if not drawRect.IntersectsCoords(AX, AY) then
-    exit;
-  ptr := GetDrawPointer(AX, AY, offset);
-  ptr^ := State.ForeColor;
-end;
-
-function TVga8Driver.GetPixel(AX, AY: integer): byte;
-var
-  offset: longint;
-  ptr: PByte;
-  drawRect: TRect;
-begin
-  GetPixel := 0;
-  Mode^.Bounds.GetIntersection(State.ViewPort, drawRect);
-  if not drawRect.IntersectsCoords(AX, AY) then
-    exit;
-  ptr := GetDrawPointer(AX, AY, offset);
-  GetPixel := ptr^;
 end;
 
 procedure TVga8Driver.RenderText(AX, AY, ALength: integer; AText: PChar);

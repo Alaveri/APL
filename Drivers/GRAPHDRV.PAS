@@ -208,6 +208,10 @@ type
     procedure Init; virtual;
     procedure WaitForVSync; virtual;
     procedure ResetMode; virtual;
+    procedure FillScreen(AScreen: PByte; AX, AY, AWidth: integer; AColor: byte);
+    procedure MoveScreen(ASource, ADest: PByte; AX, AY, AWidth: integer);
+    procedure FillRegion(AScreen: PByte; AX, AY, AWidth: integer; AColor: byte); virtual;
+    procedure MoveRegion(ASource, ADest: PByte; AX, AY, AWidth: integer); virtual;
     destructor Free; virtual;
   end;
 
@@ -308,10 +312,6 @@ begin
   State.BackColor := AColor;
 end;
 
-function TGraphicsDriver.GetPixel(AX, AY: integer): byte;
-begin
-end;
-
 procedure TGraphicsDriver.ResetMode;
 var
   oldMode: byte;
@@ -324,15 +324,147 @@ begin
   end;
 end;
 
+procedure TGraphicsDriver.MoveRegion(ASource, ADest: PByte; AX, AY, AWidth: integer);
+var
+  region: PRegion;
+  points: PInversionPointList;
+  point: PInversionPoint;
+  start, index, level: integer;
+  dest: PByte;
+begin
+  region := State.Region;
+  points := region^.GetInversionPoints(State.RegionMode, AY, AX, AX + AWidth - 1);
+  if points^.Count = 0 then begin
+    if State.RegionMode <> rmExclude then
+      Move(ASource^, ADest^, AWidth);
+    exit;
+  end;
+  point := Points^.GetItem(0);
+  level := 0;
+  start := -1;
+  dest := ADest;
+  if point^.On then begin
+    start := AX;
+    Inc(dest, start - State.ViewPort.X + 1);
+    level := 1;
+  end;
+  for index := 1 to Points^.Count - 1 do begin
+    point := Points^.GetItem(index);
+    if point^.On then begin
+      if level = 0 then
+        start := point^.Position;
+      Inc(level);
+    end
+    else begin
+      Dec(level);
+      if level = 0 then begin
+        Inc(dest, start - State.ViewPort.X + 1);
+        Move(ASource^, dest^, point^.Position - start + 1);
+        start := -1;
+      end;
+    end;
+  end;
+  if level > 0 then begin
+    Move(ASource^, ADest^, State.ViewPort.Right - start);
+  end;
+  FreeAndNil(points);
+end;
+
+
+procedure TGraphicsDriver.FillRegion(AScreen: PByte; AX, AY, AWidth: integer; AColor: byte);
+var
+  region: PRegion;
+  points: PInversionPointList;
+  point: PInversionPoint;
+  start, index, level: integer;
+  screen: PByte;
+begin
+  region := State.Region;
+  points := region^.GetInversionPoints(State.RegionMode, AY, AX, AX + AWidth - 1);
+  if points^.Count = 0 then begin
+    if State.RegionMode <> rmExclude then
+      FillChar(AScreen^, AWidth, AColor);
+    exit;
+  end;
+  point := Points^.GetItem(0);
+  level := 0;
+  start := -1;
+  screen := AScreen;
+  if point^.On then begin
+    start := AX;
+    Inc(screen, start - State.ViewPort.X + 1);
+    level := 1;
+  end;
+  for index := 1 to Points^.Count - 1 do begin
+    point := Points^.GetItem(index);
+    if point^.On then begin
+      if level = 0 then
+        start := point^.Position;
+      Inc(level);
+    end
+    else begin
+      Dec(level);
+      if level = 0 then begin
+        Inc(screen, start - State.ViewPort.X + 1);
+        FillChar(AScreen^, point^.Position - start + 1, AColor);
+        start := -1;
+      end;
+    end;
+  end;
+  if level > 0 then begin
+    FillChar(AScreen^, State.ViewPort.Right - start, AColor);
+  end;
+  FreeAndNil(points);
+end;
+
+function TGraphicsDriver.GetPixel(AX, AY: integer): byte;
+var
+  offset: longint;
+  ptr: PByte;
+  drawRect: TRect;
+begin
+  GetPixel := 0;
+  Mode^.Bounds.GetIntersection(State.ViewPort, drawRect);
+  if not drawRect.IntersectsCoords(AX, AY) then
+    exit;
+  ptr := GetDrawPointer(AX, AY, offset);
+  GetPixel := ptr^;
+end;
+
+procedure TGraphicsDriver.SetPixel(AX, AY: integer);
+var
+  offset: longint;
+  ptr: PByte;
+  drawRect: TRect;
+begin
+  Mode^.Bounds.GetIntersection(State.ViewPort, drawRect);
+  if not drawRect.IntersectsCoords(AX, AY) then
+    exit;
+  ptr := GetDrawPointer(AX, AY, offset);
+  FillScreen(ptr, AX, AY, 1, ForeColor);
+end;
+
+procedure TGraphicsDriver.MoveScreen(ASource, ADest: PByte; AX, AY, AWidth: integer);
+begin
+  if not Assigned(State.Region) then
+    Move(ASource^, ADest^, AWidth)
+  else
+    MoveRegion(ASource, ADest, AX, AY, AWidth);
+end;
+
+procedure TGraphicsDriver.FillScreen(AScreen: PByte; AX, AY, AWidth: integer; AColor: byte);
+begin
+  if not Assigned(State.Region) then
+    FillChar(AScreen^, AWidth, AColor)
+  else
+    FillRegion(AScreen, AX, AY, AWidth, AColor);
+end;
+
 procedure TGraphicsDriver.SetMode(AMode: PGraphicsMode);
 begin
   Mode := AMode;
   State.ViewPort.SetDims(0, 0, Mode^.Width, Mode^.Height);
   Mode^.Bounds.SetRect(State.ViewPort);
-end;
-
-procedure TGraphicsDriver.SetPixel(AX, AY: integer);
-begin
 end;
 
 procedure TGraphicsDriver.MoveTo(AX, AY: integer);
