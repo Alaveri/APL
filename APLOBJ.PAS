@@ -1,5 +1,5 @@
 {$I COMPILER.INC}
-unit Objects;
+unit AplObj;
 
 interface
 
@@ -8,12 +8,8 @@ uses
   StrUtils;
 
 type
-  PWord = ^word;
-  PPointer = ^pointer;
-  PBoolean = ^boolean;
   PObject = ^TObject;
   PIdentifiable = ^TIdentifiable;
-  PProc = ^TProc;
   PComparer = ^TComparer;
 
   TComparer = function(AItem1, AItem2: pointer): integer;
@@ -55,7 +51,7 @@ uses
 procedure FreeAndNil(var AObject);
 var
   obj: PObject;
-  ptr: PPointer;
+  ptr: ^Pointer;
 begin
   obj := PObject(AObject);
   if Assigned(obj) then

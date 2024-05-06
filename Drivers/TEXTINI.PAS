@@ -4,9 +4,10 @@ unit TextIni;
 interface
 
 uses
- Objects,
- TextDrv,
- DirTxDrv;
+  AplObj,
+  AplTypes,
+  TextDrv,
+  DirTxDrv;
 
 type
   TTextDrivers =

@@ -4,34 +4,12 @@ unit MouseDrv;
 interface
 
 uses
-  Objects,
+  AplObj,
+  AplTypes,
   Lists;
 
 type
   PMouseDriver = ^TMouseDriver;
-  PMouseState = ^TMouseState;
-
-  TButtonState =
-  (
-    bsLeft,
-    bsRight
-  );
-
-  TButtonStates = set of TButtonState;
-
-  TMouseState = object(TObject)
-  public
-    X: integer;
-    Y: integer;
-    ButtonState: TButtonStates;
-    Visible: boolean;
-    WheelCounter: shortint;
-    procedure Init; virtual;
-    procedure Assign(var ASource: TObject); virtual;
-    procedure Clear;
-    function Equals(const AState: TMouseState): boolean;
-    function Moved(const AState: TMouseState): boolean;
-  end;
 
   TMouseDriver = object(TObject)
   private
@@ -66,48 +44,6 @@ uses
 
 var
   PreviousExitProc: PProc;
-
-procedure TMouseState.Init;
-begin
-  inherited Init;
-  Clear;
-end;
-
-procedure TMouseState.Assign(var ASource: TObject);
-var
-  source: PMouseState;
-begin
-  inherited Assign(ASource);
-  source := PMouseState(@ASource);
-  X := source^.X;
-  Y := source^.Y;
-  ButtonState := source^.ButtonState;
-  WheelCounter := source^.WheelCounter;
-  Visible := source^.Visible;
-end;
-
-procedure TMouseState.Clear;
-begin
-  X := 0;
-  Y := 0;
-  ButtonState := [];
-  WheelCounter := 0;
-  Visible := false;
-end;
-
-function TMouseState.Equals(const AState: TMouseState): boolean;
-begin
-  Equals :=
-    (AState.X = X)
-    and (AState.Y = Y)
-    and (AState.WheelCounter = WheelCounter)
-    and (AState.ButtonState = ButtonState);
-end;
-
-function TMouseState.Moved(const AState: TMouseState): boolean;
-begin
-  Moved := (X <> AState.X) or (Y <> AState.Y);
-end;
 
 destructor TMouseDriver.Free;
 var

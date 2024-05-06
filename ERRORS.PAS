@@ -4,7 +4,7 @@ unit Errors;
 interface
 
 uses
-  Objects;
+  AplObj;
 
 type
   PCustomErrorMessageProc = ^TCustomErrorMessageProc;

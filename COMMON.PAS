@@ -7,46 +7,8 @@ uses
   {$IFDEF DOS}
   Dos,
   {$ENDIF}
-  Objects;
-
-type
-  PByte = ^byte;
-  PByteArray = ^TByteArray;
-  PPointer = ^pointer;
-  PInteger = ^integer;
-  PWord = ^word;
-  PLongint = ^longint;
-
-  Int64 = comp;
-  TBit = (bit0, bit1, bit2, bit3, bit4, bit5, bit6, bit7);
-  TBits = set of TBit;
-  TBit16 = (
-    wbit0,
-    wbit1,
-    wbit2,
-    wbit3,
-    wbit4,
-    wbit5,
-    wbit6,
-    wbit7,
-    wbit8,
-    wbit9,
-    wbit10,
-    wbit11,
-    wbit12,
-    wbit13,
-    wbit14,
-    wbit15
-  );
-  TBits16 = set of TBit16;
-  THexString = string[9];
-  TByteArray = array[byte] of byte;
-  TCharSet = set of char;
-
-  TLongLowHigh = record
-    Low: word;
-    High: word;
-  end;
+  AplTypes,
+  AplObj;
 
 var
   NumberSeparator: char;

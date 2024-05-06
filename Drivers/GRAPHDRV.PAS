@@ -8,7 +8,8 @@ uses
   Strings,
   Dos,
   {$ENDIF}
-  Objects,
+  AplObj,
+  AplTypes,
   Errors,
   Common,
   Streams,
@@ -384,6 +385,7 @@ begin
   if points^.Count = 0 then begin
     if State.RegionMode <> rmExclude then
       FillChar(AScreen^, AWidth, AColor);
+    FreeAndNil(points);
     exit;
   end;
   point := Points^.GetItem(0);

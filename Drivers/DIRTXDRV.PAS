@@ -7,14 +7,13 @@ uses
   {$IFDEF DOS}
   Dos,
   Strings,
-
   Lines,
   {$ENDIF}
-  Objects,
+  AplObj,
+  AplTypes,
   Lists,
   Common,
   Drawing,
-  AplTypes,
   AplDos,
   StrUtils,
   TextDrv;

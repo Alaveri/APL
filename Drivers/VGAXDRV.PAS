@@ -4,7 +4,8 @@ unit VgaXDrv;
 interface
 
 uses
-  Objects,
+  AplObj,
+  AplTypes,
   GraphDrv,
   GrDrv8,
   Common,

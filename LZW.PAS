@@ -6,6 +6,7 @@ interface
 uses
   Compress,
   Errors,
+  AplTypes,
   Streams,
   Common;
 

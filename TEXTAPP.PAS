@@ -4,7 +4,8 @@ unit TextApp;
 interface
 
 uses
-  Objects,
+  AplObj,
+  AplTypes,
   Lists,
   Errors,
   AplApps,

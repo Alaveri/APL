@@ -4,7 +4,7 @@ unit Compress;
 interface
 
 uses
-  Objects,
+  AplTypes,
   Errors,
   Streams,
   Common;

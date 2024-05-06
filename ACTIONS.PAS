@@ -4,7 +4,7 @@ unit Actions;
 interface
 
 uses
-  Objects,
+  AplObj,
   MouseDrv,
   StrUtils,
   AplTypes,

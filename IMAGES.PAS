@@ -4,7 +4,7 @@ unit Images;
 interface
 
 uses
-  Objects,
+  AplObj,
   Errors,
   Lists,
   Common,
@@ -12,7 +12,7 @@ uses
   Drawing,
   Streams,
   Lzw,
-
+  AplTypes,
   GraphDrv;
 
 const

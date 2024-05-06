@@ -4,7 +4,7 @@ unit Drawing;
 interface
 
 uses
-  Objects,
+  AplObj,
   Lists,
   Common;
 

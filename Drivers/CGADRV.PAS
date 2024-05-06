@@ -7,7 +7,8 @@ uses
   {$IFDEF DOS}
   Strings,
   {$ENDIF}
-  Objects,
+  AplTypes,
+  AplObj,
   Common,
   StrUtils,
   Streams,

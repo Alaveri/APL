@@ -4,7 +4,6 @@ unit GraphApp;
 interface
 
 uses
-  Objects,
   Lists,
   Errors,
   AplApps,

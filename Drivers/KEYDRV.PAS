@@ -7,7 +7,8 @@ uses
   {$IFDEF DOS}
   Dos,
   {$ENDIF}
-  Objects,
+  AplObj,
+  AplTypes,
   Common,
   DateTime;
 
@@ -266,7 +267,6 @@ var
   KeyDown: array[byte] of boolean;
   {$ENDIF}
   PreviousExitProc: PProc;
-
 (*
 procedure KeyboardHandler(Flags, CS, IP, AX, BX, CX, DX, SI, DI, DS, ES, BP: Word); {$IFDEF DOS}interrupt;{$ENDIF}
 var

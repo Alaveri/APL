@@ -8,10 +8,11 @@ uses
   Strings,
   {$ENDIF}
   AplConst,
+  AplTypes,
   Common,
   Errors,
   StrUtils,
-  Objects;
+  AplObj;
 
 const
   ListBufferSize = $FFF8 div 4;

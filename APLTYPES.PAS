@@ -4,10 +4,52 @@ unit AplTypes;
 interface
 
 uses
-  Objects,
-  MouseDrv;
+  AplObj;
 
 type
+
+  PWord = ^word;
+  PPointer = ^pointer;
+  PBoolean = ^boolean;
+  PProc = ^TProc;
+  PByte = ^byte;
+  PByteArray = ^TByteArray;
+  PInteger = ^integer;
+  PLongint = ^longint;
+
+  Int64 = comp;
+
+  TProc = procedure;
+  TBit = (bit0, bit1, bit2, bit3, bit4, bit5, bit6, bit7);
+  TBits = set of TBit;
+  TBit16 = (
+    wbit0,
+    wbit1,
+    wbit2,
+    wbit3,
+    wbit4,
+    wbit5,
+    wbit6,
+    wbit7,
+    wbit8,
+    wbit9,
+    wbit10,
+    wbit11,
+    wbit12,
+    wbit13,
+    wbit14,
+    wbit15
+  );
+  TBits16 = set of TBit16;
+  THexString = string[9];
+  TByteArray = array[byte] of byte;
+  TCharSet = set of char;
+
+  TLongLowHigh = record
+    Low: word;
+    High: word;
+  end;
+
   TModalResult =
   (
     mrNone,
@@ -25,6 +67,29 @@ type
   PEventProc = ^TEventProc;
   PMouseEventProc = ^TMouseEventProc;
   PKeyEventProc = ^TKeyEventProc;
+  PMouseState = ^TMouseState;
+
+  TButtonState =
+  (
+    bsLeft,
+    bsRight
+  );
+
+  TButtonStates = set of TButtonState;
+
+  TMouseState = object(TObject)
+  public
+    X: integer;
+    Y: integer;
+    ButtonState: TButtonStates;
+    Visible: boolean;
+    WheelCounter: shortint;
+    procedure Init; virtual;
+    procedure Assign(var ASource: TObject); virtual;
+    procedure Clear;
+    function Equals(const AState: TMouseState): boolean;
+    function Moved(const AState: TMouseState): boolean;
+  end;
 
   TEvent = object(TObject)
   private
@@ -131,5 +196,48 @@ begin
   inherited Clear;
   Key := 0;
 end;
+
+procedure TMouseState.Init;
+begin
+  inherited Init;
+  Clear;
+end;
+
+procedure TMouseState.Assign(var ASource: TObject);
+var
+  source: PMouseState;
+begin
+  inherited Assign(ASource);
+  source := PMouseState(@ASource);
+  X := source^.X;
+  Y := source^.Y;
+  ButtonState := source^.ButtonState;
+  WheelCounter := source^.WheelCounter;
+  Visible := source^.Visible;
+end;
+
+procedure TMouseState.Clear;
+begin
+  X := 0;
+  Y := 0;
+  ButtonState := [];
+  WheelCounter := 0;
+  Visible := false;
+end;
+
+function TMouseState.Equals(const AState: TMouseState): boolean;
+begin
+  Equals :=
+    (AState.X = X)
+    and (AState.Y = Y)
+    and (AState.WheelCounter = WheelCounter)
+    and (AState.ButtonState = ButtonState);
+end;
+
+function TMouseState.Moved(const AState: TMouseState): boolean;
+begin
+  Moved := (X <> AState.X) or (Y <> AState.Y);
+end;
+
 
 end.

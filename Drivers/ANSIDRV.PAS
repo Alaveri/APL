@@ -8,7 +8,8 @@ uses
   Strings,
   Dos,
   {$ENDIF}
-  Objects,
+  AplObj,
+  AplTypes,
   Lists,
   Common,
   Drawing,

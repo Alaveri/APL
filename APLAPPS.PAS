@@ -7,9 +7,9 @@ uses
   {$IFDEF DOS}
   Dos,
   {$ENDIF}
-  Objects,
   MemDrv,
   AplTypes,
+  AplObj,
   Common,
   StrUtils,
   KeyDrv,
