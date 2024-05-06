@@ -248,7 +248,6 @@ end;
 
 procedure TGraphics8Driver.SetStandardPalette;
 begin
-  FreeAndNil(Palette);
   Palette := GetStandardPalette;
   SetRgbPalette(Palette);
 end;
