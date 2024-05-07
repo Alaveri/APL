@@ -61,10 +61,7 @@ type
   private
   public
     function GetItem(AIndex: longint): PFile;
-    function IndexOf(AItem: PFile): longint;
     function Find(const AFilename: string): PFile;
-    function Add(AItem: PFile): integer;
-    procedure Insert(AIndex: longint; AItem: PFile);
   end;
 
   TDirectoryManager = object(TExceptionObject)
@@ -332,10 +329,11 @@ begin
   SortDirection := ADirection;
   SortDirsFirst := ADirsFirst;
   case ASort of
-    dsFilename: Files^.Sort(FilenameCompare);
-    dsSize: Files^.Sort(FileSizeCompare);
-    dsTime: Files^.Sort(FileTimeCompare);
+    dsFilename: Files^.SetComparer(FilenameCompare);
+    dsSize: Files^.SetComparer(FileSizeCompare);
+    dsTime: Files^.SetComparer(FileTimeCompare);
   end;
+  Files^.Sort;
 end;
 
 procedure TFile.Init;
@@ -373,21 +371,6 @@ begin
       exit;
     end;
   end;
-end;
-
-function TFileList.IndexOf(AItem: PFile): longint;
-begin
-  IndexOf := inherited IndexOf(AItem);
-end;
-
-function TFileList.Add(AItem: PFile): integer;
-begin
-  Add := inherited Add(AItem);
-end;
-
-procedure TFileList.Insert(AIndex: longint; AItem: PFile);
-begin
-  inherited Insert(AIndex, AItem);
 end;
 
 procedure Finalize; far;

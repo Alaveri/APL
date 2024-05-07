@@ -456,7 +456,7 @@ begin
   streamStart := AStream^.Position;
   for yIndex := 0 to drawRect.Height - 1 do begin
     screen := GetDrawPointer(drawRect.X, sy, offset);
-    AStream^.Seek((yIndex + imageRect.Y) * longint(imageRect.Width) + imageRect.X, soFromBeginning);
+    AStream^.Seek(streamStart + (yIndex + imageRect.Y) * longint(imageRect.Width) + imageRect.X, soFromBeginning);
     if offset + lineWidth > FWinSize then begin
       partialWidth := FWinSize - offset + 1;
       AStream^.Read(screen, partialWidth);
@@ -498,7 +498,7 @@ begin
   end;
   streamStart := AStream^.Position;
   sy := drawRect.Y;
-  AStream^.Seek((yIndex + imageRect.Y) * AWidth + imageRect.X, soFromPosition);
+  AStream^.Seek(streamStart + (yIndex + imageRect.Y) * AWidth + imageRect.X, soFromPosition);
   for yIndex := 0 to drawRect.Height - 1 do begin
     screen := GetDrawPointer(drawRect.X, drawRect.Y + yIndex, offset);
     AStream^.Seek(yIndex * imageRect.Width + imageRect.X, soFromBeginning);
@@ -577,7 +577,7 @@ begin
   streamStart := AStream^.Position;
   for yIndex := 0 to drawRect.Height - 1 do begin
     screen := GetDrawPointer(drawRect.X, sy, offset);
-    AStream^.Seek((yIndex + imageRect.Y) * longint(imageRect.Width) + imageRect.X, soFromBeginning);
+    AStream^.Seek(streamStart + (yIndex + imageRect.Y) * longint(imageRect.Width) + imageRect.X, soFromBeginning);
     if offset + lineWidth > FWinSize then begin
       partialWidth := FWinSize - offset + 1;
       AStream^.Write(screen, partialWidth);

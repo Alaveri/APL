@@ -93,6 +93,7 @@ const
   ecFileInvalidEnvironment = 1005;
   ecFileInvalidFormat = 1006;
   ecDirChangeError = 1007;
+  ecFileInvalidVersion = 1008;
 
   { User defined errors }
   ecUser = 5000;
@@ -192,6 +193,7 @@ begin
     ecFileInvalidEnvironment: ErrorMessage := 'Invalid environment';
     ecFileInvalidFormat: ErrorMessage := 'Invalid file format';
     ecDirChangeError: ErrorMessage := 'Error changing directory';
+    ecFileInvalidVersion: ErrorMessage := 'Unsupported file version';
     else begin
       if AErrorCode >= ecUser then begin
         if Assigned(CustomErrorMessage) then begin

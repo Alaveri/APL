@@ -113,12 +113,9 @@ type
   TMouseCursorList = object(TIdentifiableList)
   private
   public
-    function IndexOf(AItem: PMouseCursor): integer;
-    function Add(AItem: PMouseCursor): integer;
     function GetItem(AIndex: integer): PMouseCursor;
     function GetItemById(const AId: string): PMouseCursor;
     procedure Init; virtual;
-    procedure Insert(AIndex: integer; AItem: PMouseCursor);
   end;
 
 const
@@ -481,16 +478,6 @@ begin
   BackData := FBackData;
 end;
 
-function TMouseCursorList.IndexOf(AItem: PMouseCursor): integer;
-begin
-  IndexOf := inherited IndexOf(AItem);
-end;
-
-function TMouseCursorList.Add(AItem: PMouseCursor): integer;
-begin
-  Add := inherited Add(AItem);
-end;
-
 function TMouseCursorList.GetItem(AIndex: integer): PMouseCursor;
 begin
   GetItem := PMouseCursor(inherited GetItem(AIndex));
@@ -499,11 +486,6 @@ end;
 procedure TMouseCursorList.Init;
 begin
   inherited Init;
-end;
-
-procedure TMouseCursorList.Insert(AIndex: integer; AItem: PMouseCursor);
-begin
-  inherited Insert(AIndex, AItem);
 end;
 
 function TMouseCursorList.GetItemById(const AId: string): PMouseCursor;

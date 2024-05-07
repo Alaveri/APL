@@ -74,9 +74,6 @@ type
   private
   public
     function GetItem(AIndex: integer): PImage;
-    function IndexOf(AItem: PImage): integer;
-    function Add(AItem: PImage): integer;
-    procedure Insert(AIndex: integer; AItem: PImage);
   end;
 
 implementation
@@ -337,21 +334,6 @@ end;
 function TImageList.GetItem(AIndex: integer): PImage;
 begin
   GetItem := PImage(inherited GetItem(AIndex));
-end;
-
-function TImageList.IndexOf(AItem: PImage): integer;
-begin
-  IndexOf := inherited IndexOf(AItem);
-end;
-
-function TImageList.Add(AItem: PImage): integer;
-begin
-  Add := inherited Add(AItem);
-end;
-
-procedure TImageList.Insert(AIndex: integer; AItem: PImage);
-begin
-  inherited Insert(AIndex, AItem);
 end;
 
 end.

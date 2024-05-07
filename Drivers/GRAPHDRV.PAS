@@ -57,12 +57,8 @@ type
 
   TGraphicsModeList = object(TIdentifiableList)
   public
-    function IndexOf(AItem: PGraphicsMode): integer;
     function GetItemById(const AId: string): PGraphicsMode;
-    function IndexOfId(const AId: string): integer;
-    function Add(AItem: PGraphicsMode): integer;
     function GetItem(AIndex: integer): PGraphicsMode;
-    procedure Insert(AIndex: integer; AItem: PGraphicsMode);
   end;
 
   TFontHeader = record
@@ -218,13 +214,8 @@ type
 
   TFontList = Object(TIdentifiableList)
   public
-    function ToString: string; virtual;
-    function IndexOf(AItem: PFont): integer;
     function GetItemById(AId: string): PFont;
     function GetItem(AIndex: integer): PFont;
-    function Add(AItem: PFont): integer;
-    procedure Init; virtual;
-    procedure Insert(AIndex: integer; AItem: PFont);
   end;
 
 var
@@ -729,26 +720,6 @@ begin
   GetItemById := PGraphicsMode(inherited GetItemById(AId));
 end;
 
-function TGraphicsModeList.IndexOfId(const AId: string): integer;
-begin
-  IndexOfId := inherited IndexOfId(AId);
-end;
-
-function TGraphicsModeList.IndexOf(AItem: PGraphicsMode): integer;
-begin
-  IndexOf := inherited IndexOf(AItem);
-end;
-
-function TGraphicsModeList.Add(AItem: PGraphicsMode): integer;
-begin
-  Add := inherited Add(AItem);
-end;
-
-procedure TGraphicsModeList.Insert(AIndex: integer; AItem: PGraphicsMode);
-begin
-  inherited Insert(AIndex, AItem);
-end;
-
 destructor TFont.Free;
 begin
   if Assigned(FFontData) then
@@ -925,12 +896,10 @@ procedure TProportionalFont.SetCharWidths;
 var
   charIndex, xIndex, yIndex: integer;
   linePtr: PWord;
-  total: integer;
   avgCount: integer;
   avgTotal: integer;
   width: word;
 begin
-  total := 0;
   avgCount := 0;
   avgTotal := 0;
   for charIndex := 0 to High(byte) do begin
@@ -952,13 +921,12 @@ begin
     end;
     Inc(width, Spacing);
     CharWidths[charIndex] := width;
-    Inc(total, width);
   end;
   if AvgTotal = 0 then
     AverageWidth := MaxWidth
   else
     AverageWidth := Round(avgCount / avgTotal);
-  CharWidths[32] := Trunc(total / High(byte)) div 2;
+  CharWidths[32] := AverageWidth div 2;
   CharWidths[0] := CharWidths[32];
 end;
 
@@ -1151,11 +1119,6 @@ begin
   RegionMode := state^.RegionMode;
 end;
 
-function TFontList.ToString: string;
-begin
-  ToString := 'TFontList';
-end;
-
 function TFontList.GetItem(AIndex: integer): PFont;
 begin
   GetItem := PFont(inherited GetItem(AIndex));
@@ -1164,26 +1127,6 @@ end;
 function TFontList.GetItemById(AId: string): PFont;
 begin
   GetItemById := PFont(inherited GetItemById(AId));
-end;
-
-function TFontList.IndexOf(AItem: PFont): integer;
-begin
-  IndexOf := inherited IndexOf(AItem);
-end;
-
-function TFontList.Add(AItem: PFont): integer;
-begin
-  Add := inherited Add(AItem);
-end;
-
-procedure TFontList.Init;
-begin
-  inherited init;
-end;
-
-procedure TFontList.Insert(AIndex: integer; AItem: PFont);
-begin
-  inherited Insert(AIndex, AItem);
 end;
 
 procedure Finalize; far;

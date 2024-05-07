@@ -45,14 +45,12 @@ type
 
   TActionList = object(TObjectList)
   public
-    function IndexOf(AItem: PAction): integer;
     function NewAction(AActionId: integer; AText: string; AShortcut: word): PAction;
-    function Add(AItem: PAction): integer;
     function GetItem(AIndex: integer): PAction;
     function GetActionById(AActionId: integer): PAction;
     function GetHelpMaxWidth(AControl: pointer): integer;
+    function Add(AItem: pointer): integer; virtual;
     procedure Init; virtual;
-    procedure Insert(AIndex: integer; AItem: PAction);
     destructor Free; virtual;
   end;
 
@@ -148,15 +146,10 @@ begin
   GetItem := PAction(inherited GetItem(AIndex));
 end;
 
-function TActionList.IndexOf(AItem: PAction): integer;
-begin
-  IndexOf := inherited IndexOf(AItem);
-end;
-
-function TActionList.Add(AItem: PAction): integer;
+function TActionList.Add(AItem: pointer): integer;
 begin
   Add := inherited Add(AItem);
-  AItem^.ParentList := @self;
+  PAction(AItem)^.ParentList := @self;
 end;
 
 function TActionList.GetActionById(AActionId: integer): PAction;
@@ -177,11 +170,6 @@ end;
 procedure TActionList.Init;
 begin
   inherited Init;
-end;
-
-procedure TActionList.Insert(AIndex: integer; AItem: PAction);
-begin
-  inherited Insert(AIndex, AItem);
 end;
 
 destructor TActionList.Free;

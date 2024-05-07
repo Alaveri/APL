@@ -25,11 +25,7 @@ type
   TPointList = object(TObjectList)
   private
   public
-    function IndexOf(AItem: PPoint): integer;
-    function Add(AItem: PPoint): integer;
     function GetItem(AIndex: integer): PPoint;
-    function SetItem(AIndex: integer; AItem: PPoint): boolean;
-    procedure Insert(AIndex: integer; AItem: PPoint);
   end;
 
   TInversionPoint = object(TObject)
@@ -45,11 +41,7 @@ type
   TRectList = object(TObjectList)
   private
   public
-    function IndexOf(AItem: PRect): integer;
-    function Add(AItem: PRect): integer;
     function GetItem(AIndex: integer): PRect;
-    function SetItem(AIndex: integer; AItem: PRect): boolean;
-    procedure Insert(AIndex: integer; AItem: PRect);
   end;
 
   TRegion = object(TRectList)
@@ -66,11 +58,7 @@ type
   TInversionPointList = object(TObjectList)
   private
   public
-    function IndexOf(AItem: PInversionPoint): integer;
-    function Add(AItem: PInversionPoint): integer;
     function GetItem(AIndex: integer): PInversionPoint;
-    function SetItem(AIndex: integer; AItem: PInversionPoint): boolean;
-    procedure Insert(AIndex: integer; AItem: PInversionPoint);
   end;
 
   TPoint = object(TObject)
@@ -136,11 +124,7 @@ type
   THorzSegmentList = object(TObjectList)
   private
   public
-    function IndexOf(AItem: PHorzSegment): integer;
-    function Add(AItem: PHorzSegment): integer;
     function GetItem(AIndex: integer): PHorzSegment;
-    function SetItem(AIndex: integer; AItem: PHorzSegment): boolean;
-    procedure Insert(AIndex: integer; AItem: PHorzSegment);
   end;
 
   TSize = object(TObject)
@@ -536,54 +520,14 @@ begin
   Inc(height, ADH);
 end;
 
-function TPointList.IndexOf(AItem: PPoint): integer;
-begin
-  IndexOf := inherited IndexOf(AItem);
-end;
-
-function TPointList.Add(AItem: PPoint): integer;
-begin
-  Add := inherited Add(AItem);
-end;
-
 function TPointList.GetItem(AIndex: integer): PPoint;
 begin
   GetItem := PPoint(inherited GetItem(AIndex));
 end;
 
-function TPointList.SetItem(AIndex: integer; AItem: PPoint): boolean;
-begin
-  SetItem := inherited SetItem(AIndex, AItem);
-end;
-
-procedure TPointList.Insert(AIndex: integer; AItem: PPoint);
-begin
-  inherited Insert(AIndex, AItem);
-end;
-
-function TRectList.IndexOf(AItem: PRect): integer;
-begin
-  IndexOf := inherited IndexOf(AItem);
-end;
-
-function TRectList.Add(AItem: PRect): integer;
-begin
-  Add := inherited Add(AItem);
-end;
-
 function TRectList.GetItem(AIndex: integer): PRect;
 begin
   GetItem := PRect(inherited GetItem(AIndex));
-end;
-
-function TRectList.SetItem(AIndex: integer; AItem: PRect): boolean;
-begin
-  SetItem := inherited SetItem(AIndex, AItem);
-end;
-
-procedure TRectList.Insert(AIndex: integer; AItem: PRect);
-begin
-  inherited Insert(AIndex, AItem);
 end;
 
 procedure TRegion.Init;
@@ -672,29 +616,9 @@ begin
   On := source^.On;
 end;
 
-function TInversionPointList.IndexOf(AItem: PInversionPoint): integer;
-begin
-  IndexOf := inherited IndexOf(AItem);
-end;
-
-function TInversionPointList.Add(AItem: PInversionPoint): integer;
-begin
-  Add := inherited Add(AItem);
-end;
-
 function TInversionPointList.GetItem(AIndex: integer): PInversionPoint;
 begin
   GetItem := PInversionPoint(inherited GetItem(AIndex));
-end;
-
-function TInversionPointList.SetItem(AIndex: integer; AItem: PInversionPoint): boolean;
-begin
-  SetItem := inherited SetItem(AIndex, AItem);
-end;
-
-procedure TInversionPointList.Insert(AIndex: integer; AItem: PInversionPoint);
-begin
-  inherited Insert(AIndex, AItem);
 end;
 
 constructor THorzSegment.CreateSegment(AX1, AX2: integer);
@@ -721,29 +645,9 @@ begin
   X2 := source^.X2;
 end;
 
-function THorzSegmentList.IndexOf(AItem: PHorzSegment): integer;
-begin
-  IndexOf := inherited IndexOf(AItem);
-end;
-
-function THorzSegmentList.Add(AItem: PHorzSegment): integer;
-begin
-  Add := inherited Add(AItem);
-end;
-
 function THorzSegmentList.GetItem(AIndex: integer): PHorzSegment;
 begin
   GetItem := PHorzSegment(inherited GetItem(AIndex));
-end;
-
-function THorzSegmentList.SetItem(AIndex: integer; AItem: PHorzSegment): boolean;
-begin
-  inherited SetItem(AIndex, AItem);
-end;
-
-procedure THorzSegmentList.Insert(AIndex: integer; AItem: PHorzSegment);
-begin
-  inherited Insert(AIndex, AItem);
 end;
 
 end.

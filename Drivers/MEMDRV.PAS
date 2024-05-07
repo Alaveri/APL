@@ -30,11 +30,7 @@ type
   private
   public
     destructor Free; virtual;
-    function Add(AItem: PReference): integer;
     function GetItem(AIndex: integer): PReference;
-    function SetItem(AIndex: integer; AItem: PReference): boolean;
-    function IndexOf(AItem: PReference): integer;
-    procedure Insert(AIndex: integer; AItem: PReference);
   end;
 
   TReference = record
@@ -624,29 +620,9 @@ begin
   inherited Free;
 end;
 
-function TReferenceList.IndexOf(AItem: PReference): integer;
-begin
-  IndexOf := inherited IndexOf(AItem);
-end;
-
-function TReferenceList.Add(AItem: PReference): integer;
-begin
-  Add := inherited Add(AItem);
-end;
-
 function TReferenceList.GetItem(AIndex: integer): PReference;
 begin
   GetItem := PReference(Inherited GetItem(AIndex));
-end;
-
-function TReferenceList.SetItem(AIndex: integer; AItem: PReference): boolean;
-begin
-  inherited SetItem(AIndex, AItem);
-end;
-
-procedure TReferenceList.Insert(AIndex: integer; AItem: PReference);
-begin
-  inherited Insert(AIndex, AItem);
 end;
 
 procedure Finalize; far;
