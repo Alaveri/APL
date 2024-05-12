@@ -92,7 +92,7 @@ type
     procedure Sort(AComparer: TComparer); virtual;
     procedure Insert(AIndex: longint; AItem: pointer);
     procedure Delete(AIndex: longint);
-    procedure Clear;
+    procedure Clear; virtual;
   end;
 
   TObjectList = object(TList)
@@ -103,6 +103,7 @@ type
     procedure Init; virtual;
     procedure Delete(AIndex: integer); virtual;
     procedure Clear; virtual;
+    destructor Free; virtual;
   end;
 
   TLinkedObjectList = object(TLinkedList)
@@ -210,12 +211,6 @@ end;
 function TStringComparer.CaseInsensitive: PComparer;
 begin
   CaseInsensitive := @CaseInsensitiveStringCompare;
-end;
-
-constructor TList.CreateCapacity(ACapacity: integer);
-begin
-  inherited Create;
-  SetCapacity(ACapacity);
 end;
 
 destructor TList.Free;
@@ -384,10 +379,18 @@ end;
 
 constructor TList.CreateSortedCapacity(AComparer: TComparer; ACapacity: integer);
 begin
-  CreateCapacity(ACapacity);
+  inherited Create;
   FComparer := AComparer;
   FSorted := true;
+  SetCapacity(ACapacity);
 end;
+
+constructor TList.CreateCapacity(ACapacity: integer);
+begin
+  inherited Create;
+  SetCapacity(ACapacity);
+end;
+
 
 procedure TList.SetComparer(AComparer: TComparer);
 begin
@@ -539,6 +542,12 @@ begin
   if DisposeObjects then
     FreeAndNil(obj);
   inherited Delete(AIndex);
+end;
+
+destructor TObjectList.Free;
+begin
+  Clear;
+  inherited Free;
 end;
 
 procedure TObjectList.Clear;

@@ -17,6 +17,7 @@ type
   private
   public
     constructor Create;
+    function Alloc(ALength: word): PChar;
     function New(ASource: string): PChar;
     function CompareLength(AStr1, AStr2: PChar; AMaxLength: word; ACompareOptions: TStringCompareOptions): integer;
     function Compare(AStr1, AStr2: PChar; ACompareOptions: TStringCompareOptions): integer;
@@ -29,6 +30,7 @@ type
     function EndCopy(ASource: PChar): PChar;
     function Get(ASource: PChar): string;
     function Reassign(ADest, ASource: PChar): PChar;
+    function Length(AString: PChar): word;
     procedure Free(var AString: PChar);
     procedure Assign(var ADest: PChar; ASource: string);
   end;
@@ -42,12 +44,22 @@ constructor TStringUtil.Create;
 begin
 end;
 
+function TStringUtil.Alloc(ALength: word): PChar;
+var
+  result: PChar;
+begin
+  GetMem(result, ALength + 1);
+  if Assigned(result) then
+    FillChar(result^, ALength + 1, 0);
+  Alloc := result;
+end;
+
 function TStringUtil.New(ASource: string): PChar;
 var
   dest: PChar;
 begin
   New := nil;
-  GetMem(dest, Length(ASource) + 1);
+  GetMem(dest, System.Length(ASource) + 1);
   if not Assigned(dest) then
     exit;
   StrPCopy(dest, ASource);
@@ -60,9 +72,9 @@ var
   short: string;
 begin
   AppendShort := nil;
-  if not Assigned(AStr1) or (Length(AStr2) = 0) then
+  if not Assigned(AStr1) or (System.Length(AStr2) = 0) then
     exit;
-  GetMem(str, StrLen(AStr1) + Length(AStr2) + 1);
+  GetMem(str, StrLen(AStr1) + System.Length(AStr2) + 1);
   if not Assigned(str) then
     exit;
   short := AStr2 + #0;
@@ -181,6 +193,13 @@ begin
   Get := '';
   if Assigned(ASource) then
     Get := StrPas(ASource);
+end;
+
+function TStringUtil.Length(AString: PChar): word;
+begin
+  Length := 0;
+  if Assigned(AString) then
+    Length := StrLen(AString);
 end;
 
 begin

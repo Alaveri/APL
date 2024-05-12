@@ -205,9 +205,10 @@ type
     procedure Init; virtual;
     procedure WaitForVSync; virtual;
     procedure ResetMode; virtual;
-    procedure FillScreen(AScreen: PByte; AX, AY, AWidth: integer; AColor: byte);
-    procedure MoveScreen(ASource, ADest: PByte; AX, AY, AWidth: integer);
-    procedure FillRegion(AScreen: PByte; AX, AY, AWidth: integer; AColor: byte); virtual;
+    procedure FillLine(ADest: PByte; AX, AY, AWidth: integer; AColor: byte);
+    procedure MoveLine(ASource, ADest: PByte; AX, AY, AWidth: integer);
+    procedure FillRegion(ADest: PByte; AX, AY, AWidth: integer; AColor: byte); virtual;
+    procedure SetLinePixel(ADest: PByte; AX, AY: integer; AForeColor: byte);
     procedure MoveRegion(ASource, ADest: PByte; AX, AY, AWidth: integer); virtual;
     destructor Free; virtual;
   end;
@@ -362,33 +363,37 @@ begin
   FreeAndNil(points);
 end;
 
+procedure TGraphicsDriver.SetLinePixel(ADest: PByte; AX, AY: integer; AForeColor: byte);
+begin
+end;
 
-procedure TGraphicsDriver.FillRegion(AScreen: PByte; AX, AY, AWidth: integer; AColor: byte);
+procedure TGraphicsDriver.FillRegion(ADest: PByte; AX, AY, AWidth: integer; AColor: byte);
 var
   region: PRegion;
   points: PInversionPointList;
   point: PInversionPoint;
-  start, index, level: integer;
-  screen: PByte;
+  size, start, index, level: integer;
+  dest: PByte;
+  rect: TRect;
+  draw: boolean;
 begin
   region := State.Region;
   points := region^.GetInversionPoints(State.RegionMode, AY, AX, AX + AWidth - 1);
   if points^.Count = 0 then begin
-    if State.RegionMode <> rmExclude then
-      FillChar(AScreen^, AWidth, AColor);
+    FillChar(ADest^, AWidth, AColor);
     FreeAndNil(points);
     exit;
   end;
-  point := Points^.GetItem(0);
+  draw := region^.IntersectsCoords(AX, AY);
+  if State.RegionMode = rmExclude then
+    draw := not draw;
   level := 0;
-  start := -1;
-  screen := AScreen;
-  if point^.On then begin
-    start := AX;
-    Inc(screen, start - State.ViewPort.X + 1);
+  if draw then begin
     level := 1;
+    start := AX;
   end;
-  for index := 1 to Points^.Count - 1 do begin
+  for index := 0 to Points^.Count - 1 do begin
+    dest := ADest;
     point := Points^.GetItem(index);
     if point^.On then begin
       if level = 0 then
@@ -397,15 +402,19 @@ begin
     end
     else begin
       Dec(level);
-      if level = 0 then begin
-        Inc(screen, start - State.ViewPort.X + 1);
-        FillChar(AScreen^, point^.Position - start + 1, AColor);
+      size := point^.Position - start;
+      if (level = 0) and (size > 0) then begin
+        Inc(dest, start - AX);
+        FillChar(dest^, size, AColor);
         start := -1;
       end;
     end;
   end;
-  if level > 0 then begin
-    FillChar(AScreen^, State.ViewPort.Right - start, AColor);
+  size := AX + AWidth - start;
+  dest := ADest;
+  if (level > 0) and (size > 0) then begin
+    Inc(dest, start - AX);
+    FillChar(dest^, size, AColor);
   end;
   FreeAndNil(points);
 end;
@@ -434,10 +443,10 @@ begin
   if not drawRect.IntersectsCoords(AX, AY) then
     exit;
   ptr := GetDrawPointer(AX, AY, offset);
-  FillScreen(ptr, AX, AY, 1, ForeColor);
+  FillLine(ptr, AX, AY, 1, ForeColor);
 end;
 
-procedure TGraphicsDriver.MoveScreen(ASource, ADest: PByte; AX, AY, AWidth: integer);
+procedure TGraphicsDriver.MoveLine(ASource, ADest: PByte; AX, AY, AWidth: integer);
 begin
   if not Assigned(State.Region) then
     Move(ASource^, ADest^, AWidth)
@@ -445,12 +454,12 @@ begin
     MoveRegion(ASource, ADest, AX, AY, AWidth);
 end;
 
-procedure TGraphicsDriver.FillScreen(AScreen: PByte; AX, AY, AWidth: integer; AColor: byte);
+procedure TGraphicsDriver.FillLine(ADest: PByte; AX, AY, AWidth: integer; AColor: byte);
 begin
   if not Assigned(State.Region) then
-    FillChar(AScreen^, AWidth, AColor)
+    FillChar(ADest^, AWidth, AColor)
   else
-    FillRegion(AScreen, AX, AY, AWidth, AColor);
+    FillRegion(ADest, AX, AY, AWidth, AColor);
 end;
 
 procedure TGraphicsDriver.SetMode(AMode: PGraphicsMode);
@@ -503,6 +512,7 @@ begin
   State.ForeColor := State.BackColor;
   if ARect.IsEmpty then
     exit;
+  ARect.Intersect(State.ViewPort);
   for index := ARect.Y to ARect.Bottom do
     HLine(ARect.X, index, ARect.Width);
   State.ForeColor := tempColor;

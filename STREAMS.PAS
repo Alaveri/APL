@@ -54,6 +54,9 @@ type
     function ReadWord: word; virtual;
     function ReadLong: longint; virtual;
     function ReadString: string; virtual;
+    function ReadDouble: double; virtual;
+    function ReadBool: boolean; virtual;
+    function ReadReal: real; virtual;
     function Write(ABuffer: PByte; ACount: longint): longint; virtual;
     function Seek(AOffset: longint; AOrigin: TSeekOrigin): longint; virtual;
     function WriteToStream(AStream: PStream; ACount: longint): longint; virtual;
@@ -65,6 +68,9 @@ type
     procedure WriteWord(AValue: word); virtual;
     procedure WriteLong(AValue: longint); virtual;
     procedure WriteString(const AString: string); virtual;
+    procedure WriteDouble(AValue: double); virtual;
+    procedure WriteReal(AValue: real); virtual;
+    procedure WriteBool(AValue: boolean); virtual;
   end;
 
   TMemoryStream = object(TStream)
@@ -109,6 +115,9 @@ type
     function ReadInteger: integer; virtual;
     function ReadWord: word; virtual;
     function ReadLong: longint; virtual;
+    function ReadDouble: double; virtual;
+    function ReadBool: boolean; virtual;
+    function ReadReal: real; virtual;
     function Write(ABuffer: PByte; ACount: longint): longint; virtual;
     function WriteToStream(AStream: PStream; ACount: longint): longint; virtual;
     function ReadFromStream(AStream: PStream; ACount: longint): longint; virtual;
@@ -123,6 +132,9 @@ type
     procedure WriteInteger(AValue: integer); virtual;
     procedure WriteWord(AValue: word); virtual;
     procedure WriteLong(AValue: longint); virtual;
+    procedure WriteDouble(AValue: double); virtual;
+    procedure WriteReal(AValue: real); virtual;
+    procedure WriteBool(AValue: boolean); virtual;
   end;
 
   TStreamReader = object(TExceptionObject)
@@ -236,6 +248,33 @@ begin
   ReadLong := aNum;
 end;
 
+function TStream.ReadDouble: double;
+var
+  aNum: double;
+begin
+  aNum := 0;
+  Read(@aNum, SizeOf(double));
+  ReadDouble := aNum;
+end;
+
+function TStream.ReadReal;
+var
+  aNum: real;
+begin
+  aNum := 0;
+  Read(@aNum, SizeOf(real));
+  ReadReal := aNum;
+end;
+
+function TStream.ReadBool: boolean;
+var
+  aBool: boolean;
+begin
+  aBool := false;
+  Read(@aBool, SizeOf(boolean));
+  ReadBool := aBool;
+end;
+
 function TStream.ReadWord: word;
 var
   aNum: word;
@@ -306,6 +345,21 @@ end;
 procedure TStream.WriteLong(AValue: longint);
 begin
   Write(@AValue, SizeOf(longint));
+end;
+
+procedure TStream.WriteDouble(AValue: double);
+begin
+  Write(@AValue, SizeOf(double));
+end;
+
+procedure TStream.WriteReal(AValue: real);
+begin
+  Write(@AValue, SizeOf(real));
+end;
+
+procedure TStream.WriteBool(AValue: boolean);
+begin
+  Write(@AValue, SizeOf(boolean));
 end;
 
 constructor TMemoryStream.Create(ASize: longint);
@@ -616,7 +670,7 @@ begin
   if not CheckRead then
     exit;
   aNum := 0;
-  inherited Read(@aNum, SizeOf(word));
+  Read(@aNum, SizeOf(word));
   ReadWord := aNum;
 end;
 
@@ -626,8 +680,39 @@ var
 begin
   if not CheckRead then
     exit;
-  inherited Read(@aNum, SizeOf(longint));
+  Read(@aNum, SizeOf(longint));
   ReadLong := aNum;
+end;
+
+function TFileStream.ReadDouble: double;
+var
+  aNum: double;
+begin
+  if not CheckRead then
+    exit;
+  Read(@aNum, SizeOf(double));
+  ReadDouble := aNum;
+end;
+
+function TFileStream.ReadReal: real;
+var
+  aNum: real;
+begin
+  if not CheckRead then
+    exit;
+  Read(@aNum, SizeOf(real));
+  ReadReal := aNum;
+end;
+
+function TFileStream.ReadBool: boolean;
+var
+  aBool: boolean;
+begin
+  if not CheckRead then
+    exit;
+  aBool := false;
+  Read(@aBool, SizeOf(boolean));
+  ReadBool := aBool;
 end;
 
 function TFileStream.WriteToStream(AStream: PStream; ACount: longint): longint;
@@ -707,6 +792,27 @@ begin
   if not CheckWrite then
     exit;
   Write(@AValue, SizeOf(longint));
+end;
+
+procedure TFileStream.WriteDouble(AValue: double);
+begin
+  if not CheckWrite then
+    exit;
+  Write(@AValue, SizeOf(double));
+end;
+
+procedure TFileStream.WriteReal(AValue: real);
+begin
+  if not CheckWrite then
+    exit;
+  Write(@AValue, SizeOf(real));
+end;
+
+procedure TFileStream.WriteBool(AValue: boolean);
+begin
+  if not CheckWrite then
+    exit;
+  Write(@AValue, SizeOf(boolean));
 end;
 
 function TFileStream.Seek(AOffset: longint; AOrigin: TSeekOrigin): longint;

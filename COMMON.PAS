@@ -76,6 +76,7 @@ function GetCurrentDirectory: string;
 function ChangeDirectory(const ADirectory: string): boolean;
 function StringsEqualInsensitive(const AString1, AString2: string): boolean;
 function HasWildcard(const AFilename: string): boolean;
+function IsDirectory(const AFilename: string): boolean;
 
 var
   WhiteSpaceChars: set of char;
@@ -702,6 +703,19 @@ begin
     result := false;
     exit;
   end;
+end;
+
+function IsDirectory(const AFilename: string): boolean;
+var
+  search: SearchRec;
+  error: integer;
+begin
+  FindFirst(AFilename, byte(faDirectory), search);
+  error := DosError;
+  if error = 0 then
+    IsDirectory := faDirectory in TFileAttributes(search.Attr)
+  else
+    IsDirectory := false;
 end;
 
 function HasWildcard(const AFilename: string): boolean;

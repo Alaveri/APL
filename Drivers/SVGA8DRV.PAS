@@ -296,7 +296,7 @@ begin
       px := AX;
       for xIndex := minX to maxX do begin
         if (currentLine and (32768 shr xIndex)) > 0 then
-          FillScreen(screen, px, sy, 1, fore);
+          FillLine(screen, px, sy, 1, fore);
         Inc(px);
         Inc(screen);
         Inc(offset);
@@ -337,14 +337,14 @@ begin
   color := byte(State.ForeColor);
   if AWidth + offset > FWinSize then begin
     partialWidth := FWinSize - offset + 1;
-    FillScreen(screen, AX, AY, partialWidth, color);
+    FillLine(screen, AX, AY, partialWidth, color);
     SetBank(FCurrentBank + 1);
     screen := Mode^.FrameBuffer;
     Dec(AWidth, partialWidth);
-    FillScreen(screen, AX, AY, AWidth, color);
+    FillLine(screen, AX, AY, AWidth, color);
   end
   else
-    FillScreen(screen, AX, AY, AWidth, color);
+    FillLine(screen, AX, AY, AWidth, color);
 end;
 
 procedure TSVga8Driver.VLine(AX, AY, AHeight: integer);
@@ -365,7 +365,7 @@ begin
     exit;
   for index := MaxLong(AY, 0) to MinLong(AY + AHeight - 1, Mode^.MaxY) do begin
     screen := GetDrawPointer(AX, index, offset);
-    FillScreen(screen, AX, AY, 1, ForeColor);
+    FillLine(screen, AX, AY, 1, ForeColor);
   end;
 end;
 
@@ -391,15 +391,15 @@ begin
     Inc(image, (yIndex + imageRect.Y) * imageRect.Width + imageRect.X);
     if offset + lineWidth > FWinSize then begin
       partialWidth := FWinSize - offset + 1;
-      MoveScreen(image, screen, drawRect.X, sy, partialWidth);
+      MoveLine(image, screen, drawRect.X, sy, partialWidth);
       Inc(image, partialWidth);
       SetBank(FCurrentBank + 1);
       screen := Mode^.FrameBuffer;
-      MoveScreen(image, screen, drawRect.X, sy, lineWidth - partialWidth);
+      MoveLine(image, screen, drawRect.X, sy, lineWidth - partialWidth);
       Inc(image, lineWidth - partialWidth);
     end
     else begin
-      MoveScreen(image, screen, drawRect.X, sy, lineWidth);
+      MoveLine(image, screen, drawRect.X, sy, lineWidth);
       Inc(image, lineWidth);
     end;
     Inc(sy);
@@ -425,7 +425,7 @@ begin
     Inc(image, (yIndex + imageRect.Y) * imageRect.Width + imageRect.X);
     for xIndex := 0 to drawRect.Width - 1 do begin
       if image^ <> TransparentColor then
-        MoveScreen(image, screen, drawRect.X, sy, 1);
+        MoveLine(image, screen, drawRect.X, sy, 1);
       Inc(image);
       Inc(screen);
       Inc(offset);

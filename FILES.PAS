@@ -51,6 +51,7 @@ type
   public
     Files: PFileList;
     Path: string;
+    Directory: string;
     Filter: string;
     procedure Init; virtual;
     procedure Sort(ASort: TDirSort; ADirection: TDirSortDirection; ADirsFirst: boolean);
@@ -268,7 +269,13 @@ var
 begin
   result := New(PDirectoryContents, Create);
   result^.Path := FExpand(Trim(APath));
-  result^.Filter := ExtractFullname(APath);
+  result^.Directory := IncludeBackslash(ExtractDirectory(result^.Path));
+  if DirectoryExists(result^.Directory) then
+    ChangeDirectory(result^.Directory);
+  if HasWildCard(APath) then
+    result^.Filter := ExtractFullname(APath)
+  else
+    result^.Filter := '*.*';
   result^.Name := TString.New(ExtractDirectory(APath));
   GetDirectory := result;
   attributes := [];
@@ -315,6 +322,7 @@ begin
   inherited Init;
   Files := New(PFileList, Create);
   Path := '';
+  Directory := '';
   Filter := '';
 end;
 
