@@ -53,11 +53,11 @@ type
     function Add(AItem: pointer): integer; virtual;
     function Sorted: boolean;
     function GetItem(AIndex: integer): pointer;
-    function SetItem(AIndex: integer; AItem: pointer): boolean; virtual;
     function IndexOf(AItem: pointer): integer; virtual;
     function Capacity: integer;
     procedure SetComparer(AComparer: TComparer); virtual;
     procedure Swap(AIndex1, AIndex2: integer); virtual;
+    procedure SetItem(AIndex: integer; AItem: pointer); virtual;
     procedure Sort; virtual;
     procedure SetCapacity(ACapacity: integer); virtual;
     procedure CustomSort(AComparer: TComparer; ASortFunc: TSortFunc); virtual;
@@ -86,9 +86,9 @@ type
     function Add(AItem: pointer): PListNode;
     function GetItem(AIndex: longint): pointer;
     function GetNode(AIndex: longint): PListNode;
-    function SetItem(AIndex: longint; AItem: pointer): boolean;
     function IndexOf(AItem: pointer): longint;
     procedure Swap(var AItem1, AItem2: PListNode);
+    procedure SetItem(AIndex: longint; AItem: pointer);
     procedure Sort(AComparer: TComparer); virtual;
     procedure Insert(AIndex: longint; AItem: pointer);
     procedure Delete(AIndex: longint);
@@ -112,7 +112,7 @@ type
     procedure Init; virtual;
     function Add(AItem: PObject): PListNode;
     function GetItem(AIndex: longint): PObject;
-    function SetItem(AIndex: longint; AItem: PObject): boolean;
+    procedure SetItem(AIndex: longint; AItem: PObject);
     function IndexOf(AItem: PObject): longint;
     procedure Insert(AIndex: longint; AItem: PObject);
     procedure FreeNode(ANode: PListNode); virtual;
@@ -415,19 +415,11 @@ end;
 
 function TList.GetItem(AIndex: integer): pointer;
 begin
-  GetItem := nil;
-  if (AIndex < 0) or (AIndex > Count - 1) then
-    exit;
   GetItem := FBuffer^[AIndex];
 end;
 
-function TList.SetItem(AIndex: integer; AItem: pointer): boolean;
+procedure TList.SetItem(AIndex: integer; AItem: pointer);
 begin
-  SetItem := true;
-  if (AIndex < 0) or (AIndex > Count - 1) then begin
-    SetItem := false;
-    exit;
-  end;
   FBuffer^[AIndex] := AItem;
 end;
 
@@ -776,16 +768,13 @@ begin
   GetItem := node^.Item;
 end;
 
-function TLinkedList.SetItem(AIndex: longint; AItem: pointer): boolean;
+procedure TLinkedList.SetItem(AIndex: longint; AItem: pointer);
 var
   node: PListNode;
 begin
-  SetItem := false;
   node := GetNode(AIndex);
-  if Assigned(node) then begin
-    SetItem := true;
+  if Assigned(node) then
     node^.Item := AItem;
-  end;
 end;
 
 function TLinkedList.IndexOf(AItem: pointer): longint;
@@ -961,9 +950,9 @@ begin
   GetItem := inherited GetItem(AIndex);
 end;
 
-function TLinkedObjectList.SetItem(AIndex: longint; AItem: PObject): boolean;
+procedure TLinkedObjectList.SetItem(AIndex: longint; AItem: PObject);
 begin
-  SetItem := inherited SetItem(AIndex, AItem);
+  inherited SetItem(AIndex, AItem);
 end;
 
 function TLinkedObjectList.IndexOf(AItem: PObject): longint;
