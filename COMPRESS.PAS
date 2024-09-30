@@ -15,7 +15,7 @@ type
 
   TCompressProgressProc = procedure(ASender: PCompressor; AMax, ACurrent: longint);
 
-  TCompressor = object(TExceptionObject)
+  TCompressor = object(TStatusObject)
   private
     FReadBufferSize: word;
     FWriteBufferSize: word;

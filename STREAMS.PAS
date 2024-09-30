@@ -28,22 +28,13 @@ type
     soFromPosition
   );
 
-  TStreamStatus =
-  (
-    ssOk,
-    ssError,
-    ssEndOfStream
-  );
-
-  TStream = object(TExceptionObject)
+  TStream = object(TStatusObject)
   private
-    FStatus: TStreamStatus;
     FClosed: boolean;
   public
     Position: longint;
     Size: longint;
     destructor Free; virtual;
-    function Status: TStreamStatus; virtual;
     function EndOfStream: boolean; virtual;
     function CanRead: boolean; virtual;
     function CanWrite: boolean; virtual;
@@ -137,7 +128,7 @@ type
     procedure WriteBool(AValue: boolean); virtual;
   end;
 
-  TStreamReader = object(TExceptionObject)
+  TStreamReader = object(TStatusObject)
   private
     FStream: PStream;
   public
@@ -164,11 +155,6 @@ destructor TStream.Free;
 begin
   Close;
   inherited Free;
-end;
-
-function TStream.Status: TStreamStatus;
-begin
-  Status := status;
 end;
 
 function TStream.EndOfStream: boolean;
@@ -296,7 +282,6 @@ procedure TStream.Init;
 begin
   inherited Init;
   Position := 0;
-  FStatus := ssEndOfStream;
   Size := 0;
   FClosed := true;
 end;
@@ -365,15 +350,14 @@ end;
 constructor TMemoryStream.Create(ASize: longint);
 var
   reference: PReference;
-  total: longint;
+  remaining: longint;
   refSize: longint;
 begin
   inherited Create;
-  FStatus := ssOk;
   Memory.BeginAllocTransaction;
-  total := ASize;
-  while total > 0 do begin
-    refSize := MinLong(total, MaxVarSize);
+  remaining := ASize;
+  while remaining > 0 do begin
+    refSize := MinLong(remaining, MaxVarSize);
     reference := Memory.Alloc(refSize);
     if Memory.HasException then begin
       Raise(Memory.Exception^.Code);
@@ -383,7 +367,7 @@ begin
       exit;
     end;
     FReferences^.Add(reference);
-    Dec(total, refSize);
+    Dec(remaining, refSize);
   end;
   Size := ASize;
   Memory.CommitAllocTransaction;
@@ -614,14 +598,12 @@ end;
 function TFileStream.Write(ABuffer: PByte; ACount: longint): longint;
 var
   bytesWritten: word;
-  bufferPtr: PByte;
   total: longint;
 begin
   Write := 0;
   if (ACount <= 0) or not CheckWrite then
     exit;
   total := 0;
-  bufferPtr := ABuffer;
   while total < ACount do begin
     Seek(Position, soFromBeginning);
     {$I-}
@@ -738,6 +720,10 @@ begin
       break;
     end;
     bytesWritten := AStream^.Write(buffer, bytesRead);
+    if AStream^.HasException then begin
+      Raise(AStream^.Exception^.Code);
+      break;
+    end;
     if bytesWritten = 0 then
       break;
     Inc(total, bytesWritten);
@@ -840,10 +826,14 @@ begin
         Reset(FFile, 1);
         Size := FileSize(FFile);
       end;
-      fmWrite: Rewrite(FFile, 1);
+      fmWrite: begin
+        Rewrite(FFile, 1);
+        Size := 0;
+      end;
     end;
   end
   else begin
+    Size := 0;
     System.Assign(FFile, FFilename);
     case FMode of
       fmRead, fmReadWrite: Raise(ecFileNotFound);

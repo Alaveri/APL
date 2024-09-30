@@ -37,17 +37,27 @@ type
     Size: word;
     case Xms: boolean of
       true: (Handle: word; Unused: word);
-      false: (Ptr: Pointer);
+      false: (Ptr: pointer);
   end;
 
   TXmsMoveRecord = record
     Length: longint;
     case boolean of
-      true: (Unused1: word; SourcePointer: pointer; DestHandle: word; DestOffset: longint);
-      false: (SourceHandle: word; SourceOffset: longint; Unused2: word; DestPointer: pointer);
+      true: (
+        Unused1: word;
+        SourcePointer: pointer;
+        DestHandle: word;
+        DestOffset: longint
+      );
+      false: (
+        SourceHandle: word;
+        SourceOffset: longint;
+        Unused2: word;
+        DestPointer: pointer
+      );
   end;
 
-  TMemoryDriver = object(TExceptionObject)
+  TMemoryDriver = object(TStatusObject)
   private
     FXmsSupported: boolean;
     FReferences: PReferenceList;
@@ -87,7 +97,7 @@ type
     {$ENDIF}
   end;
 
-  TBuffer = object(TExceptionObject)
+  TBuffer = object(TStatusObject)
   private
     procedure SetDataSize(ASize: word; AClear, APreserve: boolean);
   public
@@ -106,8 +116,8 @@ type
     procedure Clear;
     procedure FillByte(AByte: byte; ASize: word);
     procedure FillChar(AChar: char; ASize: word);
-    procedure FillAllBytes(AByte: word);
-    procedure FillAllChars(AChar: char);
+    procedure FillAllByte(AByte: word);
+    procedure FillAllChar(AChar: char);
     procedure Init; virtual;
     destructor Free; virtual;
   end;
@@ -289,12 +299,10 @@ var
   result: pointer;
 begin
   asm
-    push es
     mov ax, 4310h
     int 2Fh
     mov word ptr [result], bx
     mov word ptr [result + 2], es
-    pop es
   end;
   GetXmsControlFunction := result;
 end;
@@ -737,12 +745,12 @@ begin
   FillByte(byte(AChar), ASize);
 end;
 
-procedure TBuffer.FillAllBytes(AByte: word);
+procedure TBuffer.FillAllByte(AByte: word);
 begin
   FillByte(AByte, Size);
 end;
 
-procedure TBuffer.FillAllChars(AChar: char);
+procedure TBuffer.FillAllChar(AChar: char);
 begin
   FillChar(AChar, Size);
 end;

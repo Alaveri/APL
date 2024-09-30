@@ -132,7 +132,6 @@ const
   DaysTo1601 = DaysPer400Years * 4;
   DaysTo1899 = DaysPer400Years * 4 + DaysPer100Years * 3 - 367;
   DaysTo1970 = DaysPer400Years * 4 + DaysPer100Years * 3 + DaysPer4Years * 17 + DaysPerYear;
-  DaysTo10000 = DaysPerYear * 25 - 366;
 
   DaysInMonth365: MonthArray = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31);
   DaysInMonth366: MonthArray = (31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31);

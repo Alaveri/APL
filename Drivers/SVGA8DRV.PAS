@@ -91,7 +91,7 @@ var
   newMode: PSVga8Mode;
   oldMode: byte;
   vbeInfo: TVbeInfo;
-  supported, status: byte;
+  supported, callStatus: byte;
   modePtr: PWord;
   vbeModeIndex: word;
   colors: string;
@@ -109,9 +109,9 @@ begin
     les di, recordPtr
     int 10h
     mov [supported], al
-    mov [status], ah
+    mov [callStatus], ah
   end;
-  if (supported <> $4F) or (status <> 0) then begin
+  if (supported <> $4F) or (callStatus <> 0) then begin
     Raise(ecGraphicsNotSupported);
     exit;
   end;

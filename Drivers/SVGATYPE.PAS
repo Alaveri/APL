@@ -97,8 +97,7 @@ type
     Planes: byte; {Number of memory planes.}
     Bpp: byte; {Bits per pixel.}
     NumberOfBanks: byte; {Total number of banks in this mode.}
-    {See MemoryModel constants above}
-    MemoryModel: byte;
+    MemoryModel: byte; {See MemoryModel constants above}
     BankSize: byte; {Bank size in number of KBytes.}
     NumberOfImagePages: byte; {Number of offscreen pages}
     Reserved0: byte;

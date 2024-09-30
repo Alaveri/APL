@@ -73,7 +73,7 @@ type
     Reserved: array[0..254] of byte;
   end;
 
-  TFont = object(TExceptionObject)
+  TFont = object(TStatusObject)
   private
     FFontData: PWord;
     FFontDataSize: word;
@@ -152,7 +152,7 @@ type
     procedure Assign(var ASource: TObject); virtual;
   end;
 
-  TGraphicsDriver = object(TExceptionObject)
+  TGraphicsDriver = object(TStatusObject)
   private
     FOldMode: byte;
   public

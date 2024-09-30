@@ -56,7 +56,8 @@ type
   TTextModeList = object(TIdentifiableList)
   private
   public
-    function GetItem(AIndex: integer): PTextMode;    function GetItemById(const AId: string): PTextMode;
+    function GetItem(AIndex: integer): PTextMode;
+    function GetItemById(const AId: string): PTextMode;
     function IndexOfId(const AId: string): integer;
     function IndexOf(AItem: PTextMode): integer;
     function Add(AItem: PTextMode): integer;

@@ -20,6 +20,11 @@ function Trim(AString: string): string;
 function IntToStr(ANum: longint): string;
 function IntToHex(ANum: longint): THexString;
 function IntToBool(ANum: longint): boolean;
+function StrToLong(const AString: string; ADefault: longint): longint;
+function StrToShort(const AString: string; ADefault: shortint): shortint;
+function StrToByte(const AString: string; ADefault: byte): byte;
+function StrToWord(const AString: string; ADefault: word): word;
+function StrToInt(const AString: string; ADefault: integer): integer;
 function IncludeBackSlash(const AString: string): string;
 function ExcludeBackSlash(const AString: string): string;
 function DoubleToStr(ADouble: double; ADigits: byte): string;
@@ -52,6 +57,8 @@ function ExtractExtension(const AFilename: string): string;
 function Equal(var AVar1, AVar2; ASize: word): boolean;
 function Replace(const AString, APattern, AReplacePattern: string): string;
 function ZeroPad(AInt: longint; ALength: byte): string;
+function LeftPad(AString: string; ALength: byte; AChar: char): string;
+function RightPad(AString: string; ALength: byte; AChar: char): string;
 function EndZeroPad(AInt: longint; ALength: byte): string;
 function FormatLong(ALong: longint): string;
 function StartsWith(const AString, AStartsWith: string): boolean;
@@ -738,6 +745,81 @@ begin
       or (Pos('?', dir) > 0)
     );
   HasWildCard := found;
+end;
+
+function LeftPad(AString: string; ALength: byte; AChar: char): string;
+var
+  result: string;
+begin
+  result := AString;
+  while Length(result) < ALength do
+    result := AChar + result;
+  LeftPad := result;
+end;
+
+function RightPad(AString: string; ALength: byte; AChar: char): string;
+var
+  result: string;
+begin
+  result := AString;
+  while Length(result) < ALength do
+    result := result + AChar;
+  RightPad := result;
+end;
+
+function StrToLong(const AString: string; ADefault: longint): longint;
+var
+  result: longint;
+  error: integer;
+begin
+  Val(AString, result, error);
+  if error <> 0 then
+    result := ADefault;
+  StrToLong := result;
+end;
+
+function StrToShort(const AString: string; ADefault: shortint): shortint;
+var
+  result: shortint;
+  error: integer;
+begin
+  Val(AString, result, error);
+  if error <> 0 then
+    result := ADefault;
+  StrToShort := result;
+end;
+
+function StrToByte(const AString: string; ADefault: byte): byte;
+var
+  result: byte;
+  error: integer;
+begin
+  Val(AString, result, error);
+  if error <> 0 then
+    result := ADefault;
+  StrToByte := result;
+end;
+
+function StrToWord(const AString: string; ADefault: word): word;
+var
+  result: word;
+  error: integer;
+begin
+  Val(AString, result, error);
+  if error <> 0 then
+    result := ADefault;
+  StrToWord := result;
+end;
+
+function StrToInt(const AString: string; ADefault: integer): integer;
+var
+  result: integer;
+  error: integer;
+begin
+  Val(AString, result, error);
+  if error <> 0 then
+    result := ADefault;
+  StrToInt := result;
 end;
 
 procedure Finalize; far;

@@ -22,7 +22,6 @@ type
     constructor Create;
     constructor CreateAssign(var ASource: TObject);
     destructor Free; virtual;
-    function ToString: string; virtual;
     procedure Abstract; virtual;
     procedure Assign(var ASource: TObject); virtual;
     procedure Init; virtual;
@@ -38,7 +37,6 @@ type
     procedure Assign(var ASource: TObject); virtual;
     procedure Init; virtual;
     function GetId: string;
-    function ToString: string; virtual;
   end;
 
 procedure FreeAndNil(var AObject);
@@ -85,11 +83,6 @@ begin
   RunError(301);
 end;
 
-function TObject.ToString: string;
-begin
-  ToString := 'TObject';
-end;
-
 procedure TObject.Assign(var ASource: TObject);
 begin
 end;
@@ -129,11 +122,6 @@ end;
 function TIdentifiable.GetId: string;
 begin
   GetId := TString.Get(Id);
-end;
-
-function TIdentifiable.ToString: string;
-begin
-  ToString := GetId;
 end;
 
 end.
