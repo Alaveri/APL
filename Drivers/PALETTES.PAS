@@ -21,6 +21,29 @@ type
   PJascPaletteWriter = ^TJascPaletteWriter;
   PJascPaletteReader = ^TJascPaletteReader;
 
+  TStandardColor =
+  (
+    scEga,
+    scWhite,
+    scRed,
+    scGreen,
+    scBlue,
+    scCyan,
+    scYellow,
+    scMagenta,
+    scOrange,
+    scBrown,
+    scSpringGreen,
+    scAzure,
+    scViolet,
+    scFleshTone
+  );
+
+  TColor = record
+    Color: TStandardColor;
+    Shade: byte;
+  end;
+
   TPaletteFormat =
   (
     pfNone,
@@ -118,10 +141,164 @@ type
     function ReadPalette(AStream: PStream): PRgbColorList; virtual;
   end;
 
+const
+  egaBlack = 0;
+  egaBlue = 1;
+  egaGreen = 2;
+  egaCyan = 3;
+  egaRed = 4;
+  egaMagenta = 5;
+  egaBrown = 6;
+  egaLightGray = 7;
+  egaDarkGray = 8;
+  egaLightBlue = 9;
+  egaLightGreen = 10;
+  egaLightCyan = 11;
+  egaLightRed = 12;
+  egaLightMagenta = 13;
+  egaYellow = 14;
+  egaWhite = 15;
+
+  rgbEgaBlack: TRgbColor = (Red: $00; Green: $00; Blue: $00);
+  rgbEgaBlue: TRgbColor = (Red: $00; Green: $00; Blue: $AA);
+  rgbEgaGreen: TRgbColor = (Red: $00; Green: $AA; Blue: $00);
+  rgbEgaCyan: TRgbColor = (Red: $00; Green: $AA; Blue: $AA);
+  rgbEgaRed: TRgbColor = (Red: $AA; Green: $00; Blue: $00);
+  rgbEgaMagenta: TRgbColor = (Red: $AA; Green: $00; Blue: $AA);
+  rgbEgaBrown: TRgbColor = (Red: $AA; Green: $55; Blue: $00);
+  rgbEgaLightGray: TRgbColor = (Red: $AA; Green: $AA; Blue: $AA);
+  rgbEgaDarkGray: TRgbColor = (Red: $55; Green: $55; Blue: $55);
+  rgbEgaLightBlue: TRgbColor = (Red: $55; Green: $55; Blue: $FF);
+  rgbEgaLightGreen: TRgbColor = (Red: $55; Green: $FF; Blue: $55);
+  rgbEgaLightCyan: TRgbColor = (Red: $55; Green: $FF; Blue: $FF);
+  rgbEgaLightRed: TRgbColor = (Red: $FF; Green: $55; Blue: $55);
+  rgbEgaLightMagenta: TRgbColor = (Red: $FF; Green: $55; Blue: $FF);
+  rgbEgaYellow: TRgbColor = (Red: $FF; Green: $FF; Blue: $55);
+  rgbEgaWhite: TRgbColor = (Red: $FF; Green: $FF; Blue: $FF);
+
+  MinIntensity: byte = 0;
+  MaxIntensity: byte = 15;
+  Intensity50: byte = 7;
+  Intensity25: byte = 3;
+  Intensity75: byte = 11;
+  PaletteAnimationStart: byte = 224;
+  PaletteAnimationEnd: byte = 254;
+  TransparentColor: byte = 255;
+
+function GetStandardPalette: PRgbPaletteData; far;
+
 implementation
 
 uses
   Common;
+
+function GetStandardPalette: PRgbPaletteData;
+var
+  colorIndex: TStandardColor;
+  shadeIndex, shade: integer;
+  paletteIndex: integer;
+  index: integer;
+  newPalette: PRgbPaletteData;
+  color: PRgbColor;
+begin
+  New(newPalette);
+  FillChar(newPalette^, SizeOf(TRgbPaletteData), 0);
+
+  { Standard EGA colors }
+  newPalette^[0] := rgbEgaBlack;
+  newPalette^[1] := rgbEgaBlue;
+  newPalette^[2] := rgbEgaGreen;
+  newPalette^[3] := rgbEgaCyan;
+  newPalette^[4] := rgbEgaRed;
+  newPalette^[5] := rgbEgaMagenta;
+  newPalette^[6] := rgbEgaBrown;
+  newPalette^[7] := rgbEgaLightGray;
+  newPalette^[8] := rgbEgaDarkGray;
+  newPalette^[9] := rgbEgaLightBlue;
+  newPalette^[10] := rgbEgaLightGreen;
+  newPalette^[11] := rgbEgaLightCyan;
+  newPalette^[12] := rgbEgaLightRed;
+  newPalette^[13] := rgbEgaLightMagenta;
+  newPalette^[14] := rgbEgaYellow;
+  newPalette^[15] := rgbEgaWhite;
+  paletteIndex := 16;
+
+  for colorIndex := scWhite to High(TStandardColor) do begin
+    for shadeIndex := 1 to 16 do begin
+      shade := shadeIndex * 16 - 1;
+      case colorIndex of
+        scWhite: begin
+          newPalette^[paletteIndex].Red := shade;
+          newPalette^[paletteIndex].Green := shade;
+          newPalette^[paletteIndex].Blue := shade;
+        end;
+        scRed: begin
+          newPalette^[paletteIndex].Red := shade;
+          newPalette^[paletteIndex].Green := 0;
+          newPalette^[paletteIndex].Blue := 0;
+        end;
+        scGreen: begin
+          newPalette^[paletteIndex].Red := 0;
+          newPalette^[paletteIndex].Green := shade;
+          newPalette^[paletteIndex].Blue := 0;
+        end;
+        scBlue: begin
+          newPalette^[paletteIndex].Red := 0;
+          newPalette^[paletteIndex].Green := 0;
+          newPalette^[paletteIndex].Blue := shade;
+        end;
+        scYellow: begin
+          newPalette^[paletteIndex].Red := shade;
+          newPalette^[paletteIndex].Green := shade;
+          newPalette^[paletteIndex].Blue := 0;
+        end;
+        scMagenta: begin
+          newPalette^[paletteIndex].Red := shade;
+          newPalette^[paletteIndex].Green := 0;
+          newPalette^[paletteIndex].Blue := shade;
+        end;
+        scCyan: begin
+          newPalette^[paletteIndex].Red := 0;
+          newPalette^[paletteIndex].Green := shade;
+          newPalette^[paletteIndex].Blue := shade;
+        end;
+        scOrange: begin
+          newPalette^[paletteIndex].Red := shade;
+          newPalette^[paletteIndex].Green := shade div 2;
+          newPalette^[paletteIndex].Blue := 0;
+        end;
+        scBrown: begin
+          newPalette^[paletteIndex].Red := Round(shade / 1.7);
+          newPalette^[paletteIndex].Green := shade div 2;
+          newPalette^[paletteIndex].Blue := 0;
+        end;
+        scSpringGreen: begin
+          newPalette^[paletteIndex].Red := shade div 2;
+          newPalette^[paletteIndex].Green := shade;
+          newPalette^[paletteIndex].Blue := shade div 2;
+        end;
+        scAzure: begin
+          newPalette^[paletteIndex].Red := shade div 3;
+          newPalette^[paletteIndex].Green := shade div 3;
+          newPalette^[paletteIndex].Blue := shade;
+        end;
+        scViolet: begin
+          newPalette^[paletteIndex].Red := shade div 2;
+          newPalette^[paletteIndex].Green := 0;
+          newPalette^[paletteIndex].Blue := shade;
+        end;
+        scFleshTone: begin
+          newPalette^[paletteIndex].Red := 215 - Round((shadeIndex / 18) * 115);
+          newPalette^[paletteIndex].Green := 190 - Round((shadeIndex / 18) * 135);
+          newPalette^[paletteIndex].Blue := 140 - Round((shadeIndex / 18) * 135);
+        end;
+      end;
+      Inc(paletteIndex);
+    end;
+  end;
+
+  GetStandardPalette := newPalette;
+end;
 
 function TRgbColorList.Add(AItem: PRgbColor): integer;
 begin
@@ -476,7 +653,7 @@ begin
       Raise(AStream^.Exception^.Code);
       exit;
     end;
-    // Change this to not read padding for each color component
+    {// Change this to not read padding for each color component}
     color.Red := StrToInt(Trim(Copy(line, 1, 3)), 0);
     color.Green := StrToInt(Trim(Copy(line, 5, 3)), 0);
     color.Blue := StrToInt(Trim(Copy(line, 9, 3)), 0);

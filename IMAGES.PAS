@@ -13,12 +13,13 @@ uses
   Streams,
   Lzw,
   AplTypes,
+  Palettes,
   GraphDrv;
 
 const
   ImageVersionMajor = 1;
-  ImageVersionMinor = 0;
-  ImageIdentifier: string3 = 'IMG';
+  ImageVersionMinor = 1;
+  ImageIdentifier: string3 = 'APLIMG';
 
 type
   PImage = ^TImage;
@@ -30,16 +31,16 @@ type
   );
 
   TImageHeader = record
-    Identifier: array[0..2] of byte;
+    Identifier: array[0..5] of byte;
     MajorVersion: byte;
     MinorVersion: byte;
     Width, Height: word;
     Compression: TImageCompression;
     Bpp: byte;
-    Reserved: array[0..4] of byte;
+    PaletteEntries: word;
   end;
 
-  TImage = object(TExceptionObject)
+  TImage = object(TStatusObject)
   private
     FHeader: TImageHeader;
     procedure InitHeader;
@@ -114,7 +115,7 @@ end;
 procedure TImage.InitHeader;
 begin
   FillChar(FHeader, SizeOf(FHeader), 0);
-  Move(ImageIdentifier[1], FHeader.Identifier, 3);
+  Move(ImageIdentifier[1], FHeader.Identifier, 6);
   FHeader.MajorVersion := ImageVersionMajor;
   FHeader.MinorVersion := ImageVersionMinor;
   FHeader.Width := 0;
@@ -184,7 +185,7 @@ end;
 procedure TImage.LoadFromStream(ASource: PStream);
 var
   header: TImageHeader;
-  identifier: string3;
+  identifier: string6;
   bytes: byte;
   lzw: TLzw;
 begin
@@ -193,8 +194,8 @@ begin
     Raise(ASource^.Exception^.Code);
     exit;
   end;
-  Move(header.Identifier, identifier[1], 3);
-  identifier[0] := #3;
+  Move(header.Identifier, identifier[1], 6);
+  identifier[0] := #6;
   if identifier <> ImageIdentifier then begin
     Raise(ecInvalidImage);
     exit;

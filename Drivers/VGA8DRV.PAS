@@ -16,6 +16,7 @@ uses
   Drawing,
   MouseDrv,
   GraphDrv,
+  Palettes,
   GrDrv8;
 
 type
@@ -562,12 +563,7 @@ begin
   inherited Init;
   newMode := New(PGraphicsMode, Create);
   with newMode^ do begin
-    Id := TString.New('Vga'
-      + IntToStr(320)
-      + 'x'
-      + IntToStr(200)
-      + 'x'
-      + IntToStr(8));
+    Id := $13;
     desc := 'VGA '
       + IntToStr(320)
       + 'x'

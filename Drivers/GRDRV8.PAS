@@ -22,16 +22,6 @@ uses
   MemDrv,
   Palettes;
 
-const
-  MinIntensity = 0;
-  MaxIntensity = 15;
-  Intensity50 = 7;
-  Intensity25 = 3;
-  Intensity75 = 11;
-  TransparentColor: byte = 255;
-  ReservedColor1: byte = 253;
-  ReservedColor2: byte = 254;
-
 type
   PGraphics8Driver = ^TGraphics8Driver;
   PMouseCursor = ^TMouseCursor;
@@ -39,30 +29,6 @@ type
 
   TLargeMouseCursorImage = array[0..14, 0..7] of byte;
   TSmallMouseCursorImage = array[0..8, 0..7] of byte;
-
-  TStandardColor =
-  (
-    scWhite,
-    scRed,
-    scGreen,
-    scBlue,
-    scCyan,
-    scYellow,
-    scMagenta,
-    scOrange,
-    scBrown,
-    scSpringGreen,
-    scAzure,
-    scViolet,
-    scFleshTone,
-    scEga,
-    scBlack
-  );
-
-  TColor = record
-    Color: TStandardColor;
-    Shade: byte;
-  end;
 
   TMouseCursor = object(TIdentifiable)
   private
@@ -91,11 +57,9 @@ type
     procedure Init; virtual;
     destructor Free; virtual;
     function GetColor8(AColor: TStandardColor; AIntensity: byte): longint; virtual;
-    procedure GetStandardColor(AColor: longint;
-      var AStandardColor: TStandardColor; var AIntensity: byte); virtual;
-    function GetStandardPalette: PRgbPaletteData; virtual;
+    procedure GetStandardColor(AColor: longint; var AStandardColor: TStandardColor; var AIntensity: byte); virtual;
+    procedure SetStandardPalette;
     procedure SetMode(AMode: PGraphicsMode); virtual;
-    procedure SetStandardPalette; virtual;
     procedure SetRgbPalette(APalette: PRgbPaletteData); virtual;
     procedure SetForeColor8(AColor: TStandardColor; AIntensity: byte); virtual;
     procedure SetBackColor8(AColor: TStandardColor; AIntensity: byte); virtual;
@@ -116,40 +80,6 @@ type
   end;
 
 const
-  egaBlack = 209;
-  egaBlue = 210;
-  egaGreen = 211;
-  egaCyan = 212;
-  egaRed = 213;
-  egaMagenta = 214;
-  egaBrown = 215;
-  egaLightGray = 216;
-  egaDarkGray = 217;
-  egaLightBlue = 218;
-  egaLightGreen = 219;
-  egaLightCyan = 220;
-  egaLightRed = 221;
-  egaLightMagenta = 222;
-  egaYellow = 223;
-  egaWhite = 224;
-
-  rgbEgaBlack: TRgbColor = (Red: $00; Green: $00; Blue: $00);
-  rgbEgaBlue: TRgbColor = (Red: $00; Green: $00; Blue: $AA);
-  rgbEgaGreen: TRgbColor = (Red: $00; Green: $AA; Blue: $00);
-  rgbEgaCyan: TRgbColor = (Red: $00; Green: $AA; Blue: $AA);
-  rgbEgaRed: TRgbColor = (Red: $AA; Green: $00; Blue: $00);
-  rgbEgaMagenta: TRgbColor = (Red: $AA; Green: $00; Blue: $AA);
-  rgbEgaBrown: TRgbColor = (Red: $AA; Green: $55; Blue: $00);
-  rgbEgaLightGray: TRgbColor = (Red: $AA; Green: $AA; Blue: $AA);
-  rgbEgaDarkGray: TRgbColor = (Red: $55; Green: $55; Blue: $55);
-  rgbEgaLightBlue: TRgbColor = (Red: $55; Green: $55; Blue: $FF);
-  rgbEgaLightGreen: TRgbColor = (Red: $55; Green: $FF; Blue: $55);
-  rgbEgaLightCyan: TRgbColor = (Red: $55; Green: $FF; Blue: $FF);
-  rgbEgaLightRed: TRgbColor = (Red: $FF; Green: $55; Blue: $55);
-  rgbEgaLightMagenta: TRgbColor = (Red: $FF; Green: $55; Blue: $FF);
-  rgbEgaYellow: TRgbColor = (Red: $FF; Green: $FF; Blue: $55);
-  rgbEgaWhite: TRgbColor = (Red: $FF; Green: $FF; Blue: $FF);
-
   DefaultSmallMouseCursor: TSmallMouseCursorImage =
   (
     ($0F, $0F, $0F, $0F, $0F, $0F, $FF, $FF),
@@ -278,8 +208,7 @@ end;
 procedure TGraphics8Driver.SetStandardPalette;
 begin
   Palette := GetStandardPalette;
-  ExportPalette('Gimp.PAL', Palette, pfGimp);
-  ExportPalette('Jasc.PAL', Palette, pfJasc);
+  ExportPalette('Apl.gpl', Palette, pfGimp);
   SetRgbPalette(Palette);
 end;
 
@@ -292,133 +221,6 @@ begin
   pal^.SetPaletteData(APalette);
   pal^.SaveToFileFormat(AFilename, AFormat);
   FreeAndNil(pal);
-end;
-
-function TGraphics8Driver.GetStandardPalette: PRgbPaletteData;
-var
-  colorIndex: TStandardColor;
-  shadeIndex, shade: integer;
-  paletteIndex: integer;
-  index: integer;
-  newPalette: PRgbPaletteData;
-  color: PRgbColor;
-begin
-  New(newPalette);
-  paletteIndex := 0;
-
-  newPalette^[paletteIndex].Red := 0;
-  newPalette^[paletteIndex].Green := 0;
-  newPalette^[paletteIndex].Blue := 0;
-
-  Inc(paletteIndex);
-
-  for colorIndex := scWhite to scFleshTone do begin
-    for shadeIndex := 1 to 16 do begin
-      shade := shadeIndex * 16 - 1;
-      case colorIndex of
-        scWhite: begin
-          newPalette^[paletteIndex].Red := shade;
-          newPalette^[paletteIndex].Green := shade;
-          newPalette^[paletteIndex].Blue := shade;
-        end;
-        scRed: begin
-          newPalette^[paletteIndex].Red := shade;
-          newPalette^[paletteIndex].Green := 0;
-          newPalette^[paletteIndex].Blue := 0;
-        end;
-        scGreen: begin
-          newPalette^[paletteIndex].Red := 0;
-          newPalette^[paletteIndex].Green := shade;
-          newPalette^[paletteIndex].Blue := 0;
-        end;
-        scBlue: begin
-          newPalette^[paletteIndex].Red := 0;
-          newPalette^[paletteIndex].Green := 0;
-          newPalette^[paletteIndex].Blue := shade;
-        end;
-        scYellow: begin
-          newPalette^[paletteIndex].Red := shade;
-          newPalette^[paletteIndex].Green := shade;
-          newPalette^[paletteIndex].Blue := 0;
-        end;
-        scMagenta: begin
-          newPalette^[paletteIndex].Red := shade;
-          newPalette^[paletteIndex].Green := 0;
-          newPalette^[paletteIndex].Blue := shade;
-        end;
-        scCyan: begin
-          newPalette^[paletteIndex].Red := 0;
-          newPalette^[paletteIndex].Green := shade;
-          newPalette^[paletteIndex].Blue := shade;
-        end;
-        scOrange: begin
-          newPalette^[paletteIndex].Red := shade;
-          newPalette^[paletteIndex].Green := shade div 2;
-          newPalette^[paletteIndex].Blue := 0;
-        end;
-        scBrown: begin
-          newPalette^[paletteIndex].Red := Round(shade / 1.7);
-          newPalette^[paletteIndex].Green := shade div 2;
-          newPalette^[paletteIndex].Blue := 0;
-        end;
-        scSpringGreen: begin
-          newPalette^[paletteIndex].Red := shade div 2;
-          newPalette^[paletteIndex].Green := shade;
-          newPalette^[paletteIndex].Blue := shade div 2;
-        end;
-        scAzure: begin
-          newPalette^[paletteIndex].Red := shade div 3;
-          newPalette^[paletteIndex].Green := shade div 3;
-          newPalette^[paletteIndex].Blue := shade;
-        end;
-        scViolet: begin
-          newPalette^[paletteIndex].Red := shade div 2;
-          newPalette^[paletteIndex].Green := 0;
-          newPalette^[paletteIndex].Blue := shade;
-        end;
-        scFleshTone: begin
-          newPalette^[paletteIndex].Red := 215 - Round((shadeIndex / 18) * 115);
-          newPalette^[paletteIndex].Green := 190 - Round((shadeIndex / 18) * 135);
-          newPalette^[paletteIndex].Blue := 140 - Round((shadeIndex / 18) * 135);
-        end;
-      end;
-      Inc(paletteIndex);
-    end;
-  end;
-
-  { Standard EGA colors }
-  newPalette^[209] := rgbEgaBlack;
-  newPalette^[210] := rgbEgaBlue;
-  newPalette^[211] := rgbEgaGreen;
-  newPalette^[212] := rgbEgaCyan;
-  newPalette^[213] := rgbEgaRed;
-  newPalette^[214] := rgbEgaMagenta;
-  newPalette^[215] := rgbEgaBrown;
-  newPalette^[216] := rgbEgaLightGray;
-  newPalette^[217] := rgbEgaDarkGray;
-  newPalette^[218] := rgbEgaLightBlue;
-  newPalette^[219] := rgbEgaLightGreen;
-  newPalette^[220] := rgbEgaLightCyan;
-  newPalette^[221] := rgbEgaLightRed;
-  newPalette^[222] := rgbEgaLightMagenta;
-  newPalette^[223] := rgbEgaYellow;
-  newPalette^[224] := rgbEgaWhite;
-
-  { Two 14-value palette-swapping ranges }
-  for Index := 225 to 252 do begin
-    newPalette^[index].Red := 0;
-    newPalette^[index].Green := 0;
-    newPalette^[index].Blue := 0;
-  end;
-
-  { 253/254 reserved, 255 transparent }
-  for index := 253 to 255 do begin
-    newPalette^[255].Red := 0;
-    newPalette^[255].Green := 0;
-    newPalette^[255].Blue := 0;
-  end;
-
-  GetStandardPalette := newPalette;
 end;
 
 procedure TGraphics8Driver.SetRgbPalette(APalette: PRgbPaletteData);
@@ -458,7 +260,7 @@ procedure TGraphics8Driver.GetStandardColor(AColor: longint;
   var AStandardColor: TStandardColor; var AIntensity: byte);
 begin
   if AColor = 0 then begin
-    AStandardColor := scBlack;
+    AStandardColor := scEga;
     AIntensity := 0;
     exit;
   end;
@@ -468,7 +270,7 @@ end;
 
 function TGraphics8Driver.GetColor8(AColor: TStandardColor; AIntensity: byte): longint;
 begin
-  if AColor = scBlack then begin
+  if AColor = scEga then begin
     GetColor8 := 0;
     exit;
   end;
