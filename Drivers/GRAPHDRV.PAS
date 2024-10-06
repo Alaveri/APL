@@ -265,7 +265,7 @@ begin
   asm
     mov ah, 0Fh
     int 10h
-    mov [oldMode], al
+    mov oldMode, al
   end;
   FOldMode := oldMode;
   Modes.Create;
@@ -432,9 +432,8 @@ begin
     exit;
   end;
   draw := region^.IntersectsCoords(AX, AY);
-  if State.RegionMode = rmExclude then
-    draw := not draw;
   level := 0;
+  start := -1;
   if draw then begin
     level := 1;
     start := AX;
