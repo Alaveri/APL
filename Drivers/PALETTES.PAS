@@ -5,7 +5,9 @@ interface
 
 uses
   AplObj,
+  AplTypes,
   Errors,
+  Common,
   Streams,
   Lists;
 
@@ -20,6 +22,8 @@ type
   PRgbPaletteData = ^TRgbPaletteData;
   PJascPaletteWriter = ^TJascPaletteWriter;
   PJascPaletteReader = ^TJascPaletteReader;
+  PAplPaletteWriter = ^TAplPaletteWriter;
+  PAplPaletteReader = ^TAplPaletteReader;
 
   TStandardColor =
   (
@@ -49,9 +53,7 @@ type
     pfNone,
     pfApl,
     pfJasc,
-    pfGimp,
-    pfPhotoshop,
-    pfAesprite
+    pfGimp
   );
 
   TRgbColor = record
@@ -111,6 +113,20 @@ type
     function Format: TPaletteFormat; virtual;
     function ReadPalette(AStream: PStream): PRgbColorList; virtual;
     function ReadLine(AStream: PStream): string;
+  end;
+
+  TAplPaletteWriter = object(TPaletteWriter)
+  private
+  public
+    function Format: TPaletteFormat; virtual;
+    procedure WritePalette(APalette: PRgbColorList; AStream: PStream); virtual;
+  end;
+
+  TAplPaletteReader = object(TPaletteReader)
+  private
+  public
+    function Format: TPaletteFormat; virtual;
+    function ReadPalette(AStream: PStream): PRgbColorList; virtual;
   end;
 
   TGimpPaletteWriter = object(TPaletteWriter)
@@ -188,9 +204,6 @@ const
 function GetStandardPalette: PRgbPaletteData; far;
 
 implementation
-
-uses
-  Common;
 
 function GetStandardPalette: PRgbPaletteData;
 var
@@ -412,6 +425,7 @@ begin
   case AFormat of
     pfGimp: writer := New(PGimpPaletteWriter, Create);
     pfJasc: writer := New(PJascPaletteWriter, Create);
+    pfApl: writer := New(PAplPaletteWriter, Create);
     else begin
       Raise(ecUnsupportedPaletteFormat);
       exit;
@@ -660,6 +674,61 @@ begin
     result^.Add(New(PRgbColor));
   end;
   ReadPalette := result;
+end;
+
+function TAplPaletteReader.Format: TPaletteFormat;
+begin
+  Format := pfApl;
+end;
+
+function TAplPaletteReader.ReadPalette(AStream: PStream): PRgbColorList;
+var
+  line: string;
+  color: PRgbColor;
+  result: PRgbColorList;
+  count: word;
+  index: word;
+begin
+  New(result, Create);
+  count := AStream^.ReadWord;
+  if AStream^.HasException then begin
+    Raise(AStream^.Exception^.Code);
+    exit;
+  end;
+  for index := 0 to count - 1 do begin
+    color := New(PRgbColor);
+    AStream^.Read(PByte(color), SizeOf(TRgbColor));
+    if AStream^.HasException then begin
+      Raise(AStream^.Exception^.Code);
+      exit;
+    end;
+    result^.Add(color);
+  end;
+end;
+
+function TAplPaletteWriter.Format: TPaletteFormat;
+begin
+  Format := pfApl;
+end;
+
+procedure TAplPaletteWriter.WritePalette(APalette: PRgbColorList; AStream: PStream);
+var
+  index: integer;
+  color: PRgbColor;
+begin
+  AStream^.WriteWord(APalette^.Count);
+  if AStream^.HasException then begin
+    Raise(AStream^.Exception^.Code);
+    exit;
+  end;
+  for index := 0 to APalette^.Count - 1 do begin
+    color := APalette^.GetItem(index);
+    AStream^.Write(PByte(color), SizeOf(TRgbColor));
+    if AStream^.HasException then begin
+      Raise(AStream^.Exception^.Code);
+      exit;
+    end;
+  end;
 end;
 
 end.

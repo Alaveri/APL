@@ -182,7 +182,7 @@ begin
   screenPtr := State.FrameBuffer;
   width := Mode^.Width;
   color := State.ForeColor;
-  asm
+  {asm
     mov cx, [aError]
     @loop:
       mov ax, [AX1]
@@ -243,12 +243,12 @@ begin
       mov [AY1], ax
     jmp @loop
     @endLoop:
-   end;
-{  while true do begin
-    if State^.ViewPort.IntersectCoords(AX1, AY1) then begin
-      screenPtr := State^.FrameBuffer;
+  end;}
+  while true do begin
+    if State.ViewPort.IntersectsCoords(AX1, AY1) then begin
+      screenPtr := State.FrameBuffer;
       Inc(screenPtr, longint(AY1) * Mode^.Width + AX1);
-      screenPtr^ := State^.ForeColor;
+      screenPtr^ := State.ForeColor;
     end;
     if (AX1 = AX2) and (AY1 = AY2) then
       break;
@@ -265,7 +265,7 @@ begin
       Inc(aError, dlx);
       Inc(AY1, sy);
     end;
-  end;}
+  end;
 end;
 
 procedure TVga8Driver.HLine(AX, AY, AWidth: integer);

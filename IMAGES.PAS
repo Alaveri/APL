@@ -37,23 +37,27 @@ type
     Width, Height: word;
     Compression: TImageCompression;
     Bpp: byte;
-    PaletteEntries: word;
+    HasPalette: boolean;
   end;
 
   TImage = object(TStatusObject)
   private
     FHeader: TImageHeader;
+    FPalette:  PRgbPalette;
     procedure InitHeader;
     procedure SaveToStreamLzw(ADest: PStream);
     procedure SaveToStreamRaw(ADest: PStream);
     procedure ReadHeader(ASource: PStream; var AHeader: TImageHeader);
     procedure WriteHeader(ADest: PStream);
+    procedure WritePalette(ADest: PStream);
+    procedure ReadPalette(ASource: PStream);
   public
     Buffer: PMemoryStream;
     constructor Create;
     constructor CreateSize(AWidth, AHeight: word; ABpp: byte);
     function Width: word; virtual;
     function Height: word; virtual;
+    function Palette: PRgbPalette; virtual;
     function Compression: TImageCompression; virtual;
     procedure GetImage(AX, AY, AWidth, AHeight: longint); virtual;
     procedure GetImageRect(ARect: TRect); virtual;
@@ -67,6 +71,7 @@ type
     procedure LoadFromFile(AFilename: string); virtual;
     procedure SaveToFile(AFilename: string); virtual;
     procedure SetCompression(ACompression: TImageCompression); virtual;
+    procedure SetPalette(APalette: PRgbPalette); virtual;
     procedure Init; virtual;
     destructor Free; virtual;
   end;
@@ -122,13 +127,26 @@ begin
   FHeader.Height := 0;
   FHeader.Compression := icLzw;
   FHeader.Bpp := 8;
+  FHeader.HasPalette := FPalette^.Colors^.Count > 0;
   Buffer := nil;
+end;
+
+function TImage.Palette: PRgbPalette;
+begin
+  Palette := FPalette;
+end;
+
+procedure TImage.SetPalette(APalette: PRgbPalette);
+begin
+  FreeAndNil(FPalette);
+  FPalette := APalette;
 end;
 
 procedure TImage.Init;
 begin
   inherited Init;
   InitHeader;
+  New(FPalette, Create);
 end;
 
 procedure TImage.GetImage(AX, AY, AWidth, AHeight: longint);
@@ -211,6 +229,14 @@ begin
     exit;
   end;
   FHeader := header;
+  if FHeader.HasPalette then begin
+    ReadPalette(ASource);
+    if ASource^.HasException then begin
+      Raise(ASource^.Exception^.Code);
+      exit;
+    end;
+  end;
+
   if FHeader.Bpp > 1 then
     bytes := FHeader.Bpp div 8;
   if Assigned(Buffer) then
@@ -247,9 +273,24 @@ begin
   end;
 end;
 
+procedure TImage.WritePalette(ADest: PStream);
+begin
+  if FPalette^.Colors^.Count = 0 then
+    exit;
+  FPalette^.SaveToStream(ADest);
+end;
+
+procedure TImage.ReadPalette(ASource: PStream);
+begin
+  FPalette^.Colors^.Clear;
+  FPalette^.LoadFromStream(ASource, pfApl);
+end;
+
 procedure TImage.SaveToStream(ADest: PStream);
 begin
+  FHeader.HasPalette := FPalette^.Colors^.Count > 0;
   WriteHeader(ADest);
+  WritePalette(ADest);
   case FHeader.Compression of
     icNone: SaveToStreamRaw(ADest);
     icLzw: SaveToStreamLzw(ADest);

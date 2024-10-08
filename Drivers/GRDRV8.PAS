@@ -60,7 +60,8 @@ type
     procedure GetStandardColor(AColor: longint; var AStandardColor: TStandardColor; var AIntensity: byte); virtual;
     procedure SetStandardPalette;
     procedure SetMode(AMode: PGraphicsMode); virtual;
-    procedure SetRgbPalette(APalette: PRgbPaletteData); virtual;
+    procedure SetRgbPaletteData(APalette: PRgbPaletteData); virtual;
+    procedure SetRgbPalette(APalette: PRgbPalette); virtual;
     procedure SetForeColor8(AColor: TStandardColor; AIntensity: byte); virtual;
     procedure SetBackColor8(AColor: TStandardColor; AIntensity: byte); virtual;
     procedure ShowMouseCursor; virtual;
@@ -208,8 +209,7 @@ end;
 procedure TGraphics8Driver.SetStandardPalette;
 begin
   Palette := GetStandardPalette;
-  ExportPalette('Apl.gpl', Palette, pfGimp);
-  SetRgbPalette(Palette);
+  SetRgbPaletteData(Palette);
 end;
 
 procedure TGraphics8Driver.ExportPalette(const AFilename: string; APalette: PRgbPaletteData; AFormat: TPaletteFormat);
@@ -223,7 +223,12 @@ begin
   FreeAndNil(pal);
 end;
 
-procedure TGraphics8Driver.SetRgbPalette(APalette: PRgbPaletteData);
+procedure TGraphics8Driver.SetRgbPalette(APalette: PRgbPalette);
+begin
+  SetRgbPaletteData(APalette^.GetPaletteData);
+end;
+
+procedure TGraphics8Driver.SetRgbPaletteData(APalette: PRgbPaletteData);
 var
   segm, offs: word;
   index: integer;

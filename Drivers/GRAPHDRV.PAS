@@ -93,6 +93,7 @@ type
     AverageWidth: integer;
     Spacing: byte;
     destructor Free; virtual;
+    constructor CreateSize(AMaxWidth, AHeight: byte);
     procedure Assign(var ASource: TObject); virtual;
     procedure Init; virtual;
     procedure SaveToStream(AStream: PStream); virtual;
@@ -141,7 +142,7 @@ type
   public
     StartChar: byte;
     EndChar: byte;
-    procedure CreateSize(AMaxWidth, AHeight: byte);
+    constructor CreateSize(AMaxWidth, AHeight: byte);
     function Format: word; virtual;
     procedure Init; virtual;
     procedure Assign(var ASource: TObject); virtual;
@@ -824,6 +825,13 @@ begin
   Spacing := 2;
 end;
 
+constructor TFont.CreateSize(AMaxWidth, AHeight: byte);
+begin
+  inherited Create;
+  MaxWidth := AMaxWidth;
+  Height := AHeight;
+end;
+
 function TFont.CharWidth(AChar: char): integer;
 begin
 end;
@@ -914,11 +922,9 @@ end;
 
 constructor TProportionalFont.CreateSize(AMaxWidth, AHeight: byte);
 begin
-  inherited Create;
-  MaxWidth := AMaxWidth;
-  Height := AHeight;
+  inherited CreateSize(AMaxWidth, AHeight);
   FillChar(CharWidths, SizeOf(CharWidths), MaxWidth);
-  FFontDataSize := Height * 256;
+  FFontDataSize := AHeight * 256;
   GetMem(FFontData, FontDataSize);
   FillChar(FFontData^, FontDataSize, 0);
 end;
@@ -1127,11 +1133,9 @@ begin
   fileStream.Free;
 end;
 
-procedure TColoredFont.CreateSize(AMaxWidth, AHeight: byte);
+constructor TColoredFont.CreateSize(AMaxWidth, AHeight: byte);
 begin
-  inherited Create;
-  MaxWidth := AMaxWidth;
-  Height := AHeight;
+  inherited CreateSize(AMaxWidth, AHeight);
   FillChar(CharWidths, SizeOf(CharWidths), MaxWidth);
   FFontDataSize := Height * (StartChar - EndChar) * 2;
   GetMem(FFontData, FontDataSize);

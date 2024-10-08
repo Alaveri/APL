@@ -16,7 +16,8 @@ type
 
   TFastVgaDriver = object(TGraphics8Driver)
   private
-    function InitialBoundsCheck(AX, AY, AWidth, AHeight: integer; var ADrawRect: TRect): boolean;
+    function InitializeDrawRect(AX, AY, AWidth, AHeight: integer; var ADrawRect: TRect): boolean;
+    procedure Render4BppText(AX, AY, ALength: integer; AText: PChar);
   public
     function GetScreenPointer(AX, AY: integer; var AOffset: longint): PByte; virtual;
     procedure GetImage(AX, AY, AWidth, AHeight: longint; ABuffer: PByte); virtual;
@@ -42,6 +43,8 @@ implementation
 
 uses
   MouseDrv,
+  Errors,
+  Palettes,
   StrUtils;
 
 procedure TFastVgaDriver.Init;
@@ -160,46 +163,53 @@ begin
   end;
 end;
 
-function TFastVgaDriver.InitialBoundsCheck(AX, AY, AWidth, AHeight: integer; var ADrawRect: TRect): boolean;
+function TFastVgaDriver.InitializeDrawRect(AX, AY, AWidth, AHeight: integer; var ADrawRect: TRect): boolean;
+var
+  visibleRect: TRect;
 begin
-  InitialBoundsCheck := false;
+  InitializeDrawRect := false;
   if HasException then
     exit;
-  if HasException then
-    exit;
-  if AX > ADrawRect.Right then
-    exit;
-  if (AWidth > 0) and (AX + AWidth < ADrawRect.X) then
-    exit;
-  if AY > ADrawRect.Bottom then
-    exit;
-  if (AHeight > 0) and (AY + AHeight < ADrawRect.Y) then
-    exit;
-  InitialBoundsCheck := true;
+  Mode^.Bounds.GetIntersection(State.ViewPort, visibleRect);
+  ADrawRect.CreateDims(AX, AY, AWidth, AHeight);
+  ADrawRect.Intersect(visibleRect);
+  if not ADrawRect.IsEmpty then
+    InitializeDrawRect := true;
+end;
+
+procedure TFastVgaDriver.Render4BppText(AX, AY, ALength: integer; AText: PChar);
+begin
 end;
 
 procedure TFastVgaDriver.RenderText(AX, AY, ALength: integer; AText: PChar);
 var
   drawRect: TRect;
-  charIndex, yIndex: integer;
-  count: word;
+  charIndex, yIndex, xIndex: integer;
   ch: char;
-  sx, sy: integer;
-  minX, maxX: byte;
+  sx, sy, minX, maxX: integer;
   width: integer;
   linePtr: PWord;
+  height: word;
   screen: PByte;
   fore: byte;
   offset: longint;
   currentLine: word;
-  height: word;
+  px: word;
+  format: TFontFormats;
+  count: word;
 begin
+  if HasException then
+    exit;
   Mode^.Bounds.GetIntersection(State.ViewPort, drawRect);
   height := State.Font^.Height;
-  if not InitialBoundsCheck(AX, AY, 0, height, drawRect) then
+  if (AX > drawRect.Right) or (AY > drawRect.Bottom) or (AY + height < drawRect.Y) then
     exit;
+  GetFontFormats(State.Font, format);
+  if ff4Bpp in format then begin
+    Render4BppText(AX, AY, ALength, AText);
+    exit;
+  end;
   sx := AX;
-  fore := State.ForeColor;
   for charIndex := 0 to ALength - 1 do begin
     ch := AText[charIndex];
     width := State.Font^.TextWidth(ch);
@@ -210,46 +220,28 @@ begin
       continue;
     end;
     sy := AY;
+    fore := State.ForeColor;
     linePtr := State.Font^.FontData;
     Inc(linePtr, Ord(ch) * height);
-    minX := Max(0, drawRect.X - sx);
-    maxX := Min(State.Font^.TextWidth(ch) - 1, drawRect.Right - sx);
+    minX := MaxLong(0, drawRect.X - sx);
+    maxX := MinLong(State.Font^.TextWidth(ch) - 1, drawRect.Right - sx);
     sy := AY;
     for yIndex := 0 to height - 1 do begin
       currentLine := linePtr^;
-      if sy < drawRect.Y then begin
-        Inc(linePtr);
-        Inc(sy);
-        continue;
-      end;
       if sy > drawRect.Bottom then
         break;
-      screen := GetDrawPointer(sx + minX, sy, offset);
-      count := maxX - minX + 1;
-      asm
-        les di, screen { Load screen pointer into ES:DI }
-        mov cx, count { Load count into CX as the loop counter }
-        mov dl, minx { Load starting x index into DL }
-        mov dh, fore { Load foreground color into DH }
-        mov ax, currentLine { Load current character line into AX }
-        @loop:
-          push cx { Save loop counter }
-          mov cl, dl { Load x index into CL }
-          mov bx, 8000h { Load 32768 into BX }
-          shr bx, cl { Shift 32768 right by x index to get the mask }
-          pop cx { Restore loop counter }
-          push ax
-          and ax, bx { Check if the character pixel is set }
-          jz @next { If the pixel is not set, skip to the next pixel }
-          mov [es:di], dh { Set the screen pixel to the ForeColor }
-          @next:
-          pop ax
-          inc dl { Increment the x index }
-          inc di { Increment the screen pointer }
-        loop @loop
+      if sy >= drawRect.Y then begin
+        screen := GetDrawPointer(sx + minX, sy, offset);
+        px := word(1) shl (15 - minX);
+        for xIndex := minX to maxX do begin
+          if currentLine and px > 0 then
+            screen^ := fore;
+          Inc(screen);
+          px := px shr 1;
+        end;
+        Inc(linePtr);
+        Inc(sy);
       end;
-      Inc(linePtr);
-      Inc(sy);
     end;
     Inc(sx, width);
   end;
@@ -331,7 +323,7 @@ begin
       je @endLoop
       add cx, dly
       add ax, sx
-      mov [AX1], ax
+      mov AX1, ax
     @yCompare:
       mov ax, dlx
       cmp dx, ax
@@ -342,7 +334,7 @@ begin
       je @endLoop
       add cx, dlx
       add ax, sy
-      mov [AY1], ax
+      mov AY1, ax
       jmp @loop
     @endLoop:
    end;
@@ -356,27 +348,17 @@ var
   color: byte;
   drawRect: TRect;
 begin
-  if HasException then
+  if not InitializeDrawRect(AX, AY, AWidth, 0, drawRect) then
     exit;
-  Mode^.Bounds.GetIntersection(State.ViewPort, drawRect);
-  if not InitialBoundsCheck(AX, AY, AWidth, 0, drawRect) then
-    exit;
-  if AX < drawRect.X then
-    AX := drawRect.X;
-  if AX + AWidth > drawRect.Right then
-    AWidth := drawRect.Right - AX + 1;
-  if AWidth <= 0 then
-    exit;
+  AX := EnsureRange(AX, drawRect.X, drawRect.Right);
+  AWidth := MinLong(drawRect.Width, AWidth);
   screen := GetDrawPointer(AX, AY, offset);
   color := byte(State.ForeColor);
   asm
     mov cx, AWidth
     mov al, color
     les di, screen
-    @loop:
-      mov [es:di], al
-      inc di
-    loop @loop
+    rep stosb
   end;
 end;
 
@@ -393,7 +375,7 @@ begin
   if HasException then
     exit;
   Mode^.Bounds.GetIntersection(State.ViewPort, drawRect);
-  if not InitialBoundsCheck(AX, AY, 0, AHeight, drawRect) then
+  if not InitializeDrawRect(AX, AY, 0, AHeight, drawRect) then
     exit;
   AY := EnsureRange(AY, drawRect.Y, drawRect.Bottom);
   AHeight := MinLong(drawRect.Height, AHeight);
@@ -418,27 +400,221 @@ begin
 end;
 
 procedure TFastVgaDriver.DrawImage(AX, AY, AWidth, AHeight: integer; AImage: PByte);
+var
+  imageRect, drawRect: TRect;
+  yIndex: integer;
+  screen, image: PByte;
+  offset: longint;
+  sy: word;
+  lineWidth: word;
 begin
+  if HasException then
+    exit;
+  GetImageDrawRects(AX, AY, AWidth, AHeight, imageRect, drawRect);
+  if drawRect.IsEmpty then
+    exit;
+  sy := drawRect.Y;
+  lineWidth := drawRect.Width;
+  for yIndex := 0 to drawRect.Height - 1 do begin
+    screen := GetDrawPointer(drawRect.X, sy, offset);
+    image := AImage;
+    Inc(image, (yIndex + imageRect.Y) * imageRect.Width + imageRect.X);
+    asm
+      push ds
+      lds si, image
+      les di, screen
+      mov cx, lineWidth
+      rep movsb
+      pop ds
+    end;
+    Inc(sy);
+  end;
 end;
 
 procedure TFastVgaDriver.DrawImageT(AX, AY, AWidth, AHeight: integer; AImage: PByte);
+var
+  imageRect, drawRect: TRect;
+  xIndex, yIndex: integer;
+  sy: longint;
+  offset: longint;
+  screen, image: PByte;
+  width: word;
 begin
+  if HasException then
+    exit;
+  GetImageDrawRects(AX, AY, AWidth, AHeight, imageRect, drawRect);
+  if drawRect.IsEmpty then
+    exit;
+  sy := drawRect.Y;
+  width := drawRect.Width;
+  for yIndex := 0 to drawRect.Height - 1 do begin
+    screen := GetDrawPointer(drawRect.X, sy, offset);
+    image := AImage;
+    Inc(image, (yIndex + imageRect.Y) * imageRect.Width + imageRect.X);
+    asm
+      push ds
+      lds si, image
+      les di, screen
+      mov cx, width
+      mov bl, TransparentColor
+      @loop:
+        mov al, [ds:si]
+        cmp al, bl
+        je @equal
+        movsb
+        jmp @end
+        @equal:
+        inc di
+        inc si
+        @end:
+      loop @loop
+      pop ds
+    end;
+    Inc(sy);
+  end;
 end;
 
 procedure TFastVgaDriver.DrawImageStream(AX, AY, AWidth, AHeight: integer; AStream: PStream);
+var
+  imageRect, drawRect: TRect;
+  yIndex: integer;
+  screen: PByte;
+  offset: longint;
+  sy: longint;
+  lineWidth: integer;
+  streamStart: longint;
 begin
+  if AStream^.HasException or HasException then
+    exit;
+  GetImageDrawRects(AX, AY, AWidth, AHeight, imageRect, drawRect);
+  if drawRect.IsEmpty then
+    exit;
+  sy := drawRect.Y;
+  lineWidth := drawRect.Width;
+  streamStart := AStream^.Position;
+  for yIndex := 0 to drawRect.Height - 1 do begin
+    screen := GetDrawPointer(drawRect.X, sy, offset);
+    AStream^.Seek((yIndex + imageRect.Y) * imageRect.Width + imageRect.X, soFromBeginning);
+    AStream^.Read(screen, lineWidth);
+  end;
+  if AStream^.HasException then
+    Raise(AStream^.Exception^.Code);
 end;
 
 procedure TFastVgaDriver.DrawImageStreamT(AX, AY, AWidth, AHeight: integer; AStream: PStream);
+var
+  imageRect, drawRect: TRect;
+  xIndex, yIndex: integer;
+  screen: PByte;
+  offset: longint;
+  imageLine: PByte;
+  streamStart: longint;
+  sy: integer;
+  lineWidth: integer;
 begin
+  if AStream^.HasException or HasException then
+    exit;
+  GetImageDrawRects(AX, AY, AWidth, AHeight, imageRect, drawRect);
+  if drawRect.IsEmpty then
+    exit;
+  lineWidth := drawRect.Width;
+  GetMem(imageLine, lineWidth);
+  if not Assigned(imageLine) then begin
+    Raise(ecNotEnoughMemory);
+    exit;
+  end;
+  streamStart := AStream^.Position;
+  sy := drawRect.Y;
+  AStream^.Seek((yIndex + imageRect.Y) * AWidth + imageRect.X, soFromPosition);
+  for yIndex := 0 to drawRect.Height - 1 do begin
+    screen := GetDrawPointer(drawRect.X, drawRect.Y + yIndex, offset);
+    AStream^.Seek(yIndex * imageRect.Width + imageRect.X, soFromBeginning);
+    AStream^.Read(imageLine, lineWidth);
+    asm
+      push ds
+      lds si, imageLine
+      les di, screen
+      mov cx, lineWidth
+      mov bl, TransparentColor
+      @loop:
+        mov al, [ds:si]
+        cmp al, bl
+        je @equal
+        movsb
+        jmp @end
+        @equal:
+        inc di
+        inc si
+        @end:
+      loop @loop
+      pop ds
+    end;
+    Inc(sy);
+  end;
+  if AStream^.HasException then
+    Raise(AStream^.Exception^.Code);
+  FreeMem(imageLine, lineWidth);
 end;
 
 procedure TFastVgaDriver.GetImage(AX, AY, AWidth, AHeight: longint; ABuffer: PByte);
+var
+  imageRect, drawRect: TRect;
+  yIndex: integer;
+  screen, image: PByte;
+  offset: longint;
+  sy: longint;
+  lineWidth: integer;
 begin
+  if HasException then
+    exit;
+  GetImageDrawRects(AX, AY, AWidth, AHeight, imageRect, drawRect);
+  if drawRect.IsEmpty then
+    exit;
+  sy := drawRect.Y;
+  lineWidth := drawRect.Width;
+  for yIndex := 0 to drawRect.Height - 1 do begin
+    screen := GetDrawPointer(drawRect.X, sy, offset);
+    image := ABuffer;
+    Inc(image, (yIndex + imageRect.Y) * imageRect.Width);
+    asm
+      push ds
+      lds si, screen
+      les di, image
+      mov cx, lineWidth
+      rep movsb
+      pop ds
+    end;
+    Inc(image, lineWidth);
+    Inc(sy);
+  end;
 end;
 
 procedure TFastVgaDriver.GetImageStream(AX, AY, AWidth, AHeight: longint; AStream: PStream);
+var
+  imageRect, drawRect: TRect;
+  yIndex: integer;
+  screen: PByte;
+  offset: longint;
+  sy: longint;
+  lineWidth: integer;
+  streamStart: longint;
 begin
+  if AStream^.HasException or HasException then
+    exit;
+  GetImageDrawRects(AX, AY, AWidth, AHeight, imageRect, drawRect);
+  if drawRect.IsEmpty then
+    exit;
+  sy := drawRect.Y;
+  lineWidth := drawRect.Width;
+  streamStart := AStream^.Position;
+  for yIndex := 0 to drawRect.Height - 1 do begin
+    screen := GetDrawPointer(drawRect.X, sy, offset);
+    AStream^.Seek((yIndex + imageRect.Y) * imageRect.Width + imageRect.X, soFromBeginning);
+    AStream^.Write(screen, lineWidth);
+    Inc(sy);
+  end;
+  if AStream^.HasException then
+    Raise(AStream^.Exception^.Code);
 end;
 
 destructor TFastVgaDriver.Free;
