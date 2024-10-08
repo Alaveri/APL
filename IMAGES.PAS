@@ -13,12 +13,13 @@ uses
   Streams,
   Lzw,
   AplTypes,
+  Palettes,
   GraphDrv;
 
 const
   ImageVersionMajor = 1;
-  ImageVersionMinor = 0;
-  ImageIdentifier: string3 = 'IMG';
+  ImageVersionMinor = 1;
+  ImageIdentifier: string3 = 'APLIMG';
 
 type
   PImage = ^TImage;
@@ -30,29 +31,33 @@ type
   );
 
   TImageHeader = record
-    Identifier: array[0..2] of byte;
+    Identifier: array[0..5] of byte;
     MajorVersion: byte;
     MinorVersion: byte;
     Width, Height: word;
     Compression: TImageCompression;
     Bpp: byte;
-    Reserved: array[0..4] of byte;
+    HasPalette: boolean;
   end;
 
-  TImage = object(TExceptionObject)
+  TImage = object(TStatusObject)
   private
     FHeader: TImageHeader;
+    FPalette:  PRgbPalette;
     procedure InitHeader;
     procedure SaveToStreamLzw(ADest: PStream);
     procedure SaveToStreamRaw(ADest: PStream);
     procedure ReadHeader(ASource: PStream; var AHeader: TImageHeader);
     procedure WriteHeader(ADest: PStream);
+    procedure WritePalette(ADest: PStream);
+    procedure ReadPalette(ASource: PStream);
   public
     Buffer: PMemoryStream;
     constructor Create;
     constructor CreateSize(AWidth, AHeight: word; ABpp: byte);
     function Width: word; virtual;
     function Height: word; virtual;
+    function Palette: PRgbPalette; virtual;
     function Compression: TImageCompression; virtual;
     procedure GetImage(AX, AY, AWidth, AHeight: longint); virtual;
     procedure GetImageRect(ARect: TRect); virtual;
@@ -66,6 +71,7 @@ type
     procedure LoadFromFile(AFilename: string); virtual;
     procedure SaveToFile(AFilename: string); virtual;
     procedure SetCompression(ACompression: TImageCompression); virtual;
+    procedure SetPalette(APalette: PRgbPalette); virtual;
     procedure Init; virtual;
     destructor Free; virtual;
   end;
@@ -114,20 +120,33 @@ end;
 procedure TImage.InitHeader;
 begin
   FillChar(FHeader, SizeOf(FHeader), 0);
-  Move(ImageIdentifier[1], FHeader.Identifier, 3);
+  Move(ImageIdentifier[1], FHeader.Identifier, 6);
   FHeader.MajorVersion := ImageVersionMajor;
   FHeader.MinorVersion := ImageVersionMinor;
   FHeader.Width := 0;
   FHeader.Height := 0;
   FHeader.Compression := icLzw;
   FHeader.Bpp := 8;
+  FHeader.HasPalette := FPalette^.Colors^.Count > 0;
   Buffer := nil;
+end;
+
+function TImage.Palette: PRgbPalette;
+begin
+  Palette := FPalette;
+end;
+
+procedure TImage.SetPalette(APalette: PRgbPalette);
+begin
+  FreeAndNil(FPalette);
+  FPalette := APalette;
 end;
 
 procedure TImage.Init;
 begin
   inherited Init;
   InitHeader;
+  New(FPalette, Create);
 end;
 
 procedure TImage.GetImage(AX, AY, AWidth, AHeight: longint);
@@ -184,7 +203,7 @@ end;
 procedure TImage.LoadFromStream(ASource: PStream);
 var
   header: TImageHeader;
-  identifier: string3;
+  identifier: string6;
   bytes: byte;
   lzw: TLzw;
 begin
@@ -193,8 +212,8 @@ begin
     Raise(ASource^.Exception^.Code);
     exit;
   end;
-  Move(header.Identifier, identifier[1], 3);
-  identifier[0] := #3;
+  Move(header.Identifier, identifier[1], 6);
+  identifier[0] := #6;
   if identifier <> ImageIdentifier then begin
     Raise(ecInvalidImage);
     exit;
@@ -210,6 +229,14 @@ begin
     exit;
   end;
   FHeader := header;
+  if FHeader.HasPalette then begin
+    ReadPalette(ASource);
+    if ASource^.HasException then begin
+      Raise(ASource^.Exception^.Code);
+      exit;
+    end;
+  end;
+
   if FHeader.Bpp > 1 then
     bytes := FHeader.Bpp div 8;
   if Assigned(Buffer) then
@@ -246,9 +273,24 @@ begin
   end;
 end;
 
+procedure TImage.WritePalette(ADest: PStream);
+begin
+  if FPalette^.Colors^.Count = 0 then
+    exit;
+  FPalette^.SaveToStream(ADest);
+end;
+
+procedure TImage.ReadPalette(ASource: PStream);
+begin
+  FPalette^.Colors^.Clear;
+  FPalette^.LoadFromStream(ASource, pfApl);
+end;
+
 procedure TImage.SaveToStream(ADest: PStream);
 begin
+  FHeader.HasPalette := FPalette^.Colors^.Count > 0;
   WriteHeader(ADest);
+  WritePalette(ADest);
   case FHeader.Compression of
     icNone: SaveToStreamRaw(ADest);
     icLzw: SaveToStreamLzw(ADest);

@@ -40,6 +40,8 @@ const
   ecGraphicsNotSupported = 201;
   ecGraphicsDriverError = 202;
   ecGraphicsModeNotFound = 203;
+  ecUnsupportedPaletteFormat = 204;
+  ecInvalidPalette = 205;
 
   { Memory errors }
   ecMemoryReferenceNotFound = 301;
@@ -73,8 +75,9 @@ const
   { Compression errors }
   ecInvalidCompressionSource = 601;
 
-  { Collection Errors }
-  ecCollectionCapacityOverflow = 701;
+  { List Errors }
+  ecListCapacityOverflow = 701;
+  ecIndexOutOfBounds = 702;
 
   { Image errors }
   ecImageBppNotSupported = 801;
@@ -95,11 +98,26 @@ const
   ecDirChangeError = 1007;
   ecFileInvalidVersion = 1008;
 
+  { System errors }
+  ecNullParameter = 1101;
+  ecInvalidOperation = 1102;
+
   { User defined errors }
   ecUser = 5000;
+
+  { Status codes }
+  sOk = 0;
+  sHint = 1;
+  sWarning = 2;
+  sException = 3;
+  sFileStatus = 100;
+  sUserStatus = 1000;
+
 type
   PException = ^TException;
-  PExceptionObject = ^TExceptionObject;
+  PStatusObject = ^TStatusObject;
+
+  TObjectStatus = integer;
 
   TException = object(TIdentifiable)
   private
@@ -114,14 +132,17 @@ type
     destructor Free; virtual;
   end;
 
-  TExceptionObject = object(TIdentifiable)
+  TStatusObject = object(TIdentifiable)
   private
   public
     Exception: PException;
+    Status: TObjectStatus;
     procedure Init; virtual;
     {$IFDEF DOS}
     procedure Raise(ACode: TExceptionCode);
     {$ENDIF}
+    procedure RaiseNullParameter(AParam: string);
+    procedure RaiseInvalidOperation(AMessage: string);
     procedure RaiseWarning(ACode: TExceptionCode);
     procedure RaiseHint(ACode: TExceptionCode);
     procedure ClearException;
@@ -181,7 +202,7 @@ begin
   	ecGraphicsModeNotFound: ErrorMessage := 'Graphics mode not found';
   	ecInvalidCompressionSource: ErrorMessage := 'Compression source is invalid';
   	ecImageBppNotSupported: ErrorMessage := 'Image bit depth not supported';
-  	ecCollectionCapacityOverflow: ErrorMessage := 'Collection capacity overflow';
+  	ecListCapacityOverflow: ErrorMessage := 'List capacity overflow';
   	ecInvalidImage: ErrorMessage := 'Invalid image data';
   	ecImageCompressionNotSupported: ErrorMessage := 'Image compression not supported';
   	ecImageVersionNotSupported: ErrorMessage := 'Image version not supported';
@@ -193,7 +214,12 @@ begin
     ecFileInvalidEnvironment: ErrorMessage := 'Invalid environment';
     ecFileInvalidFormat: ErrorMessage := 'Invalid file format';
     ecDirChangeError: ErrorMessage := 'Error changing directory';
+    ecIndexOutOfBounds: ErrorMessage := 'List index out of bounds';
     ecFileInvalidVersion: ErrorMessage := 'Unsupported file version';
+    ecNullParameter: ErrorMessage := 'Null parameter';
+    ecInvalidOperation: ErrorMessage := 'Invalid operation';
+    ecUnsupportedPaletteFormat: ErrorMessage := 'Unsupported palette format';
+    ecInvalidPalette: ErrorMessage := 'Invalid palette';
     else begin
       if AErrorCode >= ecUser then begin
         if Assigned(CustomErrorMessage) then begin
@@ -249,13 +275,14 @@ begin
   Severity := source^.Severity;
 end;
 
-procedure TExceptionObject.Init;
+procedure TStatusObject.Init;
 begin
   inherited Init;
   Exception := nil;
+  Status := sOk;
 end;
 
-function TExceptionObject.GetBaseException: PException;
+function TStatusObject.GetBaseException: PException;
 var
   result: PException;
 begin
@@ -268,18 +295,18 @@ begin
   GetBaseException := result;
 end;
 
-function TExceptionObject.HasException: boolean;
+function TStatusObject.HasException: boolean;
 begin
   HasException := Assigned(Exception);
 end;
 
-function TExceptionObject.NoException: boolean;
+function TStatusObject.NoException: boolean;
 begin
   NoException := not Assigned(Exception);
 end;
 
 {$IFDEF DOS}
-procedure TExceptionObject.Raise(ACode: TExceptionCode);
+procedure TStatusObject.Raise(ACode: TExceptionCode);
 var
   newException: PException;
   prev: PException;
@@ -294,41 +321,56 @@ begin
   prev := Exception;
   Exception := newException;
   Exception^.InnerException := prev;
+  Status := sException;
 end;
 {$ENDIF}
 
-procedure TExceptionObject.RaiseWarning(ACode: TExceptionCode);
+procedure TStatusObject.RaiseWarning(ACode: TExceptionCode);
 begin
   Raise(ACode);
   Exception^.Severity := esWarning;
+  Status := sWarning;
 end;
 
-procedure TExceptionObject.RaiseHint(ACode: TExceptionCode);
+procedure TStatusObject.RaiseHint(ACode: TExceptionCode);
 begin
   Raise(ACode);
   Exception^.Severity := esHint;
+  Status := sHint;
 end;
 
-procedure TExceptionObject.ClearException;
+procedure TStatusObject.ClearException;
 begin
   FreeAndNil(Exception);
+  Status := sOk;
 end;
 
-destructor TExceptionObject.Free;
+destructor TStatusObject.Free;
 begin
   ClearException;
   inherited Free;
 end;
 
-procedure TExceptionObject.Assign(var ASource: TObject);
+procedure TStatusObject.Assign(var ASource: TObject);
 var
-  source: PExceptionObject;
+  source: PStatusObject;
 begin
   inherited Assign(ASource);
-  source := PExceptionObject(@ASource);
+  source := PStatusObject(@ASource);
   ClearException;
   Exception := New(PException, Create(ecNone));
   Exception^.Assign(source^.Exception^);
+  Status := source^.Status;
+end;
+
+procedure TStatusObject.RaiseNullParameter(AParam: string);
+begin
+  Raise(ecNullParameter);
+end;
+
+procedure TStatusObject.RaiseInvalidOperation(AMessage: string);
+begin
+  Raise(ecInvalidOperation);
 end;
 
 begin

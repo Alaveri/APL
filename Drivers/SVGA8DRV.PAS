@@ -17,6 +17,7 @@ uses
   GraphDrv,
   GrDrv8,
   MemDrv,
+  Palettes,
   SVgaType;
 
 type
@@ -42,7 +43,9 @@ type
     FWinFunc: pointer;
     FBankShift: word;
     procedure SetBank(ABank: word);
+    procedure Render4BppText(AX, AY, ALength: integer; AText: PChar); virtual;
   public
+    function SupportsRegions: boolean; virtual;
     function GetScreenPointer(AX, AY: integer; var AOffset: longint): PByte; virtual;
     procedure GetImage(AX, AY, AWidth, AHeight: longint; ABuffer: PByte); virtual;
     procedure GetImageStream(AX, AY, AWidth, AHeight: longint; AStream: PStream); virtual;
@@ -74,6 +77,11 @@ begin
   FGranularity := 0;
 end;
 
+function TSVga8Driver.SupportsRegions: boolean;
+begin
+  SupportsRegions := true;
+end;
+
 procedure TSVga8Mode.Assign(var ASource: TObject);
 var
   mode: PSVga8Mode;
@@ -91,7 +99,7 @@ var
   newMode: PSVga8Mode;
   oldMode: byte;
   vbeInfo: TVbeInfo;
-  supported, status: byte;
+  supported, callStatus: byte;
   modePtr: PWord;
   vbeModeIndex: word;
   colors: string;
@@ -109,9 +117,9 @@ begin
     les di, recordPtr
     int 10h
     mov [supported], al
-    mov [status], ah
+    mov [callStatus], ah
   end;
-  if (supported <> $4F) or (status <> 0) then begin
+  if (supported <> $4F) or (callStatus <> 0) then begin
     Raise(ecGraphicsNotSupported);
     exit;
   end;
@@ -141,12 +149,7 @@ begin
     end;
     newMode := New(PSVga8Mode, Create);
     with newMode^ do begin
-      Id := TString.New('SVga'
-        + IntToStr(vbeMode.v1.XResolution)
-        + 'x'
-        + IntToStr(vbeMode.v1.YResolution)
-        + 'x'
-        + IntToStr(vbeMode.v1.Bpp));
+      Id := vbeModeIndex;
       case vbeMode.v1.Bpp of
           4: colors := '16';
           8: colors := '256';
@@ -172,7 +175,7 @@ begin
       FAttributes := vbeMode.v1.ModeAttributes;
       FWinSize := vbeMode.v1.WinSize;
       FWinFuncPtr := vbeMode.v1.WinFuncPtr;
-      HelpText := TString.New('Requires a VESA compliant Super VGA card.');
+      HelpText := TString.New('Requires Super VGA card supporting VBE extensions.');
       FrameBuffer := Ptr(vbeMode.v1.WinSegmentA, 0);
       FGranularity := vbeMode.v1.WinGranularity;
     end;
@@ -201,7 +204,7 @@ var
   svgaMode: PSVga8Mode;
 begin
   inherited SetMode(AMode);
-  svgaMode := PSVga8Mode(pointer(AMode));
+  svgaMode := PSVga8Mode(AMode);
   selectedMode := AMode^.ModeIndex;
   asm
     mov   ax, 4F02h
@@ -241,6 +244,17 @@ begin
   end;
 end;
 
+procedure TSVga8Driver.Render4BppText(AX, AY, ALength: integer; AText: PChar);
+var
+  sx, sy, minX, maxX: integer;
+  height: integer;
+  drawRect: TRect;
+begin
+  Mode^.Bounds.GetIntersection(State.ViewPort, drawRect);
+  height := State.Font^.Height;
+  sx := AX;
+end;
+
 procedure TSVga8Driver.RenderText(AX, AY, ALength: integer; AText: PChar);
 var
   drawRect: TRect;
@@ -255,6 +269,7 @@ var
   offset: longint;
   currentLine: word;
   px: integer;
+  format: TFontFormats;
 begin
   if HasException then
     exit;
@@ -266,6 +281,11 @@ begin
   height := State.Font^.Height;
   if AY + height < drawRect.Y then
     exit;
+  GetFontFormats(State.Font, format);
+  if ff4Bpp in format then begin
+    Render4BppText(AX, AY, ALength, AText);
+    exit;
+  end;
   sx := AX;
   for charIndex := 0 to ALength - 1 do begin
     ch := AText[charIndex];
@@ -295,7 +315,7 @@ begin
       screen := GetDrawPointer(sx + minX, sy, offset);
       px := AX;
       for xIndex := minX to maxX do begin
-        if (currentLine and (32768 shr xIndex)) > 0 then
+        if (currentLine and ($8000 shr xIndex)) > 0 then
           FillLine(screen, px, sy, 1, fore);
         Inc(px);
         Inc(screen);

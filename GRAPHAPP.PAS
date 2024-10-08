@@ -17,12 +17,12 @@ type
 
   TGraphApp = object(TApplication)
   private
-    FDriverId: TGraphDrivers;
-    FModeId: string;
   public
-    constructor Create(ADriverId: TGraphDrivers; AModeId: string);
+    constructor Create;
     procedure Init; virtual;
     procedure InitGraphics(ADriverId: TGraphDrivers);
+    function SetMode(AModeId: integer): boolean;
+    function GetGraphicsModeId(AWidth: integer; AHeight: integer; ABpp: integer): integer;
   end;
 
 var
@@ -30,37 +30,50 @@ var
 
 implementation
 
-constructor TGraphApp.Create(ADriverId: TGraphDrivers; AModeId: string);
+constructor TGraphApp.Create;
 begin
-  FDriverId := ADriverId;
-  FModeId := AModeId;
   inherited Create;
 end;
 
 procedure TGraphApp.InitGraphics(ADriverId: TGraphDrivers);
+begin
+  GraphIni.InitGraphicsDriver(ADriverId);
+  Graph8 := PGraphics8Driver(Graph);
+end;
+
+function TGraphApp.GetGraphicsModeId(AWidth: integer; AHeight: integer; ABpp: integer): integer;
+var
+  mode: PGraphicsMode;
+  index: integer;
+begin
+  GetGraphicsModeId := -1;
+  for index := 0 to Graph^.Modes.Count - 1 do begin
+    mode := Graph^.Modes.GetItem(index);
+    if (mode^.Width = AWidth) and (mode^.Height = AHeight) and (mode^.Bpp = ABpp) then begin
+      GetGraphicsModeId := mode^.Id;
+      exit;
+    end;
+  end;
+end;
+
+function TGraphApp.SetMode(AModeId: integer): boolean;
 var
   mode: PGraphicsMode;
 begin
-  InitGraphicsDriver(ADriverId);
-  Graph8 := PGraphics8Driver(Graph);
-  mode := Graph^.Modes.GetItemById(FModeId);
+  SetMode := true;
+  mode := Graph^.Modes.GetItemById(AModeId);
   if not Assigned(mode) then begin
-    WriteLn(ErrorMessage(ecGraphicsModeNotFound));
-    Close;
+    SetMode := false;
     exit;
   end;
-  WriteLn('Graphics initialized.');
   Graph^.SetMode(mode);
-  if Graph^.HasException then begin
-    WriteLn(ErrorMessage(Graph^.Exception^.Code));
-    Close;
-  end;
+  if Graph^.HasException then
+    SetMode := false;
 end;
 
 procedure TGraphApp.Init;
 begin
   inherited Init;
-  InitGraphics(FDriverId);
 end;
 
 end.

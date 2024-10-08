@@ -9,6 +9,7 @@ uses
   {$ENDIF}
   AplTypes,
   AplObj,
+  Errors,
   Common,
   Drawing,
   Lists,
@@ -18,55 +19,16 @@ uses
 
   MouseDrv,
   GraphDrv,
-  MemDrv;
-
-const
-  MinIntensity = 1;
-  MaxIntensity = 18;
-  Intensity50 = 9;
-  Intensity25 = 4;
-  Intensity75 = 14;
-  TransparentColor: byte = 1;
+  MemDrv,
+  Palettes;
 
 type
   PGraphics8Driver = ^TGraphics8Driver;
   PMouseCursor = ^TMouseCursor;
   PMouseCursorList = ^TMouseCursorList;
-  PRgbPalette = ^TRgbPalette;
 
   TLargeMouseCursorImage = array[0..14, 0..7] of byte;
   TSmallMouseCursorImage = array[0..8, 0..7] of byte;
-
-  TStandardColor =
-  (
-    scWhite,
-    scRed,
-    scGreen,
-    scBlue,
-    scCyan,
-    scYellow,
-    scMagenta,
-    scOrange,
-    scBrown,
-    scSpringGreen,
-    scAzure,
-    scViolet,
-    scFleshTone,
-    scBlack
-  );
-
-  TColor = record
-    Color: TStandardColor;
-    Shade: byte;
-  end;
-
-  TRgbColor = record
-    Red: byte;
-    Green: byte;
-    Blue: byte;
-  end;
-
-  TRgbPalette = array[byte] of TRgbColor;
 
   TMouseCursor = object(TIdentifiable)
   private
@@ -91,15 +53,14 @@ type
   TGraphics8Driver = object(TGraphicsDriver)
   public
     MouseCursor: PMouseCursor;
-    Palette: PRgbPalette;
+    Palette: PRgbPaletteData;
     procedure Init; virtual;
     destructor Free; virtual;
     function GetColor8(AColor: TStandardColor; AIntensity: byte): longint; virtual;
-    procedure GetStandardColor(AColor: longint;
-      var AStandardColor: TStandardColor; var AIntensity: byte); virtual;
-    function GetStandardPalette: PRgbPalette; virtual;
+    procedure GetStandardColor(AColor: longint; var AStandardColor: TStandardColor; var AIntensity: byte); virtual;
+    procedure SetStandardPalette;
     procedure SetMode(AMode: PGraphicsMode); virtual;
-    procedure SetStandardPalette; virtual;
+    procedure SetRgbPaletteData(APalette: PRgbPaletteData); virtual;
     procedure SetRgbPalette(APalette: PRgbPalette); virtual;
     procedure SetForeColor8(AColor: TStandardColor; AIntensity: byte); virtual;
     procedure SetBackColor8(AColor: TStandardColor; AIntensity: byte); virtual;
@@ -108,6 +69,7 @@ type
     procedure EraseMouseCursor(const AMouseState: TMouseState); virtual;
     procedure DrawMouseCursor(const AMouseState: TMouseState); virtual;
     procedure MoveMouseCursor(const AMouseState, AOldMouseState: TMouseState); virtual;
+    procedure ExportPalette(const AFilename: string; APalette: PRgbPaletteData; AFormat: TPaletteFormat); virtual;
   end;
 
   TMouseCursorList = object(TIdentifiableList)
@@ -121,53 +83,53 @@ type
 const
   DefaultSmallMouseCursor: TSmallMouseCursorImage =
   (
-    ($27, $27, $27, $27, $27, $20, $01, $01),
-    ($27, $00, $00, $00, $27, $20, $01, $01),
-    ($27, $00, $00, $00, $27, $20, $01, $01),
-    ($27, $00, $00, $00, $00, $27, $20, $01),
-    ($27, $27, $27, $00, $00, $00, $27, $20),
-    ($20, $20, $20, $27, $00, $00, $27, $20),
-    ($01, $01, $01, $20, $27, $27, $27, $20),
-    ($01, $01, $01, $01, $20, $20, $20, $20),
-    ($01, $01, $01, $01, $01, $01, $01, $01)
+    ($0F, $0F, $0F, $0F, $0F, $0F, $FF, $FF),
+    ($0F, $00, $00, $00, $0F, $0F, $FF, $FF),
+    ($0F, $00, $00, $00, $0F, $0F, $FF, $FF),
+    ($0F, $00, $00, $00, $00, $0F, $0F, $FF),
+    ($0F, $0F, $0F, $00, $00, $00, $0F, $0F),
+    ($0F, $0F, $0F, $0F, $00, $00, $0F, $0F),
+    ($FF, $FF, $FF, $0F, $0F, $0F, $0F, $0F),
+    ($FF, $FF, $FF, $FF, $0F, $0F, $0F, $0F),
+    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF)
   );
 
   DefaultMouseCursor: TLargeMouseCursorImage =
   (
-    ($27, $01, $01, $01, $01, $01, $01, $01),
-    ($27, $27, $01, $01, $01, $01, $01, $01),
-    ($27, $00, $27, $01, $01, $01, $01, $01),
-    ($27, $00, $00, $27, $01, $01, $01, $01),
-    ($27, $00, $00, $00, $27, $01, $01, $01),
-    ($27, $00, $00, $00, $00, $27, $01, $01),
-    ($27, $00, $00, $00, $00, $00, $27, $01),
-    ($27, $00, $00, $00, $00, $00, $00, $27),
-    ($27, $00, $00, $00, $00, $00, $00, $27),
-    ($27, $00, $00, $00, $27, $27, $27, $01),
-    ($27, $00, $00, $27, $01, $01, $01, $01),
-    ($01, $27, $27, $01, $01, $01, $01, $01),
-    ($01, $01, $01, $01, $01, $01, $01, $01),
-    ($01, $01, $01, $01, $01, $01, $01, $01),
-    ($01, $01, $01, $01, $01, $01, $01, $01)
+    ($0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($0F, $0F, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($0F, $00, $0F, $FF, $FF, $FF, $FF, $FF),
+    ($0F, $00, $00, $0F, $FF, $FF, $FF, $FF),
+    ($0F, $00, $00, $00, $0F, $FF, $FF, $FF),
+    ($0F, $00, $00, $00, $00, $0F, $FF, $FF),
+    ($0F, $00, $00, $00, $00, $00, $0F, $FF),
+    ($0F, $00, $00, $00, $00, $00, $00, $0F),
+    ($0F, $00, $00, $00, $00, $00, $00, $0F),
+    ($0F, $00, $00, $00, $0F, $0F, $0F, $FF),
+    ($0F, $00, $00, $0F, $FF, $FF, $FF, $FF),
+    ($FF, $0F, $0F, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF)
   );
 
   DefaultBeamMouseCursor: TLargeMouseCursorImage =
   (
-    ($27, $27, $27, $01, $27, $27, $27, $01),
-    ($27, $00, $00, $27, $00, $00, $27, $01),
-    ($27, $27, $27, $00, $27, $27, $27, $01),
-    ($01, $01, $27, $00, $27, $01, $01, $01),
-    ($01, $01, $27, $00, $27, $01, $01, $01),
-    ($01, $01, $27, $00, $27, $01, $01, $01),
-    ($01, $01, $27, $00, $27, $01, $01, $01),
-    ($01, $01, $27, $00, $27, $01, $01, $01),
-    ($01, $01, $27, $00, $27, $01, $01, $01),
-    ($01, $01, $27, $00, $27, $01, $01, $01),
-    ($01, $01, $27, $00, $27, $01, $01, $01),
-    ($01, $01, $27, $00, $27, $01, $01, $01),
-    ($27, $27, $27, $00, $27, $27, $27, $01),
-    ($27, $00, $00, $27, $00, $00, $27, $01),
-    ($27, $27, $27, $01, $27, $27, $27, $01)
+    ($0F, $0F, $0F, $FF, $0F, $0F, $0F, $FF),
+    ($0F, $00, $00, $0F, $00, $00, $0F, $FF),
+    ($0F, $0F, $0F, $00, $0F, $0F, $0F, $FF),
+    ($FF, $FF, $0F, $00, $0F, $FF, $FF, $FF),
+    ($FF, $FF, $0F, $00, $0F, $FF, $FF, $FF),
+    ($FF, $FF, $0F, $00, $0F, $FF, $FF, $FF),
+    ($FF, $FF, $0F, $00, $0F, $FF, $FF, $FF),
+    ($FF, $FF, $0F, $00, $0F, $FF, $FF, $FF),
+    ($FF, $FF, $0F, $00, $0F, $FF, $FF, $FF),
+    ($FF, $FF, $0F, $00, $0F, $FF, $FF, $FF),
+    ($FF, $FF, $0F, $00, $0F, $FF, $FF, $FF),
+    ($FF, $FF, $0F, $00, $0F, $FF, $FF, $FF),
+    ($0F, $0F, $0F, $00, $0F, $0F, $0F, $FF),
+    ($0F, $00, $00, $0F, $00, $00, $0F, $FF),
+    ($0F, $0F, $0F, $FF, $0F, $0F, $0F, $FF)
   );
 
 implementation
@@ -247,104 +209,26 @@ end;
 procedure TGraphics8Driver.SetStandardPalette;
 begin
   Palette := GetStandardPalette;
-  SetRgbPalette(Palette);
+  SetRgbPaletteData(Palette);
 end;
 
-function TGraphics8Driver.GetStandardPalette: PRgbPalette;
+procedure TGraphics8Driver.ExportPalette(const AFilename: string; APalette: PRgbPaletteData; AFormat: TPaletteFormat);
 var
-  colorIndex: TStandardColor;
-  shadeIndex, shade: integer;
-  paletteIndex: integer;
   index: integer;
-  newPalette: PRgbPalette;
+  pal: PRgbPalette;
 begin
-  newPalette := New(PRgbPalette);
-  FillChar(newPalette^, SizeOf(TRgbPalette), 0);
-
-  for Index := 0 to 21 do begin
-    newPalette^[index].Red := 0;
-    newPalette^[index].Green := 0;
-    newPalette^[index].Blue := 0;
-  end;
-  paletteIndex := 22;
-
-  for colorIndex := scWhite to scFleshTone do begin
-    for shadeIndex := 1 to 18 do begin
-      shade := shadeIndex * 14 + 3;
-      case colorIndex of
-        scWhite: begin
-          newPalette^[paletteIndex].Red := shade;
-          newPalette^[paletteIndex].Green := shade;
-          newPalette^[paletteIndex].Blue := shade;
-        end;
-        scRed: begin
-          newPalette^[paletteIndex].Red := shade;
-          newPalette^[paletteIndex].Green := 0;
-          newPalette^[paletteIndex].Blue := 0;
-        end;
-        scGreen: begin
-          newPalette^[paletteIndex].Red := 0;
-          newPalette^[paletteIndex].Green := shade;
-          newPalette^[paletteIndex].Blue := 0;
-        end;
-        scBlue: begin
-          newPalette^[paletteIndex].Red := 0;
-          newPalette^[paletteIndex].Green := 0;
-          newPalette^[paletteIndex].Blue := shade;
-        end;
-        scYellow: begin
-          newPalette^[paletteIndex].Red := shade;
-          newPalette^[paletteIndex].Green := shade;
-          newPalette^[paletteIndex].Blue := 0;
-        end;
-        scMagenta: begin
-          newPalette^[paletteIndex].Red := shade;
-          newPalette^[paletteIndex].Green := 0;
-          newPalette^[paletteIndex].Blue := shade;
-        end;
-        scCyan: begin
-          newPalette^[paletteIndex].Red := 0;
-          newPalette^[paletteIndex].Green := shade;
-          newPalette^[paletteIndex].Blue := shade;
-        end;
-        scOrange: begin
-          newPalette^[paletteIndex].Red := shade;
-          newPalette^[paletteIndex].Green := shade div 2;
-          newPalette^[paletteIndex].Blue := 0;
-        end;
-        scBrown: begin
-          newPalette^[paletteIndex].Red := Round(shade / 1.7);
-          newPalette^[paletteIndex].Green := shade div 2;
-          newPalette^[paletteIndex].Blue := 0;
-        end;
-        scSpringGreen: begin
-          newPalette^[paletteIndex].Red := shade div 2;
-          newPalette^[paletteIndex].Green := shade;
-          newPalette^[paletteIndex].Blue := shade div 2;
-        end;
-        scAzure: begin
-          newPalette^[paletteIndex].Red := shade div 3;
-          newPalette^[paletteIndex].Green := shade div 3;
-          newPalette^[paletteIndex].Blue := shade;
-        end;
-        scViolet: begin
-          newPalette^[paletteIndex].Red := shade div 2;
-          newPalette^[paletteIndex].Green := 0;
-          newPalette^[paletteIndex].Blue := shade;
-        end;
-        scFleshTone: begin
-          newPalette^[paletteIndex].Red := 215 - Round((shadeIndex / 18) * 115);
-          newPalette^[paletteIndex].Green := 190 - Round((shadeIndex / 18) * 135);
-          newPalette^[paletteIndex].Blue := 140 - Round((shadeIndex / 18) * 135);
-        end;
-      end;
-      Inc(paletteIndex);
-    end;
-  end;
-  GetStandardPalette := newPalette;
+  pal := New(PRgbPalette, Create);
+  pal^.SetPaletteData(APalette);
+  pal^.SaveToFileFormat(AFilename, AFormat);
+  FreeAndNil(pal);
 end;
 
 procedure TGraphics8Driver.SetRgbPalette(APalette: PRgbPalette);
+begin
+  SetRgbPaletteData(APalette^.GetPaletteData);
+end;
+
+procedure TGraphics8Driver.SetRgbPaletteData(APalette: PRgbPaletteData);
 var
   segm, offs: word;
   index: integer;
@@ -381,21 +265,21 @@ procedure TGraphics8Driver.GetStandardColor(AColor: longint;
   var AStandardColor: TStandardColor; var AIntensity: byte);
 begin
   if AColor = 0 then begin
-    AStandardColor := scBlack;
+    AStandardColor := scEga;
     AIntensity := 0;
     exit;
   end;
-  AStandardColor := TStandardColor((AColor - 22) div 18);
-  AIntensity := (AColor - 22) mod 18 + 1;
+  AStandardColor := TStandardColor((AColor - 1) div 16);
+  AIntensity := (AColor - 1) mod 16 + 1;
 end;
 
 function TGraphics8Driver.GetColor8(AColor: TStandardColor; AIntensity: byte): longint;
 begin
-  if AColor = scBlack then begin
+  if AColor = scEga then begin
     GetColor8 := 0;
     exit;
   end;
-  GetColor8 := 21 + Ord(AColor) * 18 + AIntensity;
+  GetColor8 := Ord(AColor) * 16 + AIntensity;
 end;
 
 procedure TGraphics8Driver.SetForeColor8(AColor: TStandardColor; AIntensity: byte);

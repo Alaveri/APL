@@ -132,8 +132,8 @@ begin
     int 33h
     mov AX, 0013h
     mov DX, 65535
+    int 33h
   end;
-
 end;
 
 procedure TMouseDriver.SetIncToPixelRatio(AIncPerPixX, AIncPerPixY: word);

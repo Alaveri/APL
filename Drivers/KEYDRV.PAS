@@ -43,6 +43,33 @@ const
   kyAltN = ExtKeyFlag + 49;
   kyAltM = ExtKeyFlag + 50;
 
+  kyQ = 16;
+  kyW = 17;
+  kyE = 18;
+  kyR = 19;
+  kyT = 20;
+  kyY = 21;
+  kyU = 22;
+  kyI = 23;
+  kyO = 24;
+  kyP = 25;
+  kyA = 30;
+  kyS = 31;
+  kyD = 32;
+  kyF = 33;
+  kyG = 34;
+  kyH = 35;
+  kyJ = 36;
+  kyK = 37;
+  kyL = 38;
+  kyZ = 44;
+  kyX = 45;
+  kyC = 46;
+  kyV = 47;
+  kyB = 48;
+  kyN = 49;
+  kyM = 50;
+
   kyShiftAltQ = ExtShiftFlag + kyAltQ;
   kyShiftAltW = ExtShiftFlag + kyAltW;
   kyShiftAltE = ExtShiftFlag + kyAltE;
@@ -158,6 +185,7 @@ const
   kyShiftDel = ExtShiftFlag + kyDel;
   kyShiftLeft = ExtShiftFlag + kyLeft;
   kyShiftRight = ExtShiftFlag + kyRight;
+
   kyShiftUp = ExtShiftFlag + kyUp;
   kyShiftDown = ExtShiftFlag + kyDown;
   kyShiftPageUp = ExtShiftFlag + kyPageUp;

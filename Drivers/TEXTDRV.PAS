@@ -56,14 +56,15 @@ type
   TTextModeList = object(TIdentifiableList)
   private
   public
-    function GetItem(AIndex: integer): PTextMode;    function GetItemById(const AId: string): PTextMode;
-    function IndexOfId(const AId: string): integer;
+    function GetItem(AIndex: integer): PTextMode;
+    function GetItemById(const AId: string): PTextMode;
+    function IndexOfId(const AId: string): integer; virtual;
     function IndexOf(AItem: PTextMode): integer;
     function Add(AItem: PTextMode): integer;
     procedure Insert(AIndex: integer; AItem: PTextMode);
   end;
 
-  TTextDriver = Object(TExceptionObject)
+  TTextDriver = Object(TStatusObject)
     FStateStack: PStack;
   public
     Mode: PTextMode;

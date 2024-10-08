@@ -8,7 +8,7 @@ uses
   MouseDrv,
   StrUtils,
   AplTypes,
-  VeriType,
+  VTypes,
   Common,
   Lists;
 

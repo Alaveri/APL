@@ -78,6 +78,7 @@ type
   TButtonStates = set of TButtonState;
 
   TMouseState = object(TObject)
+  private
   public
     X: integer;
     Y: integer;

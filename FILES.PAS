@@ -65,7 +65,7 @@ type
     function Find(const AFilename: string): PFile;
   end;
 
-  TDirectoryManager = object(TExceptionObject)
+  TDirectoryManager = object(TStatusObject)
   private
     function HandleError(AError: integer): boolean;
     procedure SetFileInfo(AFile: PFile; ASearch: SearchRec);

@@ -338,14 +338,14 @@ begin
   Source^.Read(@total, SizeOf(total));
   if ASource^.HasException then
     Raise(Source^.Exception^.Code);
-  if HasException or (oldCode = EndOfStream) then
-    exit;
 
   BitSize := bits;
   InitCoder;
   AllocateDecodeBuffer;
 
   if not ReadBits(FCurrentBitSize, oldCode) then
+    exit;
+  if HasException or (oldCode = EndOfStream) then
     exit;
 
   character := oldCode;

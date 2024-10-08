@@ -17,6 +17,7 @@ uses
   Lists,
   AplConst,
   StrUtils,
+  Palettes,
   MemDrv;
 
 const
@@ -33,11 +34,15 @@ type
   PSystemFont = ^TSystemFont;
   PMonospaceFont = ^TMonospaceFont;
   PProportionalFont = ^TProportionalFont;
+  PColoredFont = ^TColoredFont;
+  PFontFormats = ^TFontFormats;
 
   TFontWidthArray = array[byte] of word;
   TFontCompression = (fcNone, fcLzw);
+  TFontFormat = (ffProportional, ffMonospace, ffSystem, ffColored, ff1Bpp, ff2Bpp, ff4Bpp, ff8Bpp);
+  TFontFormats = set of TFontFormat;
 
-  TGraphicsMode = object(TIdentifiable)
+  TGraphicsMode = object(TObject)
   private
   public
     Description: PChar;
@@ -50,6 +55,7 @@ type
     BytesPerScanLine: word;
     FrameBuffer: pointer;
     NumPages: byte;
+    Id: integer;
     procedure Assign(var ASource: TObject); virtual;
     procedure Init; virtual;
     destructor Free; virtual;
@@ -57,7 +63,7 @@ type
 
   TGraphicsModeList = object(TIdentifiableList)
   public
-    function GetItemById(const AId: string): PGraphicsMode;
+    function GetItemById(const AId: integer): PGraphicsMode;
     function GetItem(AIndex: integer): PGraphicsMode;
   end;
 
@@ -70,10 +76,11 @@ type
     Height: byte;
     Compression: TFontCompression;
     Spacing: byte;
-    Reserved: array[0..254] of byte;
+    Format: word;
+    Reserved: array[0..252] of byte;
   end;
 
-  TFont = object(TExceptionObject)
+  TFont = object(TStatusObject)
   private
     FFontData: PWord;
     FFontDataSize: word;
@@ -86,17 +93,19 @@ type
     AverageWidth: integer;
     Spacing: byte;
     destructor Free; virtual;
+    constructor CreateSize(AMaxWidth, AHeight: byte);
     procedure Assign(var ASource: TObject); virtual;
     procedure Init; virtual;
     procedure SaveToStream(AStream: PStream); virtual;
     procedure SaveToFile(const AFilename: string); virtual;
     procedure LoadFromStream(AStream: PStream); virtual;
     procedure LoadFromFile(const AFilename: string); virtual;
+    function FontFormatsToWord(AFormat: TFontFormats): word;
+    function Format: word; virtual;
     function CharWidth(AChar: char): integer; virtual;
     function TextWidthAny(AText: PChar; ALength: word): longint; virtual;
     function TextWidth(const AText: string): longint; virtual;
     function TextWidthLarge(AText: PChar): longint; virtual;
-    function Proportional: boolean; virtual;
     function FontData: PWord; virtual;
     function FontDataSize: word; virtual;
   end;
@@ -104,6 +113,7 @@ type
   TMonospaceFont = object(TFont)
   private
   public
+    function Format: word; virtual;
     procedure Init; virtual;
     procedure Assign(var ASource: TObject); virtual;
     destructor Free; virtual;
@@ -123,7 +133,19 @@ type
     procedure SetCharWidths; virtual;
     function TextWidthAny(AText: PChar; ALength: word): longint; virtual;
     function CharWidth(AChar: char): integer; virtual;
-    function Proportional: boolean; virtual;
+    function Format: word; virtual;
+    destructor Free; virtual;
+  end;
+
+  TColoredFont = object(TProportionalFont)
+  private
+  public
+    StartChar: byte;
+    EndChar: byte;
+    constructor CreateSize(AMaxWidth, AHeight: byte);
+    function Format: word; virtual;
+    procedure Init; virtual;
+    procedure Assign(var ASource: TObject); virtual;
     destructor Free; virtual;
   end;
 
@@ -148,11 +170,13 @@ type
     BufferMode: boolean;
     Region: PRegion;
     RegionMode: TRegionMode;
+    FontColor: TStandardColor;
+    FontShade: byte;
     procedure Init; virtual;
     procedure Assign(var ASource: TObject); virtual;
   end;
 
-  TGraphicsDriver = object(TExceptionObject)
+  TGraphicsDriver = object(TStatusObject)
   private
     FOldMode: byte;
   public
@@ -165,6 +189,7 @@ type
     function BackColor: longint; virtual;
     function XPos: byte; virtual;
     function YPos: byte; virtual;
+    function SupportsRegions: boolean; virtual;
     function GetScreenPointer(AX, AY: integer; var AOffset: longint): PByte; virtual;
     function GetBufferPointer(AX, AY: integer; var AOffset: longint): PByte; virtual;
     function GetDrawPointer(AX, AY: integer; var AOffset: longint): PByte;
@@ -184,6 +209,8 @@ type
     procedure VLine(AX, AY, AHeight: integer); virtual;
     procedure Rectangle(ARect: TRect); virtual;
     procedure FillRect(ARect: TRect); virtual;
+    procedure FastFillScreen(AColor: byte); virtual;
+    procedure FastDrawImage(AX, AY, AWidth, AHeight: integer; AImage: PByte); virtual;
     procedure RenderText(AX, AY, ALength: integer; AText: PChar); virtual;
     procedure DrawImage(AX, AY, AWidth, AHeight: integer; AImage: PByte); virtual;
     procedure DrawImageT(AX, AY, AWidth, AHeight: integer; AImage: PByte); virtual;
@@ -208,8 +235,9 @@ type
     procedure FillLine(ADest: PByte; AX, AY, AWidth: integer; AColor: byte);
     procedure MoveLine(ASource, ADest: PByte; AX, AY, AWidth: integer);
     procedure FillRegion(ADest: PByte; AX, AY, AWidth: integer; AColor: byte); virtual;
-    procedure SetLinePixel(ADest: PByte; AX, AY: integer; AForeColor: byte);
+    procedure SetRegionPixel(ADest: PByte; AX, AY: integer; AForeColor: byte);
     procedure MoveRegion(ASource, ADest: PByte; AX, AY, AWidth: integer); virtual;
+    procedure GetFontFormats(AFont: PFont; var AFormats: TFontFormats);
     destructor Free; virtual;
   end;
 
@@ -227,7 +255,6 @@ implementation
 uses
   Compress,
   Lzw;
-
 var
   PreviousExitProc: PProc;
 
@@ -239,7 +266,7 @@ begin
   asm
     mov ah, 0Fh
     int 10h
-    mov [oldMode], al
+    mov oldMode, al
   end;
   FOldMode := oldMode;
   Modes.Create;
@@ -249,11 +276,24 @@ begin
   MoveTo(0, 0);
 end;
 
+function TGraphicsDriver.SupportsRegions: boolean;
+begin
+  SupportsRegions := false;
+end;
+
 procedure TGraphicsDriver.RenderText(AX, AY, ALength: integer; AText: PChar);
 begin
 end;
 
 function TGraphicsDriver.GetScreenPointer(AX, AY: integer; var AOffset: longint): PByte;
+begin
+end;
+
+procedure TGraphicsDriver.FastFillScreen(AColor: byte);
+begin
+end;
+
+procedure TGraphicsDriver.FastDrawImage(AX, AY, AWidth, AHeight: integer; AImage: PByte);
 begin
 end;
 
@@ -363,7 +403,15 @@ begin
   FreeAndNil(points);
 end;
 
-procedure TGraphicsDriver.SetLinePixel(ADest: PByte; AX, AY: integer; AForeColor: byte);
+procedure TGraphicsDriver.GetFontFormats(AFont: PFont; var AFormats: TFontFormats);
+var
+  formatByte: byte;
+begin
+  formatByte := State.Font^.Format;
+  AFormats := PFontFormats(@formatByte)^;
+end;
+
+procedure TGraphicsDriver.SetRegionPixel(ADest: PByte; AX, AY: integer; AForeColor: byte);
 begin
 end;
 
@@ -385,9 +433,8 @@ begin
     exit;
   end;
   draw := region^.IntersectsCoords(AX, AY);
-  if State.RegionMode = rmExclude then
-    draw := not draw;
   level := 0;
+  start := -1;
   if draw then begin
     level := 1;
     start := AX;
@@ -713,7 +760,6 @@ begin
   ModeIndex := mode^.ModeIndex;
   TString.Free(Description);
   TString.Free(HelpText);
-  TString.Free(Id);
   Description := TString.Copy(mode^.Description);
   HelpText:= TString.Copy(mode^.HelpText);
   BytesPerScanLine := mode^.BytesPerScanLine;
@@ -725,9 +771,19 @@ begin
   GetItem := PGraphicsMode(inherited GetItem(AIndex));
 end;
 
-function TGraphicsModeList.GetItemById(const AId: string): PGraphicsMode;
+function TGraphicsModeList.GetItemById(const AId: integer): PGraphicsMode;
+var
+  index: integer;
+  item: PGraphicsMode;
 begin
-  GetItemById := PGraphicsMode(inherited GetItemById(AId));
+  GetItemById := nil;
+  for index := 0 to Count - 1 do begin
+    item := GetItem(index);
+    if item^.Id = AId then begin
+      GetItemById := item;
+      exit;
+    end;
+  end;
 end;
 
 destructor TFont.Free;
@@ -769,9 +825,11 @@ begin
   Spacing := 2;
 end;
 
-function TFont.Proportional: boolean;
+constructor TFont.CreateSize(AMaxWidth, AHeight: byte);
 begin
-  Proportional := false;
+  inherited Create;
+  MaxWidth := AMaxWidth;
+  Height := AHeight;
 end;
 
 function TFont.CharWidth(AChar: char): integer;
@@ -808,6 +866,19 @@ begin
   FontDataSize := FFontDataSize;
 end;
 
+function TFont.Format: word;
+begin
+  Abstract;
+end;
+
+function TFont.FontFormatsToWord(AFormat: TFontFormats): word;
+var
+  result: byte;
+begin
+  result := PByte(@AFormat)^;
+  FontFormatsToWord := result;
+end;
+
 procedure TFont.SaveToStream(AStream: PStream);
 begin
 end;
@@ -831,6 +902,11 @@ begin
   AverageWidth := 8;
 end;
 
+function TMonospaceFont.Format: word;
+begin
+  Format := FontFormatsToWord([ffMonospace, ff1Bpp]);
+end;
+
 destructor TMonospaceFont.Free;
 begin
   inherited Free;
@@ -846,11 +922,9 @@ end;
 
 constructor TProportionalFont.CreateSize(AMaxWidth, AHeight: byte);
 begin
-  inherited Create;
-  MaxWidth := AMaxWidth;
-  Height := AHeight;
+  inherited CreateSize(AMaxWidth, AHeight);
   FillChar(CharWidths, SizeOf(CharWidths), MaxWidth);
-  FFontDataSize := Height * 256 * 2;
+  FFontDataSize := AHeight * 256;
   GetMem(FFontData, FontDataSize);
   FillChar(FFontData^, FontDataSize, 0);
 end;
@@ -863,9 +937,9 @@ begin
   FillChar(CharWidths, SizeOf(CharWidths), 0);
 end;
 
-function TProportionalFont.Proportional: boolean;
+function TProportionalFont.Format: word;
 begin
-  Proportional := true;
+  Format := FontFormatsToWord([ffProportional, ff1Bpp]);
 end;
 
 destructor TProportionalFont.Free;
@@ -956,6 +1030,7 @@ begin
   header.Height := Height;
   header.Compression := fcLzw;
   header.Spacing := Spacing;
+  header.Format := Format;
 
   SetCharWidths;
 
@@ -997,6 +1072,8 @@ var
   ptr: PByte;
 begin
   AStream^.Read(@header, SizeOf(header));
+  if header.Format = 0 then
+    header.Format := FontFormatsToWord([ffProportional, ff1Bpp]);
   if AStream^.HasException then begin
     Raise(AStream^.Exception^.Code);
     exit;
@@ -1056,6 +1133,39 @@ begin
   fileStream.Free;
 end;
 
+constructor TColoredFont.CreateSize(AMaxWidth, AHeight: byte);
+begin
+  inherited CreateSize(AMaxWidth, AHeight);
+  FillChar(CharWidths, SizeOf(CharWidths), MaxWidth);
+  FFontDataSize := Height * (StartChar - EndChar) * 2;
+  GetMem(FFontData, FontDataSize);
+  FillChar(FFontData^, FontDataSize, 0);
+end;
+
+procedure TColoredFont.Init;
+begin
+  inherited Init;
+  StartChar := 32;
+  EndChar := 126;
+end;
+
+destructor TColoredFont.Free;
+begin
+  inherited Free;
+end;
+
+procedure TColoredFont.Assign(var ASource: TObject);
+var
+  source: PColoredFont;
+begin
+  inherited Assign(ASource);
+end;
+
+function TColoredFont.Format: word;
+begin
+  Format := FontFormatsToWord([ffColored, ff4Bpp]);
+end;
+
 function TSystemFont.TextWidthAny(AText: PChar; ALength: word): longint;
 begin
   if not Assigned(AText) then begin
@@ -1109,6 +1219,8 @@ begin
   FrameBuffer := nil;
   Region := nil;
   RegionMode := rmInclude;
+  FontColor := scWhite;
+  FontShade := 0;
 end;
 
 procedure TGraphicsState.Assign(var ASource: TObject);
