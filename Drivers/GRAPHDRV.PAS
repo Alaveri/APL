@@ -184,47 +184,54 @@ type
     StateStack: TObjectStack;
     Modes: TGraphicsModeList;
     Mode: PGraphicsMode;
-    function GetPixel(AX, AY: integer): byte; virtual;
+    function GetPixel(APX, APY: integer): byte; virtual;
     function ForeColor: longint; virtual;
     function BackColor: longint; virtual;
     function XPos: byte; virtual;
     function YPos: byte; virtual;
     function SupportsRegions: boolean; virtual;
-    function GetScreenPointer(AX, AY: integer; var AOffset: longint): PByte; virtual;
-    function GetBufferPointer(AX, AY: integer; var AOffset: longint): PByte; virtual;
-    function GetDrawPointer(AX, AY: integer; var AOffset: longint): PByte;
+    function GetScreenPointer(APX, APY: integer; var AOffset: longint): PByte; virtual;
+    function GetBufferPointer(APX, APY: integer; var AOffset: longint): PByte; virtual;
+    function GetDrawPointer(APX, APY: integer; var AOffset: longint): PByte;
     procedure BeginDrawBuffer(var ABuffer: PByte; var ABounds: TRect); virtual;
-    procedure GetImage(AX, AY, AWidth, AHeight: longint; ABuffer: PByte); virtual;
+    procedure GetImage(APX, APY, AWidth, AHeight: longint; ABuffer: PByte); virtual;
     procedure GetImageRect(ARect: TRect; ABuffer: PByte); virtual;
-    procedure GetImageStream(AX, AY, AWidth, AHeight: longint; AStream: PStream); virtual;
+    procedure GetImageStream(APX, APY, AWidth, AHeight: longint; AStream: PStream); virtual;
     procedure GetImageStreamRect(ARect: TRect; AStream: PStream); virtual;
     procedure SetForeColor(AColor: longint); virtual;
     procedure SetBackColor(AColor: longint); virtual;
     procedure SetMode(AMode: PGraphicsMode); virtual;
-    procedure SetPixel(AX, AY: integer); virtual;
-    procedure MoveTo(AX, AY: integer); virtual;
-    procedure LineTo(AX, AY: integer); virtual;
+    procedure SetPixel(APX, APY: integer); virtual;
+    procedure FastSetPixel(APX, APY: integer); virtual;
+    procedure MoveTo(APX, APY: integer); virtual;
+    procedure LineTo(APX, APY: integer); virtual;
     procedure Line(AX1, AY1, AX2, AY2: integer); virtual;
-    procedure HLine(AX, AY, AWidth: integer); virtual;
-    procedure VLine(AX, AY, AHeight: integer); virtual;
+    procedure HLine(APX, APY, AWidth: integer); virtual;
+    procedure VLine(APX, APY, AHeight: integer); virtual;
     procedure Rectangle(ARect: TRect); virtual;
     procedure FillRect(ARect: TRect); virtual;
+    procedure Bezier(AP1: TPoint; AP2: TPoint; AControl: TPoint; AResolution: integer);
+    procedure Ellipse(AX1, AY1, AX2, AY2: integer); virtual;
+    procedure EllipseRect(ARect: TRect); virtual;
+    procedure EllipsePoints(AP1, AP2: TPoint); virtual;
+    procedure EllipseCenter(APX, APY, ARadiusX, ARadiusY: integer); virtual;
+    procedure Circle(ACenterX, ACenterY, ARadius: integer); virtual;
     procedure FastFillScreen(AColor: byte); virtual;
-    procedure FastDrawImage(AX, AY, AWidth, AHeight: integer; AImage: PByte); virtual;
-    procedure RenderText(AX, AY, ALength: integer; AText: PChar); virtual;
-    procedure DrawImage(AX, AY, AWidth, AHeight: integer; AImage: PByte); virtual;
-    procedure DrawImageT(AX, AY, AWidth, AHeight: integer; AImage: PByte); virtual;
+    procedure FastDrawImage(APX, APY, AWidth, AHeight: integer; AImage: PByte); virtual;
+    procedure RenderText(APX, APY, ALength: integer; AText: PChar); virtual;
+    procedure DrawImage(APX, APY, AWidth, AHeight: integer; AImage: PByte); virtual;
+    procedure DrawImageT(APX, APY, AWidth, AHeight: integer; AImage: PByte); virtual;
     procedure DrawImageRect(ARect: TRect; AImage: PByte); virtual;
     procedure DrawImageRectT(ARect: TRect; AImage: PByte); virtual;
-    procedure DrawImageStream(AX, AY, AWidth, AHeight: integer; AStream: PStream); virtual;
+    procedure DrawImageStream(APX, APY, AWidth, AHeight: integer; AStream: PStream); virtual;
     procedure DrawImageStreamRect(ARect: TRect; AStream: PStream); virtual;
-    procedure DrawImageStreamT(AX, AY, AWidth, AHeight: integer; AStream: PStream); virtual;
+    procedure DrawImageStreamT(APX, APY, AWidth, AHeight: integer; AStream: PStream); virtual;
     procedure DrawImageStreamRectT(ARect: TRect; AStream: PStream); virtual;
     procedure DrawImageStreamSection(ASourceRect: TRect; ADestX, ADestY: integer); virtual;
     procedure DrawImageStreamSectionT(ASourceRect: TRect; ADestX, ADestY: integer); virtual;
-    procedure DrawText(AX, AY: integer; AText: string); virtual;
-    procedure DrawTextLarge(AX, AY: integer; AText: PChar); virtual;
-    procedure GetImageDrawRects(AX, AY, AWidth, AHeight: longint;
+    procedure DrawText(APX, APY: integer; AText: string); virtual;
+    procedure DrawTextLarge(APX, APY: integer; AText: PChar); virtual;
+    procedure GetImageDrawRects(APX, APY, AWidth, AHeight: longint;
       var AImageRect, ADrawRect: TRect); virtual;
     procedure PushState; virtual;
     procedure PopState; virtual;
@@ -232,11 +239,11 @@ type
     procedure Init; virtual;
     procedure WaitForVSync; virtual;
     procedure ResetMode; virtual;
-    procedure FillLine(ADest: PByte; AX, AY, AWidth: integer; AColor: byte);
-    procedure MoveLine(ASource, ADest: PByte; AX, AY, AWidth: integer);
-    procedure FillRegion(ADest: PByte; AX, AY, AWidth: integer; AColor: byte); virtual;
-    procedure SetRegionPixel(ADest: PByte; AX, AY: integer; AForeColor: byte);
-    procedure MoveRegion(ASource, ADest: PByte; AX, AY, AWidth: integer); virtual;
+    procedure FillLine(ADest: PByte; APX, APY, AWidth: integer; AColor: byte);
+    procedure MoveLine(ASource, ADest: PByte; APX, APY, AWidth: integer);
+    procedure FillRegion(ADest: PByte; APX, APY, AWidth: integer; AColor: byte); virtual;
+    procedure SetRegionPixel(ADest: PByte; APX, APY: integer; AForeColor: byte);
+    procedure MoveRegion(ASource, ADest: PByte; APX, APY, AWidth: integer); virtual;
     procedure GetFontFormats(AFont: PFont; var AFormats: TFontFormats);
     destructor Free; virtual;
   end;
@@ -281,11 +288,11 @@ begin
   SupportsRegions := false;
 end;
 
-procedure TGraphicsDriver.RenderText(AX, AY, ALength: integer; AText: PChar);
+procedure TGraphicsDriver.RenderText(APX, APY, ALength: integer; AText: PChar);
 begin
 end;
 
-function TGraphicsDriver.GetScreenPointer(AX, AY: integer; var AOffset: longint): PByte;
+function TGraphicsDriver.GetScreenPointer(APX, APY: integer; var AOffset: longint): PByte;
 begin
 end;
 
@@ -293,26 +300,30 @@ procedure TGraphicsDriver.FastFillScreen(AColor: byte);
 begin
 end;
 
-procedure TGraphicsDriver.FastDrawImage(AX, AY, AWidth, AHeight: integer; AImage: PByte);
+procedure TGraphicsDriver.FastDrawImage(APX, APY, AWidth, AHeight: integer; AImage: PByte);
 begin
 end;
 
-function TGraphicsDriver.GetBufferPointer(AX, AY: integer; var AOffset: longint): PByte;
+procedure TGraphicsDriver.FastSetPixel(APX, APY: integer);
+begin
+end;
+
+function TGraphicsDriver.GetBufferPointer(APX, APY: integer; var AOffset: longint): PByte;
 var
   screen: PByte;
 begin
   screen := State.FrameBuffer;
-  AOffset := longint(AY) * State.ViewPort.Width + AX;
+  AOffset := longint(APY) * State.ViewPort.Width + APX;
   Inc(screen, AOffset);
   GetBufferPointer := screen;
 end;
 
-function TGraphicsDriver.GetDrawPointer(AX, AY: integer; var AOffset: longint): PByte;
+function TGraphicsDriver.GetDrawPointer(APX, APY: integer; var AOffset: longint): PByte;
 begin
   if State.BufferMode then
-    GetDrawPointer := GetBufferPointer(AX, AY, AOffset)
+    GetDrawPointer := GetBufferPointer(APX, APY, AOffset)
   else
-    GetDrawPointer := GetScreenPointer(AX, AY, AOffset);
+    GetDrawPointer := GetScreenPointer(APX, APY, AOffset);
 end;
 
 function TGraphicsDriver.ForeColor: longint;
@@ -357,7 +368,7 @@ begin
   end;
 end;
 
-procedure TGraphicsDriver.MoveRegion(ASource, ADest: PByte; AX, AY, AWidth: integer);
+procedure TGraphicsDriver.MoveRegion(ASource, ADest: PByte; APX, APY, AWidth: integer);
 var
   region: PRegion;
   points: PInversionPointList;
@@ -366,7 +377,7 @@ var
   dest: PByte;
 begin
   region := State.Region;
-  points := region^.GetInversionPoints(State.RegionMode, AY, AX, AX + AWidth - 1);
+  points := region^.GetInversionPoints(State.RegionMode, APY, APX, APX + AWidth - 1);
   if points^.Count = 0 then begin
     if State.RegionMode <> rmExclude then
       Move(ASource^, ADest^, AWidth);
@@ -377,7 +388,7 @@ begin
   start := -1;
   dest := ADest;
   if point^.On then begin
-    start := AX;
+    start := APX;
     Inc(dest, start - State.ViewPort.X + 1);
     level := 1;
   end;
@@ -411,11 +422,11 @@ begin
   AFormats := PFontFormats(@formatByte)^;
 end;
 
-procedure TGraphicsDriver.SetRegionPixel(ADest: PByte; AX, AY: integer; AForeColor: byte);
+procedure TGraphicsDriver.SetRegionPixel(ADest: PByte; APX, APY: integer; AForeColor: byte);
 begin
 end;
 
-procedure TGraphicsDriver.FillRegion(ADest: PByte; AX, AY, AWidth: integer; AColor: byte);
+procedure TGraphicsDriver.FillRegion(ADest: PByte; APX, APY, AWidth: integer; AColor: byte);
 var
   region: PRegion;
   points: PInversionPointList;
@@ -426,18 +437,18 @@ var
   draw: boolean;
 begin
   region := State.Region;
-  points := region^.GetInversionPoints(State.RegionMode, AY, AX, AX + AWidth - 1);
+  points := region^.GetInversionPoints(State.RegionMode, APY, APX, APX + AWidth - 1);
   if points^.Count = 0 then begin
     FillChar(ADest^, AWidth, AColor);
     FreeAndNil(points);
     exit;
   end;
-  draw := region^.IntersectsCoords(AX, AY);
+  draw := region^.Contains(APX, APY);
   level := 0;
   start := -1;
   if draw then begin
     level := 1;
-    start := AX;
+    start := APX;
   end;
   for index := 0 to Points^.Count - 1 do begin
     dest := ADest;
@@ -451,22 +462,22 @@ begin
       Dec(level);
       size := point^.Position - start;
       if (level = 0) and (size > 0) then begin
-        Inc(dest, start - AX);
+        Inc(dest, start - APX);
         FillChar(dest^, size, AColor);
         start := -1;
       end;
     end;
   end;
-  size := AX + AWidth - start;
+  size := APX + AWidth - start;
   dest := ADest;
   if (level > 0) and (size > 0) then begin
-    Inc(dest, start - AX);
+    Inc(dest, start - APX);
     FillChar(dest^, size, AColor);
   end;
   FreeAndNil(points);
 end;
 
-function TGraphicsDriver.GetPixel(AX, AY: integer): byte;
+function TGraphicsDriver.GetPixel(APX, APY: integer): byte;
 var
   offset: longint;
   ptr: PByte;
@@ -474,39 +485,39 @@ var
 begin
   GetPixel := 0;
   Mode^.Bounds.GetIntersection(State.ViewPort, drawRect);
-  if not drawRect.IntersectsCoords(AX, AY) then
+  if not drawRect.Contains(APX, APY) then
     exit;
-  ptr := GetDrawPointer(AX, AY, offset);
+  ptr := GetDrawPointer(APX, APY, offset);
   GetPixel := ptr^;
 end;
 
-procedure TGraphicsDriver.SetPixel(AX, AY: integer);
+procedure TGraphicsDriver.SetPixel(APX, APY: integer);
 var
   offset: longint;
   ptr: PByte;
   drawRect: TRect;
 begin
   Mode^.Bounds.GetIntersection(State.ViewPort, drawRect);
-  if not drawRect.IntersectsCoords(AX, AY) then
+  if not drawRect.Contains(APX, APY) then
     exit;
-  ptr := GetDrawPointer(AX, AY, offset);
-  FillLine(ptr, AX, AY, 1, ForeColor);
+  ptr := GetDrawPointer(APX, APY, offset);
+  FillLine(ptr, APX, APY, 1, ForeColor);
 end;
 
-procedure TGraphicsDriver.MoveLine(ASource, ADest: PByte; AX, AY, AWidth: integer);
+procedure TGraphicsDriver.MoveLine(ASource, ADest: PByte; APX, APY, AWidth: integer);
 begin
   if not Assigned(State.Region) then
     Move(ASource^, ADest^, AWidth)
   else
-    MoveRegion(ASource, ADest, AX, AY, AWidth);
+    MoveRegion(ASource, ADest, APX, APY, AWidth);
 end;
 
-procedure TGraphicsDriver.FillLine(ADest: PByte; AX, AY, AWidth: integer; AColor: byte);
+procedure TGraphicsDriver.FillLine(ADest: PByte; APX, APY, AWidth: integer; AColor: byte);
 begin
   if not Assigned(State.Region) then
     FillChar(ADest^, AWidth, AColor)
   else
-    FillRegion(ADest, AX, AY, AWidth, AColor);
+    FillRegion(ADest, APX, APY, AWidth, AColor);
 end;
 
 procedure TGraphicsDriver.SetMode(AMode: PGraphicsMode);
@@ -516,17 +527,17 @@ begin
   Mode^.Bounds.SetRect(State.ViewPort);
 end;
 
-procedure TGraphicsDriver.MoveTo(AX, AY: integer);
+procedure TGraphicsDriver.MoveTo(APX, APY: integer);
 begin
-  State.XPos := AX;
-  State.YPos := AY;
+  State.XPos := APX;
+  State.YPos := APY;
 end;
 
-procedure TGraphicsDriver.LineTo(AX, AY: integer);
+procedure TGraphicsDriver.LineTo(APX, APY: integer);
 begin
-  Line(State.XPos, State.YPos, AX, AY);
-  State.XPos := AX;
-  State.YPos := AY;
+  Line(State.XPos, State.YPos, APX, APY);
+  State.XPos := APX;
+  State.YPos := APY;
 end;
 
 procedure TGraphicsDriver.Line(AX1, AY1, AX2, AY2: integer);
@@ -541,11 +552,11 @@ begin
   VLine(ARect.Right, ARect.Y, ARect.Height);
 end;
 
-procedure TGraphicsDriver.HLine(AX, AY, AWidth: integer);
+procedure TGraphicsDriver.HLine(APX, APY, AWidth: integer);
 begin
 end;
 
-procedure TGraphicsDriver.VLine(AX, AY, AHeight: integer);
+procedure TGraphicsDriver.VLine(APX, APY, AHeight: integer);
 begin
 end;
 
@@ -565,7 +576,135 @@ begin
   State.ForeColor := tempColor;
 end;
 
-procedure TGraphicsDriver.DrawText(AX, AY: integer; AText: string);
+procedure TGraphicsDriver.Bezier(AP1: TPoint; AP2: TPoint; AControl: TPoint; AResolution: integer);
+var
+  v1, v2, v3: TVector2;
+  previous, next: TVector2;
+  value: integer;
+  index: integer;
+begin
+  v1.CreatePoint(AP1);
+  v2.CreatePoint(AControl);
+  v3.CreatePoint(AP2);
+  previous.CreateVector(v1);
+  for index := 1 to AResolution do begin
+    BezierInterpolation(v1, v2, v3, index / AResolution, next);
+    Line(Round(previous.X), Round(previous.Y), Round(next.X), round(next.Y));
+    previous.Assign(next);
+  end;
+end;
+
+procedure TGraphicsDriver.Ellipse(AX1, AY1, AX2, AY2: integer);
+var
+  halfX, halfY: integer;
+begin
+  if AX1 > AX2 then
+    Swap(AX1, AX2);
+  if AY1 > AY2 then
+    Swap(AY1, AY2);
+  halfX := (AX2 - AX1) div 2;
+  halfY := (AY2 - AY1) div 2;
+  EllipseCenter(AX1 + halfX, AY1 + halfY, halfX, halfY);
+end;
+
+procedure TGraphicsDriver.EllipseRect(ARect: TRect);
+begin
+  Ellipse(ARect.X, ARect.Y, ARect.Right, ARect.Bottom);
+end;
+
+procedure TGraphicsDriver.EllipsePoints(AP1, AP2: TPoint);
+begin
+  Ellipse(AP1.X, AP1.Y, AP2.X, AP2.Y);
+end;
+
+procedure TGraphicsDriver.EllipseCenter(APX, APY, ARadiusX, ARadiusY: integer);
+var
+  x, y: longint;
+  dx, dY: longint;
+  error: longint;
+  twoASquared, twoBSquared : longint;
+  stopX, stopY : longint;
+begin
+  if (ARadiusX = 0) or (ARadiusY = 0) then
+    exit;
+  twoASquared := 2 * longint(ARadiusX) * ARadiusX;
+  twoBSquared := 2 * longint(ARadiusY) * ARadiusY;
+  x := ARadiusX;
+  y := 0;
+  dx := longint(ARadiusY) * ARadiusY * (1 - 2 * longint(ARadiusX));
+  dy := longint(ARadiusX) * ARadiusX;
+  error := 0;
+  stopX := twoBSquared * ARadiusX;
+  stopY := 0;
+  while stopX >= stopy do begin
+    SetPixel(APX + x, APY + y);
+    SetPixel(APX - x, APY + y);
+    SetPixel(APX - x, APY - y);
+    SetPixel(APX + x, APY - y);
+    Inc(y);
+    Inc(stopY, twoASquared);
+    Inc(error, dy);
+    Inc(dy, twoASquared);
+    if 2 * error + dx > 0 then begin
+      Dec(x);
+      Dec(stopX, twoBSquared);
+      Inc(error, dx);
+      Inc(dx, twoBSquared);
+    end;
+  end;
+  X := 0;
+  Y := ARadiusY;
+  dx := longint(ARadiusY) * ARadiusY;
+  dy := longint(ARadiusX) * ARadiusX * (1 - 2 * longint(ARadiusY));
+  error := 0;
+  stopX := 0;
+  stopY := twoASquared * ARadiusY;
+  while stopX <= stopY do begin
+    SetPixel(APX + x, APY + y);
+    SetPixel(APX - x, APY + y);
+    SetPixel(APX - x, APY - y);
+    SetPixel(APX + x, APY - y);
+    Inc(X);
+    Inc(stopX, twoBSquared);
+    Inc(error, dx);
+    Inc(dx, twoBSquared);
+    if 2 * error + dy > 0 then begin
+      Dec(Y);
+      Dec(stopY, twoASquared);
+      Inc(error, dy);
+      Inc(dy, twoASquared);
+    end;
+  end;
+end;
+
+procedure TGraphicsDriver.Circle(ACenterX, ACenterY, ARadius: integer);
+var
+  t1, t2: integer;
+  x, y: integer;
+begin
+  t1 := ARadius div 16;
+  x := ARadius;
+  y := 0;
+  repeat
+    SetPixel(ACenterX + x, ACenterY + y);
+    SetPixel(ACenterX - x, ACenterY + y);
+    SetPixel(ACenterX + x, ACenterY - y);
+    SetPixel(ACenterX - x, ACenterY - y);
+    SetPixel(ACenterX + y, ACenterY + x);
+    SetPixel(ACenterX - y, ACenterY + x);
+    SetPixel(ACenterX + y, ACenterY - x);
+    SetPixel(ACenterX - y, ACenterY - x);
+    Inc(y);
+    t1 := t1 + y;
+    t2 := t1 - x;
+    if t2 >= 0 then begin
+      t1 := t2;
+      Dec(x);
+    end;
+  until x < y;
+end;
+
+procedure TGraphicsDriver.DrawText(APX, APY: integer; AText: string);
 var
   ptr: PChar;
 begin
@@ -574,10 +713,10 @@ begin
   if Length(AText) = 0 then
     exit;
   ptr := @AText[1];
-  RenderText(AX, AY, Length(AText), ptr);
+  RenderText(APX, APY, Length(AText), ptr);
 end;
 
-procedure TGraphicsDriver.DrawTextLarge(AX, AY: integer; AText: PChar);
+procedure TGraphicsDriver.DrawTextLarge(APX, APY: integer; AText: PChar);
 var
   len: word;
 begin
@@ -588,10 +727,10 @@ begin
   len := StrLen(AText);
   if len = 0 then
     exit;
-  RenderText(AX, AY, len, AText);
+  RenderText(APX, APY, len, AText);
 end;
 
-procedure TGraphicsDriver.GetImage(AX, AY, AWidth, AHeight: longint; ABuffer: PByte);
+procedure TGraphicsDriver.GetImage(APX, APY, AWidth, AHeight: longint; ABuffer: PByte);
 begin
 end;
 
@@ -600,7 +739,7 @@ begin
   GetImage(ARect.X, ARect.Y, ARect.Width, ARect.Height, ABuffer);
 end;
 
-procedure TGraphicsDriver.GetImageStream(AX, AY, AWidth, AHeight: longint; AStream: PStream);
+procedure TGraphicsDriver.GetImageStream(APX, APY, AWidth, AHeight: longint; AStream: PStream);
 begin
 end;
 
@@ -609,11 +748,11 @@ begin
   GetImageStream(ARect.X, ARect.Y, ARect.Width, ARect.Height, AStream);
 end;
 
-procedure TGraphicsDriver.DrawImage(AX, AY, AWidth, AHeight: integer; AImage: PByte);
+procedure TGraphicsDriver.DrawImage(APX, APY, AWidth, AHeight: integer; AImage: PByte);
 begin
 end;
 
-procedure TGraphicsDriver.DrawImageT(AX, AY, AWidth, AHeight: integer; AImage: PByte);
+procedure TGraphicsDriver.DrawImageT(APX, APY, AWidth, AHeight: integer; AImage: PByte);
 begin
 end;
 
@@ -627,7 +766,7 @@ begin
   DrawImage(ARect.X, ARect.Y, ARect.Width, ARect.Height, AImage);
 end;
 
-procedure TGraphicsDriver.DrawImageStream(AX, AY, AWidth, AHeight: integer; AStream: PStream);
+procedure TGraphicsDriver.DrawImageStream(APX, APY, AWidth, AHeight: integer; AStream: PStream);
 begin
 end;
 
@@ -636,7 +775,7 @@ begin
   DrawImageStream(ARect.X, ARect.Y, ARect.Width, ARect.Height, AStream);
 end;
 
-procedure TGraphicsDriver.DrawImageStreamT(AX, AY, AWidth, AHeight: integer; AStream: PStream);
+procedure TGraphicsDriver.DrawImageStreamT(APX, APY, AWidth, AHeight: integer; AStream: PStream);
 begin
 end;
 
@@ -653,10 +792,10 @@ procedure TGraphicsDriver.DrawImageStreamSectionT(ASourceRect: TRect; ADestX, AD
 begin
 end;
 
-procedure TGraphicsDriver.GetImageDrawRects(AX, AY, AWidth, AHeight: longint;
+procedure TGraphicsDriver.GetImageDrawRects(APX, APY, AWidth, AHeight: longint;
   var AImageRect, ADrawRect: TRect);
 begin
-  AImageRect.CreateDims(AX, AY, AWidth, AHeight);
+  AImageRect.CreateDims(APX, APY, AWidth, AHeight);
   Mode^.Bounds.GetIntersection(State.ViewPort, ADrawRect);
   ADrawRect.Intersect(AImageRect);
   AImageRect.X := ADrawRect.X - AImageRect.X;

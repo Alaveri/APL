@@ -43,6 +43,8 @@ function MaxShort(ANum1, ANum2: shortint): shortint;
 function MaxByte(ANum1, ANum2: byte): byte;
 function MaxWord(ANum1, ANum2: word): word;
 function MaxLong(ANum1, ANum2: longint): longint;
+function MinReal(ANum1, ANum2: real): real;
+function MaxReal(ANum1, ANum2: real): real;
 function FileExists(const AFilename: string): boolean;
 function DirectoryExists(const ADir: string): boolean;
 function GetExtension(const AFilename: string): string;
@@ -289,6 +291,20 @@ begin
   MinLong := ANum1;
   if ANum2 < ANum1 then
     MinLong := ANum2;
+end;
+
+function MinReal(ANum1, ANum2: real): real;
+begin
+  MinReal := ANum1;
+  if ANum2 < ANum1 then
+    MinReal := ANum2;
+end;
+
+function MaxReal(ANum1, ANum2: real): real;
+begin
+  MaxReal := ANum1;
+  if ANum2 > ANum1 then
+    MaxReal := ANum2;
 end;
 
 function Max(ANum1, ANum2: integer): integer;

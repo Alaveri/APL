@@ -16,24 +16,26 @@ type
 
   TFastVgaDriver = object(TGraphics8Driver)
   private
-    function InitializeDrawRect(AX, AY, AWidth, AHeight: integer; var ADrawRect: TRect): boolean;
-    procedure Render4BppText(AX, AY, ALength: integer; AText: PChar);
+    function InitializeDrawRect(APX, APY, AWidth, AHeight: integer; var ADrawRect: TRect): boolean;
+    procedure Render4BppText(APX, APY, ALength: integer; AText: PChar);
   public
-    function GetScreenPointer(AX, AY: integer; var AOffset: longint): PByte; virtual;
-    procedure GetImage(AX, AY, AWidth, AHeight: longint; ABuffer: PByte); virtual;
-    procedure GetImageStream(AX, AY, AWidth, AHeight: longint; AStream: PStream); virtual;
+    function GetScreenPointer(APX, APY: integer; var AOffset: longint): PByte; virtual;
+    procedure GetImage(APX, APY, AWidth, AHeight: longint; ABuffer: PByte); virtual;
+    procedure GetImageStream(APX, APY, AWidth, AHeight: longint; AStream: PStream); virtual;
     procedure SetMode(AMode: PGraphicsMode); virtual;
-    procedure RenderText(AX, AY, ALength: integer; AText: PChar); virtual;
+    procedure RenderText(APX, APY, ALength: integer; AText: PChar); virtual;
     procedure Line(AX1, AY1, AX2, AY2: integer); virtual;
-    procedure HLine(AX, AY, AWidth: integer); virtual;
-    procedure VLine(AX, AY, AHeight: integer); virtual;
-    procedure DrawImage(AX, AY, AWidth, AHeight: integer; AImage: PByte); virtual;
-    procedure DrawImageT(AX, AY, AWidth, AHeight: integer; AImage: PByte); virtual;
-    procedure DrawImageStream(AX, AY, AWidth, AHeight: integer; AStream: PStream); virtual;
-    procedure DrawImageStreamT(AX, AY, AWidth, AHeight: integer; AStream: PStream); virtual;
+    procedure HLine(APX, APY, AWidth: integer); virtual;
+    procedure VLine(APX, APY, AHeight: integer); virtual;
+    procedure Circle(ACenterX, ACenterY, ARadius: integer); virtual;
+    procedure DrawImage(APX, APY, AWidth, AHeight: integer; AImage: PByte); virtual;
+    procedure DrawImageT(APX, APY, AWidth, AHeight: integer; AImage: PByte); virtual;
+    procedure DrawImageStream(APX, APY, AWidth, AHeight: integer; AStream: PStream); virtual;
+    procedure DrawImageStreamT(APX, APY, AWidth, AHeight: integer; AStream: PStream); virtual;
     procedure FastFillScreen(AColor: byte); virtual;
     procedure FastDrawScreen(AImage: PByte); virtual;
-    procedure FastDrawImage(AX, AY, AWidth, AHeight: integer; AImage: PByte); virtual;
+    procedure FastDrawImage(APX, APY, AWidth, AHeight: integer; AImage: PByte); virtual;
+    procedure FastSetPixel(APX, APY: integer); virtual;
     procedure WaitForVSync; virtual;
     procedure Init; virtual;
     destructor Free; virtual;
@@ -87,11 +89,11 @@ begin
   Mouse.XShift := 1;
 end;
 
-function TFastVgaDriver.GetScreenPointer(AX, AY: integer; var AOffset: longint): PByte;
+function TFastVgaDriver.GetScreenPointer(APX, APY: integer; var AOffset: longint): PByte;
 var
   result: PByte;
 begin
-  AOffset := longint(AY) * Mode^.BytesPerScanLine + AX;
+  AOffset := longint(APY) * Mode^.BytesPerScanLine + APX;
   result := Mode^.FrameBuffer;
   Inc(result, AOffset);
   GetScreenPointer := result;
@@ -137,13 +139,13 @@ begin
   end;
 end;
 
-procedure TFastVgaDriver.FastDrawImage(AX, AY, AWidth, AHeight: integer; AImage: PByte);
+procedure TFastVgaDriver.FastDrawImage(APX, APY, AWidth, AHeight: integer; AImage: PByte);
 var
   screen: PByte;
   off: longint;
   wordOffset: word;
 begin
-  screen := GetScreenPointer(AX, AY, off);
+  screen := GetScreenPointer(APX, APY, off);
   wordOffset := off;
   asm
     push ds
@@ -163,7 +165,20 @@ begin
   end;
 end;
 
-function TFastVgaDriver.InitializeDrawRect(AX, AY, AWidth, AHeight: integer; var ADrawRect: TRect): boolean;
+procedure TFastVgaDriver.FastSetPixel(APX, APY: integer);
+var
+  ptr: PByte;
+  offset: longint;
+  drawRect: TRect;
+begin
+  Mode^.Bounds.GetIntersection(State.ViewPort, drawRect);
+  if not drawRect.Contains(APX, APY) then
+    exit;
+  ptr := GetDrawPointer(APX, APY, offset);
+  ptr^ := ForeColor;
+end;
+
+function TFastVgaDriver.InitializeDrawRect(APX, APY, AWidth, AHeight: integer; var ADrawRect: TRect): boolean;
 var
   visibleRect: TRect;
 begin
@@ -171,17 +186,17 @@ begin
   if HasException then
     exit;
   Mode^.Bounds.GetIntersection(State.ViewPort, visibleRect);
-  ADrawRect.CreateDims(AX, AY, AWidth, AHeight);
+  ADrawRect.CreateDims(APX, APY, AWidth, AHeight);
   ADrawRect.Intersect(visibleRect);
   if not ADrawRect.IsEmpty then
     InitializeDrawRect := true;
 end;
 
-procedure TFastVgaDriver.Render4BppText(AX, AY, ALength: integer; AText: PChar);
+procedure TFastVgaDriver.Render4BppText(APX, APY, ALength: integer; AText: PChar);
 begin
 end;
 
-procedure TFastVgaDriver.RenderText(AX, AY, ALength: integer; AText: PChar);
+procedure TFastVgaDriver.RenderText(APX, APY, ALength: integer; AText: PChar);
 var
   drawRect: TRect;
   charIndex, yIndex, xIndex: integer;
@@ -202,14 +217,14 @@ begin
     exit;
   Mode^.Bounds.GetIntersection(State.ViewPort, drawRect);
   height := State.Font^.Height;
-  if (AX > drawRect.Right) or (AY > drawRect.Bottom) or (AY + height < drawRect.Y) then
+  if (APX > drawRect.Right) or (APY > drawRect.Bottom) or (APY + height < drawRect.Y) then
     exit;
   GetFontFormats(State.Font, format);
   if ff4Bpp in format then begin
-    Render4BppText(AX, AY, ALength, AText);
+    Render4BppText(APX, APY, ALength, AText);
     exit;
   end;
-  sx := AX;
+  sx := APX;
   for charIndex := 0 to ALength - 1 do begin
     ch := AText[charIndex];
     width := State.Font^.TextWidth(ch);
@@ -219,13 +234,13 @@ begin
       Inc(sx, width);
       continue;
     end;
-    sy := AY;
+    sy := APY;
     fore := State.ForeColor;
     linePtr := State.Font^.FontData;
     Inc(linePtr, Ord(ch) * height);
     minX := MaxLong(0, drawRect.X - sx);
     maxX := MinLong(State.Font^.TextWidth(ch) - 1, drawRect.Right - sx);
-    sy := AY;
+    sy := APY;
     for yIndex := 0 to height - 1 do begin
       currentLine := linePtr^;
       if sy > drawRect.Bottom then
@@ -328,7 +343,7 @@ begin
       mov ax, dlx
       cmp dx, ax
       jg @loop
-      mov ax, AY1
+      mov AX, AY1
       mov bx, AY2
       cmp ax, dx
       je @endLoop
@@ -338,9 +353,32 @@ begin
       jmp @loop
     @endLoop:
    end;
+
+{  while true do begin
+    if State.ViewPort.Contains(AX1, AY1) then begin
+      screenPtr := State.FrameBuffer;
+      Inc(screenPtr, longint(AY1) * Mode^.Width + AX1);
+      screenPtr^ := State.ForeColor;
+    end;
+    if (AX1 = AX2) and (AY1 = AY2) then
+      break;
+    aError2 := 2 * aError;
+    if aError2 >= dly then begin
+      if AX1 = AX2 then
+        break;
+      Inc(aError, dly);
+      Inc(AX1, sx);
+    end;
+    if aError2 <= dlx then begin
+      if AY1 = AY2 then
+        break;
+      Inc(aError, dlx);
+      Inc(AY1, sy);
+    end;
+  end;}
 end;
 
-procedure TFastVgaDriver.HLine(AX, AY, AWidth: integer);
+procedure TFastVgaDriver.HLine(APX, APY, AWidth: integer);
 var
   screen: PByte;
   lineWidth: integer;
@@ -348,11 +386,19 @@ var
   color: byte;
   drawRect: TRect;
 begin
-  if not InitializeDrawRect(AX, AY, AWidth, 0, drawRect) then
+  if HasException then
     exit;
-  AX := EnsureRange(AX, drawRect.X, drawRect.Right);
+  Mode^.Bounds.GetIntersection(State.ViewPort, drawRect);
+  if APY < drawRect.Y then
+    exit;
+  if APY > drawRect.Bottom then
+    exit;
+  APX := EnsureRange(APX, drawRect.X, drawRect.Right);
   AWidth := MinLong(drawRect.Width, AWidth);
-  screen := GetDrawPointer(AX, AY, offset);
+  if AWidth <= 0 then
+    exit;
+
+  screen := GetDrawPointer(APX, APY, offset);
   color := byte(State.ForeColor);
   asm
     mov cx, AWidth
@@ -362,7 +408,7 @@ begin
   end;
 end;
 
-procedure TFastVgaDriver.VLine(AX, AY, AHeight: integer);
+procedure TFastVgaDriver.VLine(APX, APY, AHeight: integer);
 var
   index: integer;
   offset: longint;
@@ -375,13 +421,16 @@ begin
   if HasException then
     exit;
   Mode^.Bounds.GetIntersection(State.ViewPort, drawRect);
-  if not InitializeDrawRect(AX, AY, 0, AHeight, drawRect) then
+  if APX < drawRect.X then
     exit;
-  AY := EnsureRange(AY, drawRect.Y, drawRect.Bottom);
+  if APX > drawRect.Right then
+    exit;
+  APY := EnsureRange(APY, drawRect.Y, drawRect.Bottom);
   AHeight := MinLong(drawRect.Height, AHeight);
   if AHeight <= 0 then
     exit;
-  screen := GetDrawPointer(AX, AY, offset);
+
+  screen := GetDrawPointer(APX, APY, offset);
   color := ForeColor;
   if State.BufferMode then
     screenWidth := State.ViewPort.Width
@@ -399,7 +448,36 @@ begin
   end;
 end;
 
-procedure TFastVgaDriver.DrawImage(AX, AY, AWidth, AHeight: integer; AImage: PByte);
+procedure TFastVgaDriver.Circle(ACenterX, ACenterY, ARadius: integer);
+var
+  t1, t2: integer;
+  x, y: integer;
+  color: byte;
+begin
+  t1 := ARadius div 16;
+  x := ARadius;
+  y := 0;
+  color := State.ForeColor;
+  repeat
+    FastSetPixel(ACenterX + x, ACenterY + y);
+    FastSetPixel(ACenterX - x, ACenterY + y);
+    FastSetPixel(ACenterX + x, ACenterY - y);
+    FastSetPixel(ACenterX - x, ACenterY - y);
+    FastSetPixel(ACenterX + y, ACenterY + x);
+    FastSetPixel(ACenterX - y, ACenterY + x);
+    FastSetPixel(ACenterX + y, ACenterY - x);
+    FastSetPixel(ACenterX - y, ACenterY - x);
+    Inc(y);
+    t1 := t1 + y;
+    t2 := t1 - x;
+    if t2 >= 0 then begin
+      t1 := t2;
+      Dec(x);
+    end;
+  until x < y;
+end;
+
+procedure TFastVgaDriver.DrawImage(APX, APY, AWidth, AHeight: integer; AImage: PByte);
 var
   imageRect, drawRect: TRect;
   yIndex: integer;
@@ -410,7 +488,7 @@ var
 begin
   if HasException then
     exit;
-  GetImageDrawRects(AX, AY, AWidth, AHeight, imageRect, drawRect);
+  GetImageDrawRects(APX, APY, AWidth, AHeight, imageRect, drawRect);
   if drawRect.IsEmpty then
     exit;
   sy := drawRect.Y;
@@ -431,7 +509,7 @@ begin
   end;
 end;
 
-procedure TFastVgaDriver.DrawImageT(AX, AY, AWidth, AHeight: integer; AImage: PByte);
+procedure TFastVgaDriver.DrawImageT(APX, APY, AWidth, AHeight: integer; AImage: PByte);
 var
   imageRect, drawRect: TRect;
   xIndex, yIndex: integer;
@@ -442,7 +520,7 @@ var
 begin
   if HasException then
     exit;
-  GetImageDrawRects(AX, AY, AWidth, AHeight, imageRect, drawRect);
+  GetImageDrawRects(APX, APY, AWidth, AHeight, imageRect, drawRect);
   if drawRect.IsEmpty then
     exit;
   sy := drawRect.Y;
@@ -474,7 +552,7 @@ begin
   end;
 end;
 
-procedure TFastVgaDriver.DrawImageStream(AX, AY, AWidth, AHeight: integer; AStream: PStream);
+procedure TFastVgaDriver.DrawImageStream(APX, APY, AWidth, AHeight: integer; AStream: PStream);
 var
   imageRect, drawRect: TRect;
   yIndex: integer;
@@ -486,7 +564,7 @@ var
 begin
   if AStream^.HasException or HasException then
     exit;
-  GetImageDrawRects(AX, AY, AWidth, AHeight, imageRect, drawRect);
+  GetImageDrawRects(APX, APY, AWidth, AHeight, imageRect, drawRect);
   if drawRect.IsEmpty then
     exit;
   sy := drawRect.Y;
@@ -501,7 +579,7 @@ begin
     Raise(AStream^.Exception^.Code);
 end;
 
-procedure TFastVgaDriver.DrawImageStreamT(AX, AY, AWidth, AHeight: integer; AStream: PStream);
+procedure TFastVgaDriver.DrawImageStreamT(APX, APY, AWidth, AHeight: integer; AStream: PStream);
 var
   imageRect, drawRect: TRect;
   xIndex, yIndex: integer;
@@ -514,7 +592,7 @@ var
 begin
   if AStream^.HasException or HasException then
     exit;
-  GetImageDrawRects(AX, AY, AWidth, AHeight, imageRect, drawRect);
+  GetImageDrawRects(APX, APY, AWidth, AHeight, imageRect, drawRect);
   if drawRect.IsEmpty then
     exit;
   lineWidth := drawRect.Width;
@@ -556,7 +634,7 @@ begin
   FreeMem(imageLine, lineWidth);
 end;
 
-procedure TFastVgaDriver.GetImage(AX, AY, AWidth, AHeight: longint; ABuffer: PByte);
+procedure TFastVgaDriver.GetImage(APX, APY, AWidth, AHeight: longint; ABuffer: PByte);
 var
   imageRect, drawRect: TRect;
   yIndex: integer;
@@ -567,7 +645,7 @@ var
 begin
   if HasException then
     exit;
-  GetImageDrawRects(AX, AY, AWidth, AHeight, imageRect, drawRect);
+  GetImageDrawRects(APX, APY, AWidth, AHeight, imageRect, drawRect);
   if drawRect.IsEmpty then
     exit;
   sy := drawRect.Y;
@@ -589,7 +667,7 @@ begin
   end;
 end;
 
-procedure TFastVgaDriver.GetImageStream(AX, AY, AWidth, AHeight: longint; AStream: PStream);
+procedure TFastVgaDriver.GetImageStream(APX, APY, AWidth, AHeight: longint; AStream: PStream);
 var
   imageRect, drawRect: TRect;
   yIndex: integer;
@@ -601,7 +679,7 @@ var
 begin
   if AStream^.HasException or HasException then
     exit;
-  GetImageDrawRects(AX, AY, AWidth, AHeight, imageRect, drawRect);
+  GetImageDrawRects(APX, APY, AWidth, AHeight, imageRect, drawRect);
   if drawRect.IsEmpty then
     exit;
   sy := drawRect.Y;

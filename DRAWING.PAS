@@ -17,6 +17,7 @@ type
   PRegion = ^TRegion;
   PInversionPoint = ^TInversionPoint;
   PInversionPointList = ^TInversionPointList;
+  PVector2 = ^TVector2;
 
   TRegionMode = (rmInclude, rmExclude);
 
@@ -64,6 +65,32 @@ type
     function Equals(APoint: TPoint): boolean;
   end;
 
+  TVector2 = object(TObject)
+  private
+  public
+    X, Y: real;
+    constructor CreateCoords(AX, AY: real);
+    constructor CreateVector(AVector: TVector2);
+    constructor CreateSingle(AValue: real);
+    constructor CreatePoint(APoint: TPoint);
+    procedure Assign(var ASource: TObject); virtual;
+    procedure SetVector(AVector: TVector2);
+    procedure SetSingle(AValue: real);
+    procedure SetPoint(APoint: TPoint);
+    procedure Translate(ADX, ADY: real);
+    procedure Init; virtual;
+    procedure Negate;
+    procedure Abs;
+    procedure Divide(AValue: real);
+    procedure Multiply(AValue: real);
+    procedure Add(AVector: TVector2);
+    procedure Subtract(AVector: TVector2);
+    function Equals(AVector: TVector2): boolean;
+    function EqualsSingle(AValue: real): boolean;
+    function Distance(AVector: TVector2): real;
+    function DistanceSquared(AVector: TVector2): real;
+  end;
+
   PLocation = ^TLocation;
   TLocation = TPoint;
 
@@ -94,8 +121,8 @@ type
     function IsEmpty: boolean;
     function Right: integer;
     function Bottom: integer;
-    function IntersectsCoords(AX, AY: integer): boolean;
-    function IntersectsPoint(APoint: TPoint): boolean;
+    function Contains(APX, APY: integer): boolean;
+    function ContainsPoint(APoint: TPoint): boolean;
     function IntersectsRect(ARect: TRect): boolean;
   end;
 
@@ -121,11 +148,35 @@ type
     procedure Assign(var ASource: TObject); virtual;
     function GetInversionPoints(AMode: TRegionMode;
       AY, AStartX, AEndX: integer): PInversionPointList;
-    function IntersectsCoords(AX, AY: integer): boolean;
+    function Contains(AX, AY: integer): boolean;
     function IntersectsRect(var ARect: TRect): boolean;
   end;
 
+procedure LinearInterpolation(AStart: TVector2; AEnd: TVector2;
+  AValue: real; var AResult: TVector2); far;
+
+procedure BezierInterpolation(AP1: TVector2; AP2: TVector2; AP3: TVector2;
+  AValue: real; var AResult: TVector2); far;
+
 implementation
+
+procedure LinearInterpolation(AStart: TVector2; AEnd: TVector2;
+  AValue: real; var AResult: TVector2);
+begin
+  AResult.Create;
+  AResult.X := AStart.X + (AEnd.X - AStart.X) * AValue;
+  AResult.Y := AStart.Y + (AEnd.Y - AStart.Y) * AValue;
+end;
+
+procedure BezierInterpolation(AP1: TVector2; AP2: TVector2; AP3: TVector2;
+  AValue: real; var AResult: TVector2);
+var
+  intermediateA, intermediateB: TVector2;
+begin
+  LinearInterpolation(AP1, AP2, AValue, intermediateA);
+  LinearInterpolation(AP2, AP3, AValue, intermediateB);
+  LinearInterpolation(intermediateA, intermediateB, AValue, AResult);
+end;
 
 function InversionCompare(AItem1, AItem2: pointer): integer; far;
 var
@@ -260,19 +311,58 @@ begin
   Bottom := Y + Height - 1;
 end;
 
-function TRect.IntersectsCoords(AX, AY: integer): boolean;
-begin
-  IntersectsCoords :=
-    (AX >= X) and
-    (AY >= Y) and
-    (AX <= Right) and
-    (AY <= Bottom);
+function TRect.Contains(APX, APY: integer): boolean; assembler;
+asm
+    mov al, 0
+    les di, self
+    mov bx, APX
+    mov dx, ES:[DI].TRect.X
+    cmp bx, dx
+    jl @end
+    add dx, ES:[DI].TRect.Width
+    dec dx
+    cmp bx, dx
+    jg @end
+    mov bx, APY
+    mov dx, ES:[DI].TRect.Y
+    cmp bx, dx
+    jl @end
+    add dx, ES:[DI].TRect.Height
+    dec dx
+    cmp bx, dx
+    jg @end
+    inc ax
+    jmp @end
+  @end:
 end;
 
-function TRect.IntersectsPoint(APoint: TPoint): boolean;
-begin
-  IntersectsPoint := IntersectsCoords(APoint.X, APoint.Y);
+function TRect.ContainsPoint(APoint: TPoint): boolean; assembler;
+asm
+    mov al, 0
+    les di, self
+    mov bx, APoint.X
+    mov dx, ES:[DI].TRect.X
+    cmp bx, dx
+    jl @end
+    add dx, ES:[DI].TRect.Width
+    dec dx
+    cmp bx, dx
+    jg @end
+    mov bx, APoint.Y
+    mov dx, ES:[DI].TRect.Y
+    cmp bx, dx
+    jl @end
+    add dx, ES:[DI].TRect.Height
+    dec dx
+    cmp bx, dx
+    jg @end
+    inc ax
+    jmp @end
+  @end:
 end;
+{begin
+  ContainsPoint := Contains(APoint.X, APoint.Y);
+end;}
 
 function TRect.IntersectsRect(ARect: TRect): boolean;
 begin
@@ -490,16 +580,16 @@ begin
   end;
 end;
 
-function TRegion.IntersectsCoords(AX, AY: integer): boolean;
+function TRegion.Contains(AX, AY: integer): boolean;
 var
   index: integer;
   rect: PRect;
 begin
-  IntersectsCoords := false;
+  Contains := false;
   for index := 0 to Count - 1 do begin
     rect := GetItem(index);
-    if rect^.IntersectsCoords(AX, AY) then begin
-      IntersectsCoords := true;
+    if rect^.Contains(AX, AY) then begin
+      Contains := true;
       exit;
     end;
   end;
@@ -541,6 +631,128 @@ begin
   inherited Create;
   On := AOn;
   Position := APosition;
+end;
+
+constructor TVector2.CreateCoords(AX, AY: real);
+begin
+  Init;
+  X := AX;
+  Y := AY;
+end;
+
+constructor TVector2.CreateVector(AVector: TVector2);
+begin
+  Init;
+  SetVector(AVector);
+end;
+
+constructor TVector2.CreateSingle(AValue: real);
+begin
+  Init;
+  SetSingle(AValue);
+end;
+
+constructor TVector2.CreatePoint(APoint: TPoint);
+begin
+  Init;
+  SetPoint(APoint);
+end;
+
+procedure TVector2.Assign(var ASource: TObject);
+var
+  source: PVector2;
+begin
+  inherited Assign(ASource);
+  source := PVector2(@ASource);
+  X := source^.X;
+  Y := source^.Y;
+end;
+
+procedure TVector2.SetVector(AVector: TVector2);
+begin
+  X := AVector.X;
+  Y := AVector.Y;
+end;
+
+procedure TVector2.SetSingle(AValue: real);
+begin
+  X := AValue;
+  Y := AValue;
+end;
+
+procedure TVector2.SetPoint(APoint: TPoint);
+begin
+  X := APoint.X;
+  Y := APoint.Y;
+end;
+
+procedure TVector2.Translate(ADX, ADY: real);
+begin
+  X := X + ADX;
+  Y := Y + ADY;
+end;
+
+procedure TVector2.Init;
+begin
+  inherited Init;
+  X := 0;
+  Y := 0;
+end;
+
+procedure TVector2.Negate;
+begin
+  X := -X;
+  Y := -Y;
+end;
+
+procedure TVector2.Abs;
+begin
+  X := System.Abs(X);
+  Y := System.Abs(Y);
+end;
+
+procedure TVector2.Divide(AValue: real);
+begin
+  X := X / AValue;
+  Y := Y / AValue;
+end;
+
+procedure TVector2.Multiply(AValue: real);
+begin
+  X := X * AValue;
+  Y := Y * AValue;
+end;
+
+procedure TVector2.Add(AVector: TVector2);
+begin
+  X := X + AVector.X;
+  Y := Y + AVector.Y;
+end;
+
+procedure TVector2.Subtract(AVector: TVector2);
+begin
+  X := X - AVector.X;
+  Y := Y - AVector.Y;
+end;
+
+function TVector2.Equals(AVector: TVector2): boolean;
+begin
+  Equals := (AVector.X = X) and (AVector.Y = Y);
+end;
+
+function TVector2.EqualsSingle(AValue: real): boolean;
+begin
+  EqualsSingle := (X = AValue) and (Y = AValue);
+end;
+
+function TVector2.Distance(AVector: TVector2): real;
+begin
+  Distance := Sqrt(Sqr(X - AVector.X) + Sqr(Y - AVector.Y));
+end;
+
+function TVector2.DistanceSquared(AVector: TVector2): real;
+begin
+  DistanceSquared := Sqr(X - AVector.X) + Sqr(Y - AVector.Y);
 end;
 
 procedure TInversionPoint.Init;

@@ -245,7 +245,7 @@ begin
     @endLoop:
   end;}
   while true do begin
-    if State.ViewPort.IntersectsCoords(AX1, AY1) then begin
+    if State.ViewPort.Contains(AX1, AY1) then begin
       screenPtr := State.FrameBuffer;
       Inc(screenPtr, longint(AY1) * Mode^.Width + AX1);
       screenPtr^ := State.ForeColor;
