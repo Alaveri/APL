@@ -30,9 +30,18 @@ type
   PComparer = ^TComparer;
   PListBuffer = ^TListBuffer;
   PListNode = ^TListNode;
+  PListProc = ^TListProc;
+  PIdentifiableList = ^TIdentifiableList;
+  PIdentifiableListProc = ^TIdentifiableListProc;
+  PObjectListProc = ^TObjectListProc;
+  PStringListProc = ^TStringListProc;
 
   TSortFunc = procedure(AList: PList; AComparer: TComparer);
   TListBuffer = array[0..ListBufferSize] of pointer;
+  TListProc = procedure(ASender: PObject; AItem: pointer);
+  TObjectListProc = procedure(ASender: PObject; AItem: PObject);
+  TStringListProc = procedure(ASender: PObject; AItem: PChar);
+  TIdentifiableListProc = procedure(ASender: PObject; AItem: PIdentifiable);
 
   TList = object(TStatusObject)
   private
@@ -55,6 +64,7 @@ type
     function GetItem(AIndex: integer): pointer;
     function IndexOf(AItem: pointer): integer;
     function Capacity: integer;
+    procedure ForEach(AProc: PListProc);
     procedure SetComparer(AComparer: TComparer); virtual;
     procedure Swap(AIndex1, AIndex2: integer); virtual;
     procedure SetItem(AIndex: integer; AItem: pointer);
@@ -64,6 +74,16 @@ type
     procedure Insert(AIndex: integer; AItem: pointer);
     procedure Delete(AIndex: integer); virtual;
     procedure Clear; virtual;
+
+    { Standard Overrides
+    function GetItemById(const AID: string): PObject;
+    function GetItem(AIndex: integer): PObject;
+    function Add(AItem: PObject): integer;
+    function IndexOf(AItem: PObject): integer;
+    procedure ForEach(AProc: PObjectListProc);
+    procedure SetItem(AIndex: integer; AItem: PObject);
+    procedure Insert(AIndex: integer; AItem: PObject);
+    }
   end;
 
   TListNode = record
@@ -106,6 +126,7 @@ type
     procedure SetItem(AIndex: integer; AItem: PObject);
     procedure Insert(AIndex: integer; AItem: PObject);
     procedure Delete(AIndex: integer); virtual;
+    procedure ForEach(AProc: PObjectListProc);
     procedure Clear; virtual;
     destructor Free; virtual;
   end;
@@ -164,6 +185,7 @@ type
     function GetString(AIndex: integer): string;
     procedure Clear; virtual;
     procedure Delete(AIndex: integer); virtual;
+    procedure ForEach(AProc: PStringListProc);
     procedure Init; virtual;
   end;
 
@@ -173,6 +195,11 @@ type
     function GetItemById(const AId: string): PIdentifiable;
     function GetItem(AIndex: integer): PIdentifiable;
     function IndexOfId(const AId: string): integer; virtual;
+    function Add(AItem: PIdentifiable): integer;
+    function IndexOf(AItem: PIdentifiable): integer;
+    procedure ForEach(AProc: PIdentifiableListProc);
+    procedure SetItem(AIndex: integer; AItem: PIdentifiable);
+    procedure Insert(AIndex: integer; AItem: PIdentifiable);
   end;
 
   TStringComparer = object(TObject)
@@ -540,6 +567,14 @@ begin
   Dec(Count);
 end;
 
+procedure TList.ForEach(AProc: PListProc);
+var
+  index: integer;
+begin
+  for index := 0 to Count - 1 do
+    TListProc(AProc)(@self, GetItem(index));
+end;
+
 procedure TObjectList.Init;
 begin
   inherited Init;
@@ -598,6 +633,11 @@ end;
 function TObjectList.GetItem(AIndex: integer): PObject;
 begin
   GetItem := inherited GetItem(AIndex);
+end;
+
+procedure TObjectList.ForEach(AProc: PObjectListProc);
+begin
+  TList.ForEach(PListProc(AProc));
 end;
 
 procedure TQueue.Init;
@@ -705,6 +745,11 @@ begin
   DisposeStrings := true;
 end;
 
+procedure TStringList.ForEach(AProc: PStringListProc);
+begin
+  TList.ForEach(PListProc(AProc));
+end;
+
 function TStringList.GetString(AIndex: integer): string;
 var
   result: PChar;
@@ -774,6 +819,31 @@ begin
       break;
     end;
   end;
+end;
+
+function TIdentifiableList.Add(AItem: PIdentifiable): integer;
+begin
+  Add := inherited Add(AItem);
+end;
+
+function TIdentifiableList.IndexOf(AItem: PIdentifiable): integer;
+begin
+  IndexOf := inherited IndexOf(AItem);
+end;
+
+procedure TIdentifiableList.ForEach(AProc: PIdentifiableListProc);
+begin
+  TList.ForEach(PListProc(AProc));
+end;
+
+procedure TIdentifiableList.SetItem(AIndex: integer; AItem: PIdentifiable);
+begin
+  inherited SetItem(AIndex, AItem);
+end;
+
+procedure TIdentifiableList.Insert(AIndex: integer; AItem: PIdentifiable);
+begin
+  inherited Insert(AIndex, AItem);
 end;
 
 procedure TLinkedList.Init;

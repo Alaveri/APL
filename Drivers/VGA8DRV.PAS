@@ -563,7 +563,7 @@ begin
   inherited Init;
   newMode := New(PGraphicsMode, Create);
   with newMode^ do begin
-    Id := $13;
+    ModeId := $13;
     desc := 'VGA '
       + IntToStr(320)
       + 'x'

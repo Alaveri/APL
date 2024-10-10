@@ -18,13 +18,24 @@ type
   PInversionPoint = ^TInversionPoint;
   PInversionPointList = ^TInversionPointList;
   PVector2 = ^TVector2;
+  PPointListProc = ^TPointListProc;
+  PRectListProc = ^TRectListProc;
+  PInversionPointListProc = ^TInversionPointListProc;
 
   TRegionMode = (rmInclude, rmExclude);
+  TPointListProc = procedure(ASender: PObject; APoint: PPoint);
+  TRectListProc = procedure(ASender: PObject; ARect: PRect);
+  TInversionPointListProc = procedure(ASender: PObject; AInversionPoint: PInversionPoint);
 
   TPointList = object(TObjectList)
   private
   public
     function GetItem(AIndex: integer): PPoint;
+    function Add(AItem: PPoint): integer;
+    function IndexOf(AItem: PPoint): integer;
+    procedure ForEach(AProc: PPointListProc);
+    procedure SetItem(AIndex: integer; AItem: PPoint);
+    procedure Insert(AIndex: integer; AItem: PPoint);
   end;
 
   TInversionPoint = object(TObject)
@@ -41,6 +52,11 @@ type
   private
   public
     function GetItem(AIndex: integer): PRect;
+    function Add(AItem: PRect): integer;
+    function IndexOf(AItem: PRect): integer;
+    procedure ForEach(AProc: PRectListProc);
+    procedure SetItem(AIndex: integer; AItem: PRect);
+    procedure Insert(AIndex: integer; AItem: PRect);
   end;
 
   TInversionPointList = object(TObjectList)
@@ -49,7 +65,11 @@ type
     constructor Create;
     procedure Init; virtual;
     function GetItem(AIndex: integer): PInversionPoint;
-  end;
+    function Add(AItem: PInversionPoint): integer;
+    function IndexOf(AItem: PInversionPoint): integer;
+    procedure ForEach(AProc: PInversionPointListProc);
+    procedure SetItem(AIndex: integer; AItem: PInversionPoint);
+    procedure Insert(AIndex: integer; AItem: PInversionPoint);  end;
 
   TPoint = object(TObject)
   public
@@ -553,9 +573,59 @@ begin
   GetItem := PPoint(inherited GetItem(AIndex));
 end;
 
+function TPointList.Add(AItem: PPoint): integer;
+begin
+  Add := inherited Add(AItem);
+end;
+
+function TPointList.IndexOf(AItem: PPoint): integer;
+begin
+  IndexOf := inherited IndexOf(AItem);
+end;
+
+procedure TPointList.ForEach(AProc: PPointListProc);
+begin
+  TList.ForEach(PListProc(AProc));
+end;
+
+procedure TPointList.SetItem(AIndex: integer; AItem: PPoint);
+begin
+  inherited SetItem(AIndex, AItem);
+end;
+
+procedure TPointList.Insert(AIndex: integer; AItem: PPoint);
+begin
+  inherited Insert(AIndex, AItem);
+end;
+
 function TRectList.GetItem(AIndex: integer): PRect;
 begin
   GetItem := PRect(inherited GetItem(AIndex));
+end;
+
+function TRectList.Add(AItem: PRect): integer;
+begin
+  Add := inherited Add(AItem);
+end;
+
+function TRectList.IndexOf(AItem: PRect): integer;
+begin
+  IndexOf := inherited IndexOf(AItem);
+end;
+
+procedure TRectList.ForEach(AProc: PRectListProc);
+begin
+  TList.ForEach(PListProc(AProc));
+end;
+
+procedure TRectList.SetItem(AIndex: integer; AItem: PRect);
+begin
+  inherited SetItem(AIndex, AItem);
+end;
+
+procedure TRectList.Insert(AIndex: integer; AItem: PRect);
+begin
+  inherited Insert(AIndex, AItem);
 end;
 
 procedure TRegion.Init;
@@ -775,6 +845,31 @@ end;
 function TInversionPointList.GetItem(AIndex: integer): PInversionPoint;
 begin
   GetItem := PInversionPoint(inherited GetItem(AIndex));
+end;
+
+function TInversionPointList.Add(AItem: PInversionPoint): integer;
+begin
+  Add := inherited Add(AItem);
+end;
+
+function TInversionPointList.IndexOf(AItem: PInversionPoint): integer;
+begin
+  IndexOf := inherited IndexOf(AItem);
+end;
+
+procedure TInversionPointList.ForEach(AProc: PInversionPointListProc);
+begin
+  TList.ForEach(PListProc(AProc));
+end;
+
+procedure TInversionPointList.SetItem(AIndex: integer; AItem: PInversionPoint);
+begin
+  inherited SetItem(AIndex, AItem);
+end;
+
+procedure TInversionPointList.Insert(AIndex: integer; AItem: PInversionPoint);
+begin
+  inherited Insert(AIndex, AItem);
 end;
 
 procedure TInversionPointList.Init;

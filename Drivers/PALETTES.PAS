@@ -24,6 +24,9 @@ type
   PJascPaletteReader = ^TJascPaletteReader;
   PAplPaletteWriter = ^TAplPaletteWriter;
   PAplPaletteReader = ^TAplPaletteReader;
+  PRgbColorListProc = ^TRgbColorListProc;
+
+  TRgbColorListProc = procedure(ASender: PRgbColorList; AItem: PRgbColor);
 
   TStandardColor =
   (
@@ -72,6 +75,7 @@ type
     function IndexOf(AItem: PRgbColor): integer;
     procedure SetItem(AIndex: integer; AItem: PRgbColor);
     procedure Insert(AIndex: integer; AItem: PRgbColor);
+    procedure ForEach(AProc: PRgbColorListProc);
     procedure Delete(AIndex: integer); virtual;
     destructor Free; virtual;
   end;
@@ -91,7 +95,9 @@ type
     procedure SaveToFile(AFilename: string);
     procedure SaveToStream(AStream: PStream);
     procedure SaveToStreamFormat(AStream: PStream; AFormat: TPaletteFormat);
+    procedure SaveToStreamWriter(AStream: PStream; AWriter: PPaletteWriter);
     procedure SaveToFileFormat(AFilename: string; AFormat: TPaletteFormat);
+    procedure SaveToFileWriter(AFilename: string; AWriter: PPaletteWriter);
     procedure LoadFromFile(AFilename: string; AFormat: TPaletteFormat);
     procedure LoadFromStream(AStream: PStream; AFormat: TPaletteFormat);
     procedure SetFormat(AFormat: TPaletteFormat);
@@ -348,6 +354,11 @@ begin
   inherited Delete(AIndex);
 end;
 
+procedure TRgbColorList.ForEach(AProc: PRgbColorListProc);
+begin
+  TList.ForEach(PListProc(AProc));
+end;
+
 destructor TRgbColorList.Free;
 begin
   Clear;
@@ -403,11 +414,22 @@ begin
 end;
 
 procedure TRgbPalette.SaveToFileFormat(AFilename: string; AFormat: TPaletteFormat);
-  var
+var
   stream: PStream;
 begin
   stream := New(PFileStream, Create(AFilename, fmWrite));
   SaveToStreamFormat(stream, AFormat);
+  if stream^.HasException then
+    Raise(stream^.Exception^.Code);
+  FreeAndNil(stream);
+end;
+
+procedure TRgbPalette.SaveToFileWriter(AFilename: string; AWriter: PPaletteWriter);
+var
+  stream: PStream;
+begin
+  stream := New(PFileStream, Create(AFilename, fmWrite));
+  SaveToStreamWriter(stream, AWriter);
   if stream^.HasException then
     Raise(stream^.Exception^.Code);
   FreeAndNil(stream);
@@ -431,10 +453,15 @@ begin
       exit;
     end;
   end;
-  writer^.WritePalette(FColors, AStream);
-  if writer^.HasException then
-    Raise(writer^.Exception^.Code);
+  SaveToStreamWriter(AStream, writer);
   FreeAndNil(writer);
+end;
+
+procedure TRgbPalette.SaveToStreamWriter(AStream: PStream; AWriter: PPaletteWriter);
+begin
+  AWriter^.WritePalette(FColors, AStream);
+  if AWriter^.HasException then
+    Raise(AWriter^.Exception^.Code);
 end;
 
 procedure TRgbPalette.LoadFromFile(AFilename: string; AFormat: TPaletteFormat);

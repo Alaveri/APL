@@ -20,6 +20,8 @@ type
   PDirectoryContents = ^TDirectoryContents;
   PFile = ^TFile;
   PFileList = ^TFileList;
+  PFileListProc = ^TFileListProc;
+
 
   TFileAttribute = (
     faReadOnly,
@@ -31,7 +33,7 @@ type
   );
 
   TFileAttributes = set of TFileAttribute;
-
+  TFileListProc = procedure(ASender: PObject; AItem: PFile);
   TFile = object(TObject)
   private
   public
@@ -63,6 +65,11 @@ type
   public
     function GetItem(AIndex: longint): PFile;
     function Find(const AFilename: string): PFile;
+    function Add(AItem: PFile): integer;
+    function IndexOf(AItem: PFile): integer;
+    procedure ForEach(AProc: PFileListProc);
+    procedure SetItem(AIndex: integer; AItem: PFile);
+    procedure Insert(AIndex: integer; AItem: PFile);
   end;
 
   TDirectoryManager = object(TStatusObject)
@@ -362,6 +369,31 @@ end;
 function TFileList.GetItem(AIndex: longint): PFile;
 begin
   GetItem := PFile(inherited GetItem(AIndex));
+end;
+
+function TFileList.Add(AItem: PFile): integer;
+begin
+  Add := inherited Add(AItem);
+end;
+
+function TFileList.IndexOf(AItem: PFile): integer;
+begin
+  IndexOf := inherited IndexOf(AItem);
+end;
+
+procedure TFileList.ForEach(AProc: PFileListProc);
+begin
+  TList.ForEach(PListProc(AProc));
+end;
+
+procedure TFileList.SetItem(AIndex: integer; AItem: PFile);
+begin
+  inherited SetItem(AIndex, AItem);
+end;
+
+procedure TFileList.Insert(AIndex: integer; AItem: PFile);
+begin
+  inherited Insert(AIndex, AItem);
 end;
 
 function TFileList.Find(const AFilename: string): PFile;

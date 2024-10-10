@@ -36,13 +36,17 @@ type
   PProportionalFont = ^TProportionalFont;
   PColoredFont = ^TColoredFont;
   PFontFormats = ^TFontFormats;
+  PGraphicsModeListProc = ^TGraphicsModeListProc;
+  PFontListProc = ^TFontListProc;
 
   TFontWidthArray = array[byte] of word;
   TFontCompression = (fcNone, fcLzw);
   TFontFormat = (ffProportional, ffMonospace, ffSystem, ffColored, ff1Bpp, ff2Bpp, ff4Bpp, ff8Bpp);
   TFontFormats = set of TFontFormat;
+  TGraphicsModeListProc = procedure(ASender: PGraphicsModeList; AMode: PGraphicsMode);
+  TFontListProc = procedure(ASender: PFontList; AFont: PFont);
 
-  TGraphicsMode = object(TObject)
+  TGraphicsMode = object(TIdentifiable)
   private
   public
     Description: PChar;
@@ -55,7 +59,7 @@ type
     BytesPerScanLine: word;
     FrameBuffer: pointer;
     NumPages: byte;
-    Id: integer;
+    ModeId: integer;
     procedure Assign(var ASource: TObject); virtual;
     procedure Init; virtual;
     destructor Free; virtual;
@@ -63,8 +67,14 @@ type
 
   TGraphicsModeList = object(TIdentifiableList)
   public
-    function GetItemById(const AId: integer): PGraphicsMode;
+    function GetItemById(const AID: string): PGraphicsMode;
     function GetItem(AIndex: integer): PGraphicsMode;
+    function GetModeById(AModeID: integer): PGraphicsMode;
+    function Add(AItem: PGraphicsMode): integer;
+    function IndexOf(AItem: PGraphicsMode): integer;
+    procedure ForEach(AProc: PGraphicsModeListProc);
+    procedure SetItem(AIndex: integer; AItem: PGraphicsMode);
+    procedure Insert(AIndex: integer; AItem: PGraphicsMode);
   end;
 
   TFontHeader = record
@@ -250,8 +260,13 @@ type
 
   TFontList = Object(TIdentifiableList)
   public
-    function GetItemById(AId: string): PFont;
+    function GetItemById(const AId: string): PFont;
     function GetItem(AIndex: integer): PFont;
+    function Add(AItem: PFont): integer;
+    function IndexOf(AItem: PFont): integer;
+    procedure ForEach(AProc: PFontListProc);
+    procedure SetItem(AIndex: integer; AItem: PFont);
+    procedure Insert(AIndex: integer; AItem: PFont);
   end;
 
 var
@@ -861,6 +876,7 @@ end;
 procedure TGraphicsMode.Init;
 begin
   inherited Init;
+  ModeId := 0;
   Width := 0;
   Height := 0;
   MaxX := 0;
@@ -910,19 +926,49 @@ begin
   GetItem := PGraphicsMode(inherited GetItem(AIndex));
 end;
 
-function TGraphicsModeList.GetItemById(const AId: integer): PGraphicsMode;
+function TGraphicsModeList.GetItemById(const AID: string): PGraphicsMode;
+begin
+  GetItemById := PGraphicsMode(inherited GetItemById(AId));
+end;
+
+function TGraphicsModeList.GetModeById(AModeId: integer): PGraphicsMode;
 var
   index: integer;
-  item: PGraphicsMode;
+  mode: PGraphicsMode;
 begin
-  GetItemById := nil;
+  GetModeById := nil;
   for index := 0 to Count - 1 do begin
-    item := GetItem(index);
-    if item^.Id = AId then begin
-      GetItemById := item;
+    mode := GetItem(index);
+    if mode^.ModeId = AModeId then begin
+      GetModeById := mode;
       exit;
     end;
   end;
+end;
+
+function TGraphicsModeList.Add(AItem: PGraphicsMode): integer;
+begin
+  Add := inherited Add(AItem);
+end;
+
+function TGraphicsModeList.IndexOf(AItem: PGraphicsMode): integer;
+begin
+  IndexOf := inherited IndexOf(AItem);
+end;
+
+procedure TGraphicsModeList.ForEach(AProc: PGraphicsModeListProc);
+begin
+  TList.ForEach(PListProc(AProc));
+end;
+
+procedure TGraphicsModeList.SetItem(AIndex: integer; AItem: PGraphicsMode);
+begin
+  inherited SetItem(AIndex, AItem);
+end;
+
+procedure TGraphicsModeList.Insert(AIndex: integer; AItem: PGraphicsMode);
+begin
+  inherited Insert(AIndex, AItem);
 end;
 
 destructor TFont.Free;
@@ -1385,9 +1431,34 @@ begin
   GetItem := PFont(inherited GetItem(AIndex));
 end;
 
-function TFontList.GetItemById(AId: string): PFont;
+function TFontList.GetItemById(const AId: string): PFont;
 begin
   GetItemById := PFont(inherited GetItemById(AId));
+end;
+
+function TFontList.Add(AItem: PFont): integer;
+begin
+  Add := inherited Add(AItem);
+end;
+
+function TFontList.IndexOf(AItem: PFont): integer;
+begin
+  IndexOf := inherited IndexOf(AItem);
+end;
+
+procedure TFontList.ForEach(AProc: PFontListProc);
+begin
+  TList.ForEach(PListProc(AProc));
+end;
+
+procedure TFontList.SetItem(AIndex: integer; AItem: PFont);
+begin
+  inherited SetItem(AIndex, AItem);
+end;
+
+procedure TFontList.Insert(AIndex: integer; AItem: PFont);
+begin
+  inherited Insert(AIndex, AItem);
 end;
 
 procedure Finalize; far;

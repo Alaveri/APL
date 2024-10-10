@@ -149,7 +149,7 @@ begin
     end;
     newMode := New(PSVga8Mode, Create);
     with newMode^ do begin
-      Id := vbeModeIndex;
+      ModeId := vbeModeIndex;
       case vbeMode.v1.Bpp of
           4: colors := '16';
           8: colors := '256';

@@ -23,14 +23,21 @@ type
   PMemoryDriver = ^TMemoryDriver;
   PMemoryAllocErrorProc = ^TMemoryAllocErrorProc;
   PBuffer = ^TBuffer;
+  PReferenceListProc = ^TReferenceListProc;
 
   TMemoryAllocErrorProc = function(ASize: word): boolean;
+  TReferenceListProc = procedure(ASender: PReferenceList; AReference: PReference);
 
   TReferenceList = object(TList)
   private
   public
     destructor Free; virtual;
     function GetItem(AIndex: integer): PReference;
+    function Add(AItem: PReference): integer;
+    function IndexOf(AItem: PReference): integer;
+    procedure ForEach(AProc: PReferenceListProc);
+    procedure SetItem(AIndex: integer; AItem: PReference);
+    procedure Insert(AIndex: integer; AItem: PReference);
   end;
 
   TReference = record
@@ -631,6 +638,31 @@ end;
 function TReferenceList.GetItem(AIndex: integer): PReference;
 begin
   GetItem := PReference(Inherited GetItem(AIndex));
+end;
+
+function TReferenceList.Add(AItem: PReference): integer;
+begin
+  Add := Inherited Add(AItem);
+end;
+
+function TReferenceList.IndexOf(AItem: PReference): integer;
+begin
+  IndexOf := Inherited IndexOf(AItem);
+end;
+
+procedure TReferenceList.ForEach(AProc: PReferenceListProc);
+begin
+  TList.ForEach(PListProc(AProc));
+end;
+
+procedure TReferenceList.SetItem(AIndex: integer; AItem: PReference);
+begin
+  Inherited SetItem(AIndex, AItem);
+end;
+
+procedure TReferenceList.Insert(AIndex: integer; AItem: PReference);
+begin
+  Inherited Insert(AIndex, AItem);
 end;
 
 procedure Finalize; far;

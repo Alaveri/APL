@@ -57,7 +57,7 @@ begin
   inherited Init;
   newMode := New(PGraphicsMode, Create);
   with newMode^ do begin
-    Id := $13;
+    ModeId := $13;
     desc := 'VGA '
       + IntToStr(320)
       + 'x'
@@ -240,7 +240,6 @@ begin
     Inc(linePtr, Ord(ch) * height);
     minX := MaxLong(0, drawRect.X - sx);
     maxX := MinLong(State.Font^.TextWidth(ch) - 1, drawRect.Right - sx);
-    sy := APY;
     for yIndex := 0 to height - 1 do begin
       currentLine := linePtr^;
       if sy > drawRect.Bottom then
