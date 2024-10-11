@@ -15,7 +15,7 @@ uses
   AplObj;
 
 const
-  ListBufferSize = $FFF8 div 4;
+  ListBufferSize = $FFF8 div SizeOf(Pointer);
   DefaultListSize = 4;
 
 type
@@ -42,6 +42,7 @@ type
   TObjectListProc = procedure(ASender: PObject; AItem: PObject);
   TStringListProc = procedure(ASender: PObject; AItem: PChar);
   TIdentifiableListProc = procedure(ASender: PObject; AItem: PIdentifiable);
+  TListGrowFunc = function(ACapacity: integer): integer;
 
   TList = object(TStatusObject)
   private
@@ -49,7 +50,6 @@ type
     FComparer: TComparer;
     FCapacity: integer;
     FBuffer: PListBuffer;
-    procedure Grow;
     function GetSortedIndex(AItem: pointer): integer;
     procedure QuickSort(AComparer: TComparer; ALowIndex, AHighIndex: integer);
   public
@@ -63,7 +63,11 @@ type
     function Sorted: boolean;
     function GetItem(AIndex: integer): pointer;
     function IndexOf(AItem: pointer): integer;
+    function BinarySearchUsing(AComparer: TComparer; var AValue): integer;
+    function BinarySearch(var AValue): integer;
     function Capacity: integer;
+    procedure Grow; virtual;
+    procedure GrowUsing(AGrowFunc: TListGrowFunc);
     procedure ForEach(AProc: PListProc);
     procedure SetComparer(AComparer: TComparer); virtual;
     procedure Swap(AIndex1, AIndex2: integer); virtual;
@@ -74,16 +78,6 @@ type
     procedure Insert(AIndex: integer; AItem: pointer);
     procedure Delete(AIndex: integer); virtual;
     procedure Clear; virtual;
-
-    { Standard Overrides
-    function GetItemById(const AID: string): PObject;
-    function GetItem(AIndex: integer): PObject;
-    function Add(AItem: PObject): integer;
-    function IndexOf(AItem: PObject): integer;
-    procedure ForEach(AProc: PObjectListProc);
-    procedure SetItem(AIndex: integer; AItem: PObject);
-    procedure Insert(AIndex: integer; AItem: PObject);
-    }
   end;
 
   TListNode = record
@@ -126,7 +120,7 @@ type
     procedure SetItem(AIndex: integer; AItem: PObject);
     procedure Insert(AIndex: integer; AItem: PObject);
     procedure Delete(AIndex: integer); virtual;
-    procedure ForEach(AProc: PObjectListProc);
+    procedure ForEach(AProc: TObjectListProc);
     procedure Clear; virtual;
     destructor Free; virtual;
   end;
@@ -212,6 +206,8 @@ type
 var
   TStringCompare: TStringComparer;
 
+function DefaultListGrow(ACapacity: integer): integer; far;
+
 implementation
 
 uses
@@ -255,17 +251,30 @@ begin
   inherited Free;
 end;
 
-procedure TList.Grow;
+procedure TList.GrowUsing(AGrowFunc: TListGrowFunc);
 var
   newCapacity: integer;
 begin
-  if FCapacity >= 64 then
-    newCapacity := (FCapacity * 3) div 2
-  else if FCapacity >= 8 then
-    newCapacity := FCapacity + 16
-  else
-    newCapacity := FCapacity + 4;
+  newCapacity := AGrowFunc(FCapacity);
   SetCapacity(newCapacity);
+end;
+
+function DefaultListGrow(ACapacity: integer): integer;
+var
+  newCapacity: integer;
+begin
+  if ACapacity >= 64 then
+    newCapacity := (ACapacity * 3) div 2
+  else if ACapacity >= 8 then
+    newCapacity := ACapacity + 16
+  else
+    newCapacity := ACapacity + 4;
+  DefaultListGrow := newCapacity;
+end;
+
+procedure TList.Grow;
+begin
+  GrowUsing(DefaultListGrow);
 end;
 
 procedure TList.SetCapacity(ACapacity: integer);
@@ -425,7 +434,6 @@ begin
   SetCapacity(ACapacity);
 end;
 
-
 procedure TList.SetComparer(AComparer: TComparer);
 begin
   FComparer := AComparer;
@@ -500,29 +508,12 @@ end;
 
 function TList.GetSortedIndex(AItem: pointer): integer;
 var
-  compared: integer;
-  upper, lower, middle: integer;
-  item2: pointer;
+  result: integer;
 begin
-  GetSortedIndex := 0;
-  if Count = 0 then
-    exit;
-  lower := 0;
-  upper := Count - 1;
-  while lower <= upper do begin
-    middle := lower + (upper - lower) shr 1;
-    item2 := GetItem(middle);
-    compared := FComparer(item2, AItem);
-    if compared = 0 then begin
-      GetSortedIndex := middle;
-      exit;
-    end;
-    if compared < 0 then
-      lower := middle + 1
-    else if compared > 0 then
-      upper := middle - 1;
-  end;
-  GetSortedIndex := lower;
+  result := BinarySearch(AItem);
+  if result < 0 then
+    result := -result - 1;
+  GetSortedIndex := result;
 end;
 
 procedure TList.Insert(AIndex: integer; AItem: pointer);
@@ -573,6 +564,35 @@ var
 begin
   for index := 0 to Count - 1 do
     TListProc(AProc)(@self, GetItem(index));
+end;
+
+function TList.BinarySearch(var AValue): integer;
+begin
+  BinarySearch := BinarySearchUsing(FComparer, AValue);
+end;
+
+function TList.BinarySearchUsing(AComparer: TComparer; var AValue): integer;
+var
+  compared: integer;
+  upper, lower, middle: integer;
+  item2: pointer;
+begin
+  lower := 0;
+  upper := Count - 1;
+  while lower <= upper do begin
+    middle := lower + (upper - lower) shr 1;
+    item2 := GetItem(middle);
+    compared := AComparer(item2, pointer(AValue));
+    if compared = 0 then begin
+      BinarySearchUsing := middle;
+      exit;
+    end;
+    if compared < 0 then
+      lower := middle + 1
+    else if compared > 0 then
+      upper := middle - 1;
+  end;
+  BinarySearchUsing := -(lower + 1);
 end;
 
 procedure TObjectList.Init;
@@ -635,9 +655,9 @@ begin
   GetItem := inherited GetItem(AIndex);
 end;
 
-procedure TObjectList.ForEach(AProc: PObjectListProc);
+procedure TObjectList.ForEach(AProc: TObjectListProc);
 begin
-  TList.ForEach(PListProc(AProc));
+  TList.ForEach(@AProc);
 end;
 
 procedure TQueue.Init;

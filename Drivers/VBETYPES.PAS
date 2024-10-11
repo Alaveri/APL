@@ -1,4 +1,4 @@
-unit SVgaType;
+unit VbeTypes;
 
 interface
 
@@ -57,6 +57,13 @@ type
   TVbeCapabilities = set of TVbeCapability;
   TVbeModeAttributes = set of TVbeModeAttribute;
   TVbeWindowAttributes = set of TVbeWindowAttribute;
+
+  TVbeSupport =
+  (
+    vbe1,
+    vbe2,
+    vbe3
+  );
 
   TVbeInfo = record
     VbeSignature: array[0..3] of char;

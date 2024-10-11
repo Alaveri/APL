@@ -39,7 +39,7 @@ type
     function CanRead: boolean; virtual;
     function CanWrite: boolean; virtual;
     function CanSeek: boolean; virtual;
-    function Read(ABuffer: PByte; ACount: longint): longint; virtual;
+    function Read(ABuffer: pointer; ACount: longint): longint; virtual;
     function ReadByte: byte; virtual;
     function ReadInteger: integer; virtual;
     function ReadWord: word; virtual;
@@ -48,7 +48,7 @@ type
     function ReadDouble: double; virtual;
     function ReadBool: boolean; virtual;
     function ReadReal: real; virtual;
-    function Write(ABuffer: PByte; ACount: longint): longint; virtual;
+    function Write(ABuffer: pointer; ACount: longint): longint; virtual;
     function Seek(AOffset: longint; AOrigin: TSeekOrigin): longint; virtual;
     function WriteToStream(AStream: PStream; ACount: longint): longint; virtual;
     function ReadFromStream(AStream: PStream; ACount: longint): longint; virtual;
@@ -70,8 +70,8 @@ type
   public
     constructor Create(ASize: longint);
     destructor Free; virtual;
-    function Read(ABuffer: PByte; ACount: longint): longint; virtual;
-    function Write(ABuffer: PByte; ACount: longint): longint; virtual;
+    function Read(ABuffer: pointer; ACount: longint): longint; virtual;
+    function Write(ABuffer: pointer; ACount: longint): longint; virtual;
     function WriteToStream(AStream: PStream; ACount: longint): longint; virtual;
     function ReadFromStream(AStream: PStream; ACount: longint): longint; virtual;
     function CanRead: boolean; virtual;
@@ -101,7 +101,7 @@ type
     constructor Create(AFilename: string; AMode: TFileStreamMode);
     constructor CreateBufferSize(AFilename: string; AMode: TFileStreamMode; ABufferSize: word);
     destructor Done; virtual;
-    function Read(ABuffer: PByte; ACount: longint): longint; virtual;
+    function Read(ABuffer: pointer; ACount: longint): longint; virtual;
     function ReadByte: byte; virtual;
     function ReadInteger: integer; virtual;
     function ReadWord: word; virtual;
@@ -109,7 +109,7 @@ type
     function ReadDouble: double; virtual;
     function ReadBool: boolean; virtual;
     function ReadReal: real; virtual;
-    function Write(ABuffer: PByte; ACount: longint): longint; virtual;
+    function Write(ABuffer: pointer; ACount: longint): longint; virtual;
     function WriteToStream(AStream: PStream; ACount: longint): longint; virtual;
     function ReadFromStream(AStream: PStream; ACount: longint): longint; virtual;
     function CanRead: boolean; virtual;
@@ -177,11 +177,11 @@ begin
   CanSeek := true;
 end;
 
-function TStream.Read(ABuffer: PByte; ACount: longint): longint;
+function TStream.Read(ABuffer: pointer; ACount: longint): longint;
 begin
 end;
 
-function TStream.Write(ABuffer: PByte; ACount: longint): longint;
+function TStream.Write(ABuffer: pointer; ACount: longint): longint;
 begin
 end;
 
@@ -386,7 +386,7 @@ begin
   inherited Free;
 end;
 
-function TMemoryStream.Read(ABuffer: PByte; ACount: longint): longint;
+function TMemoryStream.Read(ABuffer: pointer; ACount: longint): longint;
 var
   bytesRead: longint;
   index: integer;
@@ -394,9 +394,11 @@ var
   reference: PReference;
   readSize: longint;
   ptr: PByte;
+  buffer: PByte;
 begin
   if HasException then
     exit;
+  buffer := PByte(ABuffer);
   Read := 0;
   bytesRead := 0;
   while bytesRead < ACount do begin
@@ -410,8 +412,8 @@ begin
       break;
     ptr := Memory.ReferencePointer(reference);
     Inc(ptr, offset);
-    Move(ptr^, ABuffer^, readSize);
-    Inc(ABuffer, readSize);
+    Move(ptr^, buffer^, readSize);
+    Inc(buffer, readSize);
     Inc(bytesRead, readSize);
     Inc(Position, readSize);
   end;
@@ -449,7 +451,7 @@ begin
   Fill := written;
 end;
 
-function TMemoryStream.Write(ABuffer: PByte; ACount: longint): longint;
+function TMemoryStream.Write(ABuffer: pointer; ACount: longint): longint;
 var
   index: integer;
   written: longint;
@@ -457,9 +459,11 @@ var
   offset: longint;
   writeSize: longint;
   ptr: PByte;
+  buffer: PByte;
 begin
   if HasException then
     exit;
+  buffer := PByte(ABuffer);
   Write := 0;
   written := 0;
   while written < ACount do begin
@@ -473,8 +477,8 @@ begin
       break;
     ptr := Memory.ReferencePointer(reference);
     Inc(ptr, offset);
-    Move(ABuffer^, ptr^, writeSize);
-    Inc(ABuffer, writeSize);
+    Move(buffer^, ptr^, writeSize);
+    Inc(buffer, writeSize);
     Inc(written, writeSize);
     Inc(Position, writeSize);
   end;
@@ -567,12 +571,14 @@ begin
   Close;
 end;
 
-function TFileStream.Read(ABuffer: PByte; ACount: longint): longint;
+function TFileStream.Read(ABuffer: pointer; ACount: longint): longint;
 var
   bytesRead: word;
   total: longint;
+  buffer: PByte;
 begin
   Read := 0;
+  buffer := PByte(ABuffer);
   if (ACount <= 0) or not CheckRead then
     exit;
   total := 0;
@@ -580,7 +586,7 @@ begin
     {$I-}
     if Eof(FFile) then
       break;
-    BlockRead(FFile, ABuffer^, MinLong(ACount, MaxVarSize), bytesRead);
+    BlockRead(FFile, buffer^, MinLong(ACount, MaxVarSize), bytesRead);
     {$I+}
     if IOResult <> 0 then begin
       Raise(ecStreamReadError);
@@ -588,26 +594,28 @@ begin
     end;
     if bytesRead = 0 then
       break;
-    Inc(ABuffer, bytesRead);
+    Inc(buffer, bytesRead);
     Inc(total, bytesRead);
     Inc(Position, bytesRead);
   end;
   Read := total;
 end;
 
-function TFileStream.Write(ABuffer: PByte; ACount: longint): longint;
+function TFileStream.Write(ABuffer: pointer; ACount: longint): longint;
 var
   bytesWritten: word;
   total: longint;
+  buffer: PByte;
 begin
   Write := 0;
+  buffer := PByte(ABuffer);
   if (ACount <= 0) or not CheckWrite then
     exit;
   total := 0;
   while total < ACount do begin
     Seek(Position, soFromBeginning);
     {$I-}
-    BlockWrite(FFile, ABuffer^, MinLong(ACount, MaxVarSize), bytesWritten);
+    BlockWrite(FFile, buffer^, MinLong(ACount, MaxVarSize), bytesWritten);
     {$I+}
     if IOResult <> 0 then begin
       Raise(ecStreamReadError);
@@ -615,7 +623,7 @@ begin
     end;
     if bytesWritten = 0 then
       break;
-    Inc(ABuffer, bytesWritten);
+    Inc(buffer, bytesWritten);
     Inc(total, bytesWritten);
     Inc(Position, bytesWritten);
     Inc(Size, bytesWritten);
