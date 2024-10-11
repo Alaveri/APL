@@ -170,6 +170,7 @@ type
       AY, AStartX, AEndX: integer): PInversionPointList;
     function Contains(AX, AY: integer): boolean;
     function IntersectsRect(var ARect: TRect): boolean;
+    function HasRect(var ARect: TRect): boolean;
   end;
 
 procedure LinearInterpolation(AStart: TVector2; AEnd: TVector2;
@@ -430,24 +431,24 @@ procedure TRect.GetInversionPoints(AList: PInversionPointList;
   AMode: TRegionMode; AY, AStartX, AEndX: integer);
 var
   point: PInversionPoint;
-  startMode, endMode: boolean;
+  on, off: boolean;
 begin
-  startMode := true;
-  endMode := false;
+  on := true;
+  off := false;
   if AMode = rmExclude then begin
-    startMode := false;
-    endMode := true;
+    on := false;
+    off := true;
   end;
-  if (AY < Y) or (AY > Bottom) then
-    exit;
   if AStartX = AEndX then
     exit;
-  if AStartX <= X then begin
-    point := New(PInversionPoint, CreatePoint(startMode, X));
+  if (AY < Y) or (AY > Bottom) then
+    exit;
+  if AStartX < X then begin
+    point := New(PInversionPoint, CreatePoint(on, X));
     AList^.Add(point);
   end;
-  if AEndX >= Right then begin
-    point := New(PInversionPoint, CreatePoint(endMode, Right + 1));
+  if AEndX > Right then begin
+    point := New(PInversionPoint, CreatePoint(off, Right));
     AList^.Add(point);
   end;
 end;
@@ -680,6 +681,20 @@ begin
   end;
 end;
 
+function TRegion.HasRect(var ARect: TRect): boolean;
+var
+  index: integer;
+  rect: PRect;
+begin
+  HasRect := false;
+  for index := 0 to Count - 1 do begin
+    rect := GetItem(index);
+    if rect^.Equals(ARect) then begin
+      HasRect := true;
+      exit;
+    end;
+  end;
+end;
 
 function TRegion.GetInversionPoints(AMode: TRegionMode;
   AY, AStartX, AEndX: integer): PInversionPointList;

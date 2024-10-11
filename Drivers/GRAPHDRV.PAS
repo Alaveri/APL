@@ -104,6 +104,8 @@ type
     Spacing: byte;
     destructor Free; virtual;
     constructor CreateSize(AMaxWidth, AHeight: byte);
+    constructor CreateLoadStream(AStream: PStream);
+    constructor CreateLoadFile(const AFilename: string);
     procedure Assign(var ASource: TObject); virtual;
     procedure Init; virtual;
     procedure SaveToStream(AStream: PStream); virtual;
@@ -390,8 +392,12 @@ var
   point: PInversionPoint;
   start, index, level: integer;
   dest: PByte;
+  draw: boolean;
 begin
   region := State.Region;
+  draw := region^.Contains(APX, APY);
+  if State.RegionMode = rmExclude then
+    draw := not draw;
   points := region^.GetInversionPoints(State.RegionMode, APY, APX, APX + AWidth - 1);
   if points^.Count = 0 then begin
     if State.RegionMode <> rmExclude then
@@ -449,21 +455,26 @@ var
   size, start, index, level: integer;
   dest: PByte;
   rect: TRect;
-  draw: boolean;
+  draw, contains: boolean;
 begin
   region := State.Region;
+  draw := false;
+  contains := region^.Contains(APX, APY);
+  if (State.RegionMode = rmInclude) and contains then
+    draw := true;
+  if (State.RegionMode = rmExclude) and not contains then
+    draw := true;
   points := region^.GetInversionPoints(State.RegionMode, APY, APX, APX + AWidth - 1);
-  if points^.Count = 0 then begin
+  if draw and (points^.Count = 0) then begin
     FillChar(ADest^, AWidth, AColor);
     FreeAndNil(points);
     exit;
   end;
-  draw := region^.Contains(APX, APY);
   level := 0;
-  start := -1;
+  start := 0;
   if draw then begin
-    level := 1;
     start := APX;
+    Inc(level)
   end;
   for index := 0 to Points^.Count - 1 do begin
     dest := ADest;
@@ -483,10 +494,10 @@ begin
       end;
     end;
   end;
-  size := APX + AWidth - start;
+  size := APX + AWidth - start + 1;
   dest := ADest;
   if (level > 0) and (size > 0) then begin
-    Inc(dest, start - APX);
+    Inc(dest, start - APX + 1);
     FillChar(dest^, size, AColor);
   end;
   FreeAndNil(points);
@@ -1064,6 +1075,18 @@ begin
   FontFormatsToWord := result;
 end;
 
+constructor TFont.CreateLoadStream(AStream: PStream);
+begin
+  inherited Create;
+  LoadFromStream(AStream);
+end;
+
+constructor TFont.CreateLoadFile(const AFilename: string);
+begin
+  inherited Create;
+  LoadFromFile(AFilename);
+end;
+
 procedure TFont.SaveToStream(AStream: PStream);
 begin
 end;
@@ -1220,7 +1243,7 @@ begin
   SetCharWidths;
 
   stream.Create(FFontDataSize);
-  stream.Write(PByte(FFontData), FFontDataSize);
+  stream.Write(FFontData, FFontDataSize);
   stream.Seek(0, soFromBeginning);
   if stream.HasException then
     Raise(stream.Exception^.Code)

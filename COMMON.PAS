@@ -488,15 +488,16 @@ var
   width: byte;
 begin
   FillChar(result, SizeOf(result), ord('0'));
-  result[1] := '$';
-  if (ANum >= High(word)) then
+  result[1] := '0';
+  result[2] := 'x';
+  if (ANum > High(word)) then
     width := 8
-  else if (ANum >= High(byte)) then
+  else if (ANum > High(byte)) then
     width := 4
   else
     width := 2;
-  result[0] := chr(width + 1);
-  numPos := width + 1;
+  result[0] := chr(width + 2);
+  numPos := width + 2;
   while (ANum > 0) do begin
     result[numPos] := HexDigits[ANum mod 16 + 1];
     Dec(numPos);

@@ -10,6 +10,7 @@ uses
   AplObj,
   AplTypes,
   Errors,
+  DateTime,
   Common,
   Lists,
   MemDrv;
@@ -18,8 +19,6 @@ type
   PStream = ^TStream;
   PMemoryStream = ^TMemoryStream;
   PFileStream = ^TFileStream;
-  PStreamReader = ^TStreamReader;
-  PTextReader = ^TTextReader;
 
   TSeekOrigin =
   (
@@ -54,6 +53,7 @@ type
     function ReadFromStream(AStream: PStream; ACount: longint): longint; virtual;
     procedure Init; virtual;
     procedure Close; virtual;
+    procedure ReadDateTime(var ADateTime: TDateTime); virtual;
     procedure WriteByte(AValue: byte); virtual;
     procedure WriteInteger(AValue: integer); virtual;
     procedure WriteWord(AValue: word); virtual;
@@ -62,6 +62,7 @@ type
     procedure WriteDouble(AValue: double); virtual;
     procedure WriteReal(AValue: real); virtual;
     procedure WriteBool(AValue: boolean); virtual;
+    procedure WriteDateTime(const ADateTime: TDateTime); virtual;
   end;
 
   TMemoryStream = object(TStream)
@@ -126,24 +127,6 @@ type
     procedure WriteDouble(AValue: double); virtual;
     procedure WriteReal(AValue: real); virtual;
     procedure WriteBool(AValue: boolean); virtual;
-  end;
-
-  TStreamReader = object(TStatusObject)
-  private
-    FStream: PStream;
-  public
-    constructor Create(AStream: PStream);
-    destructor Free; virtual;
-    procedure Init; virtual;
-  end;
-
-  TTextReader = object(TStreamReader)
-  private
-  public
-    procedure Init; virtual;
-    destructor Free; virtual;
-    function ReadLine: string;
-    function ReadAllLines: PStringList;
   end;
 
 implementation
@@ -289,6 +272,22 @@ end;
 procedure TStream.Close;
 begin
   FClosed := true;
+end;
+
+procedure TStream.ReadDateTime(var ADateTime: TDateTime);
+var
+  ticks: double;
+begin
+  Read(@ticks, SizeOf(double));
+  ADateTime.CreateTicks(ticks);
+end;
+
+procedure TStream.WriteDateTime(const ADateTime: TDateTime);
+var
+  ticks: double;
+begin
+  ticks := ADateTime.Ticks;
+  Write(@ticks, SizeOf(double));
 end;
 
 procedure TStream.WriteByte(AValue: byte);
@@ -882,58 +881,6 @@ begin
     Raise(ecStreamWriteNotSupported);
     CheckWrite := false;
   end;
-end;
-
-constructor TStreamReader.Create(AStream: PStream);
-begin
-  inherited Create;
-  FStream := AStream;
-end;
-
-destructor TStreamReader.Free;
-begin
-  inherited Free;
-end;
-
-procedure TStreamReader.Init;
-begin
-  inherited Init;
-  FStream := nil;
-end;
-
-procedure TTextReader.Init;
-begin
-  inherited Init;
-end;
-
-destructor TTextReader.Free;
-begin
-  inherited Free;
-end;
-
-function TTextReader.ReadLine: string;
-var
-  ch: char;
-  line: string;
-  charIndex : integer;
-begin
-  {TODO: this}
-  FillChar(line, SizeOf(Byte), 0);
-  charIndex := 1;
-  while FStream^.EndOfStream do begin
-    if charIndex > High(byte) then
-      break;
-    ch := Chr(FStream^.ReadByte);
-    if ch = #13 then begin
-
-    end;
-    Inc(charIndex);
-  end;
-  line[0] := Chr(charIndex - 1);
-end;
-
-function TTextReader.ReadAllLines: PStringList;
-begin
 end;
 
 begin
