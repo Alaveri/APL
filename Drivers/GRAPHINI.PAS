@@ -6,6 +6,7 @@ interface
 uses
   GraphDrv,
   Svga8Drv,
+  SvgaBgi8,
   FastVga8,
   Vga8Drv;
 
@@ -14,6 +15,7 @@ type
   (
     gdVga8,
     gdSVga8,
+    gdSVgaBgi8,
     gdFastVga8
 {    gdEga,
     gdCga,
@@ -34,6 +36,7 @@ begin
     gdVga8: Graph := New(PVga8Driver, Create);
     gdFastVga8: Graph := New(PFastVgaDriver, Create);
     gdSVga8: Graph := New(PSVga8Driver, Create);
+    gdSVgaBgi8: Graph := New(PSVgaBgiDriver, Create);
 {    gdVgaModeX: Graph := New(PVgaModeXDriver, Create);}
   end;
 end;
