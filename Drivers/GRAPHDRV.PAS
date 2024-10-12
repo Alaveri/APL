@@ -114,6 +114,7 @@ type
     procedure LoadFromFile(const AFilename: string); virtual;
     function FontFormatsToWord(AFormat: TFontFormats): word;
     function Format: word; virtual;
+    function PixelSet(AChar: char; APX, APY: integer): boolean; virtual;
     function CharWidth(AChar: char): integer; virtual;
     function TextWidthAny(AText: PChar; ALength: word): longint; virtual;
     function TextWidth(const AText: string): longint; virtual;
@@ -254,6 +255,7 @@ type
     procedure FillLine(ADest: PByte; APX, APY, AWidth: integer; AColor: byte);
     procedure MoveLine(ASource, ADest: PByte; APX, APY, AWidth: integer);
     procedure FillRegion(ADest: PByte; APX, APY, AWidth: integer; AColor: byte); virtual;
+    procedure RenderRegion(ASource, ADest: PByte; APX, APY, AWidth: integer; AColor: byte; AMove: boolean); virtual;
     procedure SetRegionPixel(ADest: PByte; APX, APY: integer; AForeColor: byte);
     procedure MoveRegion(ASource, ADest: PByte; APX, APY, AWidth: integer); virtual;
     procedure GetFontFormats(AFont: PFont; var AFormats: TFontFormats);
@@ -385,56 +387,6 @@ begin
   end;
 end;
 
-procedure TGraphicsDriver.MoveRegion(ASource, ADest: PByte; APX, APY, AWidth: integer);
-var
-  region: PRegion;
-  points: PInversionPointList;
-  point: PInversionPoint;
-  start, index, level: integer;
-  dest: PByte;
-  draw: boolean;
-begin
-  region := State.Region;
-  draw := region^.Contains(APX, APY);
-  if State.RegionMode = rmExclude then
-    draw := not draw;
-  points := region^.GetInversionPoints(State.RegionMode, APY, APX, APX + AWidth - 1);
-  if points^.Count = 0 then begin
-    if State.RegionMode <> rmExclude then
-      Move(ASource^, ADest^, AWidth);
-    exit;
-  end;
-  point := Points^.GetItem(0);
-  level := 0;
-  start := -1;
-  dest := ADest;
-  if point^.On then begin
-    start := APX;
-    Inc(dest, start - State.ViewPort.X + 1);
-    level := 1;
-  end;
-  for index := 1 to Points^.Count - 1 do begin
-    point := Points^.GetItem(index);
-    if point^.On then begin
-      if level = 0 then
-        start := point^.Position;
-      Inc(level);
-    end
-    else begin
-      Dec(level);
-      if level = 0 then begin
-        Inc(dest, start - State.ViewPort.X + 1);
-        Move(ASource^, dest^, point^.Position - start + 1);
-        start := -1;
-      end;
-    end;
-  end;
-  if level > 0 then begin
-    Move(ASource^, ADest^, State.ViewPort.Right - start);
-  end;
-  FreeAndNil(points);
-end;
-
 procedure TGraphicsDriver.GetFontFormats(AFont: PFont; var AFormats: TFontFormats);
 var
   formatByte: byte;
@@ -448,14 +400,36 @@ begin
 end;
 
 procedure TGraphicsDriver.FillRegion(ADest: PByte; APX, APY, AWidth: integer; AColor: byte);
+begin
+  RenderRegion(nil, ADest, APX, APY, AWidth, AColor, false);
+end;
+
+procedure TGraphicsDriver.MoveRegion(ASource, ADest: PByte; APX, APY, AWidth: integer);
+begin
+  RenderRegion(ASource, ADest, APX, APY, AWidth, 0, true);
+end;
+
+procedure TGraphicsDriver.RenderRegion(ASource, ADest: PByte; APX, APY, AWidth: integer; AColor: byte; AMove: boolean);
 var
   region: PRegion;
   points: PInversionPointList;
   point: PInversionPoint;
   size, start, index, level: integer;
-  dest: PByte;
+  dest, source: PByte;
   rect: TRect;
   draw, contains: boolean;
+  procedure RenderLine;
+  begin
+    Inc(dest, start - APX + 1);
+    Inc(source, start - APX + 1);
+    if size > 0 then begin
+      if AMove then
+        Move(ASource^, dest^, size)
+      else
+        FillChar(dest^, size, AColor);
+    end;
+    start := 0;
+  end;
 begin
   region := State.Region;
   draw := false;
@@ -466,18 +440,22 @@ begin
     draw := true;
   points := region^.GetInversionPoints(State.RegionMode, APY, APX, APX + AWidth - 1);
   if draw and (points^.Count = 0) then begin
-    FillChar(ADest^, AWidth, AColor);
+    if AMove then
+      Move(ASource^, ADest^, AWidth)
+    else
+      FillChar(ADest^, AWidth, AColor);
     FreeAndNil(points);
     exit;
   end;
   level := 0;
   start := 0;
   if draw then begin
-    start := APX;
+    start := APX - 1;
     Inc(level)
   end;
   for index := 0 to Points^.Count - 1 do begin
     dest := ADest;
+    source := ASource;
     point := Points^.GetItem(index);
     if point^.On then begin
       if level = 0 then
@@ -486,21 +464,18 @@ begin
     end
     else begin
       Dec(level);
-      size := point^.Position - start;
-      if (level = 0) and (size > 0) then begin
-        Inc(dest, start - APX);
-        FillChar(dest^, size, AColor);
-        start := -1;
-      end;
+      size := point^.Position - start - 1;
+      if level = 0 then
+        RenderLine;
     end;
   end;
+  FreeAndNil(points);
+  if (level = 0) or (size = 0) then
+    exit;
   size := APX + AWidth - start + 1;
   dest := ADest;
-  if (level > 0) and (size > 0) then begin
-    Inc(dest, start - APX + 1);
-    FillChar(dest^, size, AColor);
-  end;
-  FreeAndNil(points);
+  source := ASource;
+  RenderLine;
 end;
 
 function TGraphicsDriver.GetPixel(APX, APY: integer): byte;
@@ -1103,6 +1078,18 @@ procedure TFont.LoadFromFile(const AFilename: string);
 begin
 end;
 
+function TFont.PixelSet(AChar: char; APX, APY: integer): boolean;
+var
+  ptr: PWord;
+  px, currentLine: word;
+begin
+  ptr := FontData;
+  Inc(ptr, Ord(AChar) * Height + APY);
+  currentLine := ptr^;
+  px := word(1) shl (15 - APX);
+  PixelSet := currentLine and px > 0;
+end;
+
 procedure TMonospaceFont.Init;
 begin
   inherited Init;
@@ -1132,7 +1119,7 @@ constructor TProportionalFont.CreateSize(AMaxWidth, AHeight: byte);
 begin
   inherited CreateSize(AMaxWidth, AHeight);
   FillChar(CharWidths, SizeOf(CharWidths), MaxWidth);
-  FFontDataSize := AHeight * 256;
+  FFontDataSize := AHeight * 512;
   GetMem(FFontData, FontDataSize);
   FillChar(FFontData^, FontDataSize, 0);
 end;
