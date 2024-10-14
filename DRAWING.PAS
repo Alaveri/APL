@@ -21,11 +21,13 @@ type
   PPointListProc = ^TPointListProc;
   PRectListProc = ^TRectListProc;
   PInversionPointListProc = ^TInversionPointListProc;
+  PSetPixelProc = ^TSetPixelProc;
 
   TRegionMode = (rmInclude, rmExclude);
   TPointListProc = procedure(ASender: PObject; APoint: PPoint);
   TRectListProc = procedure(ASender: PObject; ARect: PRect);
   TInversionPointListProc = procedure(ASender: PObject; AInversionPoint: PInversionPoint);
+  TSetPixelProc = procedure(AX, AY: integer; AData: pointer);
 
   TPointList = object(TObjectList)
   private
@@ -179,6 +181,9 @@ procedure LinearInterpolation(AStart: TVector2; AEnd: TVector2;
 
 procedure BezierInterpolation(AP1: TVector2; AP2: TVector2; AP3: TVector2;
   AValue: real; var AResult: TVector2); far;
+
+procedure LineDraw(AX1, AY1, AX2, AY2: integer; ADrawRect: TRect;
+  ASetPixelProc: PSetPixelProc; AData: pointer); far;
 
 implementation
 
@@ -896,6 +901,53 @@ end;
 constructor TInversionPointList.Create;
 begin
   inherited Create;
+end;
+
+procedure LineDraw(AX1, AY1, AX2, AY2: integer; ADrawRect: TRect;
+  ASetPixelProc: PSetPixelProc; AData: pointer);
+var
+  aError, aError2, sx, sy, dlx, dly: integer;
+  x, y, right, bottom, width: integer;
+  color: byte;
+begin
+  if not Assigned(ASetPixelProc) then
+    exit;
+  dlx := Abs(AX2 - AX1);
+  if AX1 < AX2 then
+    sx := 1
+  else
+    sx := -1;
+
+  dly := -Abs(AY2 - AY1);
+  if AY1 < AY2 then
+    sy := 1
+  else
+    sy := -1;
+
+  aError := dlx + dly;
+  x := ADrawRect.X;
+  y := ADrawRect.Y;
+  right := ADrawRect.Right;
+  bottom := ADrawRect.Bottom;
+  while true do begin
+    if ADrawRect.Contains(AX1, AY1) then
+      TSetPixelProc(ASetPixelProc)(AX1, AY1, AData);
+    if (AX1 = AX2) and (AY1 = AY2) then
+      break;
+    aError2 := 2 * aError;
+    if aError2 >= dly then begin
+      if AX1 = AX2 then
+        break;
+      Inc(aError, dly);
+      Inc(AX1, sx);
+    end;
+    if aError2 <= dlx then begin
+      if AY1 = AY2 then
+        break;
+      Inc(aError, dlx);
+      Inc(AY1, sy);
+    end;
+  end;
 end;
 
 end.

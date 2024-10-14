@@ -28,7 +28,7 @@ type
     function CopyLength(ASource: PChar; AMaxLength: word): PChar;
     function EndString(AString: PChar): PChar;
     function EndCopy(ASource: PChar): PChar;
-    function Get(ASource: PChar): string;
+    function GetString(ASource: PChar): string;
     function Reassign(ADest, ASource: PChar): PChar;
     function IndexOf(ASource: PChar; AChar: char): integer;
     function Length(AString: PChar): word;
@@ -189,11 +189,11 @@ begin
   ADest := New(ASource);
 end;
 
-function TStringUtil.Get(ASource: PChar): string;
+function TStringUtil.GetString(ASource: PChar): string;
 begin
-  Get := '';
+  GetString := '';
   if Assigned(ASource) then
-    Get := StrPas(ASource);
+    GetString := StrPas(ASource);
 end;
 
 function TStringUtil.Length(AString: PChar): word;

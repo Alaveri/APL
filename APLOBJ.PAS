@@ -121,7 +121,7 @@ end;
 
 function TIdentifiable.GetId: string;
 begin
-  GetId := TString.Get(Id);
+  GetId := TString.GetString(Id);
 end;
 
 end.

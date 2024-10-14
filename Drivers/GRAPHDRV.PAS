@@ -109,10 +109,12 @@ type
     procedure Assign(var ASource: TObject); virtual;
     procedure Init; virtual;
     procedure SetPixel(AChar: char; APX, APY: integer); virtual;
+    procedure ClearPixel(AChar: char; APX, APY: integer); virtual;
     procedure SaveToStream(AStream: PStream); virtual;
     procedure SaveToFile(const AFilename: string); virtual;
     procedure LoadFromStream(AStream: PStream); virtual;
     procedure LoadFromFile(const AFilename: string); virtual;
+    procedure SetCharWidths; virtual;
     function FontFormatsToWord(AFormat: TFontFormats): word;
     function Format: word; virtual;
     function IsPixelSet(AChar: char; APX, APY: integer): boolean; virtual;
@@ -1045,6 +1047,10 @@ begin
   Abstract;
 end;
 
+procedure TFont.SetCharWidths;
+begin
+end;
+
 function TFont.FontFormatsToWord(AFormat: TFontFormats): word;
 var
   result: byte;
@@ -1105,6 +1111,20 @@ begin
   if currentLine and px > 0 then
     exit;
   ptr^ := currentLine or px;
+end;
+
+procedure TFont.ClearPixel(AChar: char; APX, APY: integer);
+var
+  ptr: PWord;
+  px, currentLine: word;
+begin
+  ptr := FontData;
+  Inc(ptr, Ord(AChar) * Height + APY);
+  currentLine := ptr^;
+  px := word(1) shl (15 - APX);
+  if currentLine and px = 0 then
+    exit;
+  ptr^ := currentLine and not px;
 end;
 
 procedure TMonospaceFont.Init;
@@ -1209,12 +1229,8 @@ begin
       end;
       Inc(linePtr);
     end;
-    if width = 0 then
-      width := MaxWidth
-    else begin
-      Inc(AvgTotal);
-      Inc(AvgCount, width + Spacing);
-    end;
+    Inc(AvgTotal);
+    Inc(AvgCount, width + Spacing);
     Inc(width, Spacing);
     CharWidths[charIndex] := width;
   end;
