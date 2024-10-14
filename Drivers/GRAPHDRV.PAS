@@ -108,13 +108,14 @@ type
     constructor CreateLoadFile(const AFilename: string);
     procedure Assign(var ASource: TObject); virtual;
     procedure Init; virtual;
+    procedure SetPixel(AChar: char; APX, APY: integer); virtual;
     procedure SaveToStream(AStream: PStream); virtual;
     procedure SaveToFile(const AFilename: string); virtual;
     procedure LoadFromStream(AStream: PStream); virtual;
     procedure LoadFromFile(const AFilename: string); virtual;
     function FontFormatsToWord(AFormat: TFontFormats): word;
     function Format: word; virtual;
-    function PixelSet(AChar: char; APX, APY: integer): boolean; virtual;
+    function IsPixelSet(AChar: char; APX, APY: integer): boolean; virtual;
     function CharWidth(AChar: char): integer; virtual;
     function TextWidthAny(AText: PChar; ALength: word): longint; virtual;
     function TextWidth(const AText: string): longint; virtual;
@@ -449,11 +450,12 @@ begin
   end;
   level := 0;
   start := 0;
+  size := 0;
   if draw then begin
     start := APX - 1;
-    Inc(level)
+    Inc(level);
   end;
-  for index := 0 to Points^.Count - 1 do begin
+  for index := 0 to points^.Count - 1 do begin
     dest := ADest;
     source := ASource;
     point := Points^.GetItem(index);
@@ -464,15 +466,16 @@ begin
     end
     else begin
       Dec(level);
-      size := point^.Position - start - 1;
-      if level = 0 then
+      if level = 0 then begin
+        size := point^.Position - start - 1;
         RenderLine;
+      end;
     end;
   end;
   FreeAndNil(points);
+  size := APX + AWidth - start + 1;
   if (level = 0) or (size = 0) then
     exit;
-  size := APX + AWidth - start + 1;
   dest := ADest;
   source := ASource;
   RenderLine;
@@ -1078,7 +1081,7 @@ procedure TFont.LoadFromFile(const AFilename: string);
 begin
 end;
 
-function TFont.PixelSet(AChar: char; APX, APY: integer): boolean;
+function TFont.IsPixelSet(AChar: char; APX, APY: integer): boolean;
 var
   ptr: PWord;
   px, currentLine: word;
@@ -1087,7 +1090,21 @@ begin
   Inc(ptr, Ord(AChar) * Height + APY);
   currentLine := ptr^;
   px := word(1) shl (15 - APX);
-  PixelSet := currentLine and px > 0;
+  IsPixelSet := currentLine and px > 0;
+end;
+
+procedure TFont.SetPixel(AChar: char; APX, APY: integer);
+var
+  ptr: PWord;
+  px, currentLine: word;
+begin
+  ptr := FontData;
+  Inc(ptr, Ord(AChar) * Height + APY);
+  currentLine := ptr^;
+  px := word(1) shl (15 - APX);
+  if currentLine and px > 0 then
+    exit;
+  ptr^ := currentLine or px;
 end;
 
 procedure TMonospaceFont.Init;

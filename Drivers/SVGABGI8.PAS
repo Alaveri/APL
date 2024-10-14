@@ -10,6 +10,7 @@ uses
   AplTypes,
   BgiInter,
   Streams,
+  Palettes,
   Drawing;
 
 type
@@ -38,6 +39,8 @@ type
     procedure FastDrawScreen(AImage: PByte); virtual;
     procedure FastDrawImage(APX, APY, AWidth, AHeight: integer; AImage: PByte); virtual;
     procedure FastSetPixel(APX, APY: integer); virtual;
+    procedure FillRect(ARect: TRect); virtual;
+    procedure SetRgbPaletteData(APalette: PRgbPaletteData); virtual;
     procedure WaitForVSync; virtual;
     procedure Init; virtual;
     destructor Free; virtual;
@@ -48,7 +51,6 @@ implementation
 uses
   MouseDrv,
   Errors,
-  Palettes,
   StrUtils;
 
 procedure TSVgaBgiDriver.Init;
@@ -220,6 +222,11 @@ begin
   end;
 end;
 
+procedure TSVgaBgiDriver.FillRect(ARect: TRect);
+begin
+  FBgiInterface.FillRect(ARect);
+end;
+
 procedure TSVgaBgiDriver.FastFillScreen(AColor: byte);
 begin
 end;
@@ -245,7 +252,73 @@ begin
 end;
 
 procedure TSVgaBgiDriver.RenderText(APX, APY, ALength: integer; AText: PChar);
+var
+  drawRect: TRect;
+  charIndex, yIndex, xIndex: integer;
+  ch: char;
+  sx, sy, minX, maxX: integer;
+  width: integer;
+  linePtr: PWord;
+  height: word;
+  screen: PByte;
+  fore: byte;
+  offset: longint;
+  currentLine: word;
+  px: integer;
+  format: TFontFormats;
 begin
+  if HasException then
+    exit;
+  Mode^.Bounds.GetIntersection(State.ViewPort, drawRect);
+  if APX > drawRect.Right then
+    exit;
+  if APY > drawRect.Bottom then
+    exit;
+  height := State.Font^.Height;
+  if APY + height < drawRect.Y then
+    exit;
+  GetFontFormats(State.Font, format);
+  if ff4Bpp in format then begin
+    Render4BppText(APX, APY, ALength, AText);
+    exit;
+  end;
+  sx := APX;
+  for charIndex := 0 to ALength - 1 do begin
+    ch := AText[charIndex];
+    width := State.Font^.TextWidth(ch);
+    if sx > drawRect.Right then
+      exit;
+    if sx + width < drawRect.X then begin
+      Inc(sx, width);
+      continue;
+    end;
+    sy := APY;
+    fore := State.ForeColor;
+    linePtr := State.Font^.FontData;
+    Inc(linePtr, Ord(ch) * height);
+    minX := MaxLong(0, drawRect.X - sx);
+    maxX := MinLong(State.Font^.TextWidth(ch) - 1, drawRect.Right - sx);
+    sy := APY;
+    for yIndex := 0 to height - 1 do begin
+      currentLine := linePtr^;
+      if sy < drawRect.Y then begin
+        Inc(linePtr);
+        Inc(sy);
+        continue;
+      end;
+      if sy > drawRect.Bottom then
+        break;
+      px := APX;
+      for xIndex := minX to maxX do begin
+        if (currentLine and ($8000 shr xIndex)) > 0 then
+          FBgiInterface.PutPixel(px, sy, fore);
+        Inc(px);
+      end;
+      Inc(linePtr);
+      Inc(sy);
+    end;
+    Inc(sx, width);
+  end;
 end;
 
 procedure TSVgaBgiDriver.Line(AX1, AY1, AX2, AY2: integer);
@@ -286,6 +359,12 @@ end;
 
 procedure TSVgaBgiDriver.GetImageStream(APX, APY, AWidth, AHeight: longint; AStream: PStream);
 begin
+end;
+
+procedure TSVgaBgiDriver.SetRgbPaletteData(APalette: PRgbPaletteData);
+begin
+  inherited SetRgbPaletteData(APalette);
+{  FBgiInterface.SetPalette(APalette);}
 end;
 
 destructor TSVgaBgiDriver.Free;

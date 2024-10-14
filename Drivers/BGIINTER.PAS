@@ -7,6 +7,9 @@ uses
   Graph,
   AplObj,
   Errors,
+  Palettes,
+  Drawing,
+  GraphDrv,
   Lists;
 
 type
@@ -21,9 +24,18 @@ type
     constructor Create(const ADriverName: string);
     procedure Init; virtual;
     procedure SetMode(AModeIndex: integer);
+    procedure FillRect(ARect: TRect);
+    procedure SetPalette(APalette: PRgbPaletteData);
+    procedure PutPixel(APX, APY: integer; AColor: word);
   end;
 
 implementation
+
+uses
+  GrDrv8;
+
+var
+  Graph8: PGraphics8Driver;
 
 function DetectVGA256 : integer; far;
 var
@@ -41,6 +53,13 @@ constructor TBgiInterface.Create(const ADriverName: string);
 begin
   FDriverName := ADriverName;
   inherited Create;
+end;
+
+procedure TBgiInterface.FillRect(ARect: TRect);
+begin
+  ARect.Intersect(Graph8^.State.ViewPort);
+  SetFillStyle(SolidFill, Graph8^.State.BackColor);
+  Bar(ARect.X, ARect.Y, ARect.Right, ARect.Bottom);
 end;
 
 procedure TBgiInterface.Init;
@@ -66,6 +85,7 @@ begin
     exit;
   if not FInitialized then begin
     InitGraph(FGraphDriver, AModeIndex, FGraphPath);
+    Graph8 := PGraphics8Driver(GraphDrv.Graph);
     errorCode := GraphResult;
     if errorCode <> grOk then begin
       Raise(ecGraphicsDriverError);
@@ -79,6 +99,23 @@ begin
     if GraphResult <> grOk then
       Raise(ecGraphicsDriverError);
   end;
+  Graph8^.SetStandardPalette;
+end;
+
+procedure TBgiInterface.SetPalette(APalette: PRgbPaletteData);
+var
+  index: integer;
+  color: TRgbColor;
+begin
+  for index := 0 to 255 do begin
+    color := APalette^[index];
+    SetRGBPalette(index, color.Red shr 2, color.Green shr 2, color.Blue shr 2);
+  end;
+end;
+
+procedure TBgiInterface.PutPixel(APX, APY: integer; AColor: word);
+begin
+  Graph.PutPixel(APX, APY, AColor);
 end;
 
 end.

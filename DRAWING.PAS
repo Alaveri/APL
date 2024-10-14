@@ -69,7 +69,8 @@ type
     function IndexOf(AItem: PInversionPoint): integer;
     procedure ForEach(AProc: PInversionPointListProc);
     procedure SetItem(AIndex: integer; AItem: PInversionPoint);
-    procedure Insert(AIndex: integer; AItem: PInversionPoint);  end;
+    procedure Insert(AIndex: integer; AItem: PInversionPoint);
+  end;
 
   TPoint = object(TObject)
   public
@@ -720,26 +721,26 @@ end;
 
 constructor TVector2.CreateCoords(AX, AY: real);
 begin
-  Init;
+  inherited Create;
   X := AX;
   Y := AY;
 end;
 
 constructor TVector2.CreateVector(AVector: TVector2);
 begin
-  Init;
+  inherited Create;
   SetVector(AVector);
 end;
 
 constructor TVector2.CreateSingle(AValue: real);
 begin
-  Init;
+  inherited Create;
   SetSingle(AValue);
 end;
 
 constructor TVector2.CreatePoint(APoint: TPoint);
 begin
-  Init;
+  inherited Create;
   SetPoint(APoint);
 end;
 

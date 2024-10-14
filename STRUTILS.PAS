@@ -30,6 +30,7 @@ type
     function EndCopy(ASource: PChar): PChar;
     function Get(ASource: PChar): string;
     function Reassign(ADest, ASource: PChar): PChar;
+    function IndexOf(ASource: PChar; AChar: char): integer;
     function Length(AString: PChar): word;
     procedure Free(var AString: PChar);
     procedure Assign(var ADest: PChar; ASource: string);
@@ -200,6 +201,20 @@ begin
   Length := 0;
   if Assigned(AString) then
     Length := StrLen(AString);
+end;
+
+function TStringUtil.IndexOf(ASource: PChar; AChar: char): integer;
+var
+  index: integer;
+begin
+  IndexOf := -1;
+  if not Assigned(ASource) then
+    exit;
+  for index := 0 to StrLen(ASource) - 1 do
+    if ASource[index] = AChar then begin
+      IndexOf := index;
+      break;
+    end;
 end;
 
 begin

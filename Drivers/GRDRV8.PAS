@@ -217,7 +217,6 @@ end;
 procedure TGraphics8Driver.SetStandardPalette;
 begin
   Palette := GetStandardPalette;
-  ExportPalette('APL.GPL', Palette, pfGimp);
   SetRgbPaletteData(Palette);
 end;
 
