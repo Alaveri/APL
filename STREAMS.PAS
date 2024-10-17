@@ -103,13 +103,6 @@ type
     constructor CreateBufferSize(AFilename: string; AMode: TFileStreamMode; ABufferSize: word);
     destructor Done; virtual;
     function Read(ABuffer: pointer; ACount: longint): longint; virtual;
-    function ReadByte: byte; virtual;
-    function ReadInteger: integer; virtual;
-    function ReadWord: word; virtual;
-    function ReadLong: longint; virtual;
-    function ReadDouble: double; virtual;
-    function ReadBool: boolean; virtual;
-    function ReadReal: real; virtual;
     function Write(ABuffer: pointer; ACount: longint): longint; virtual;
     function WriteToStream(AStream: PStream; ACount: longint): longint; virtual;
     function ReadFromStream(AStream: PStream; ACount: longint): longint; virtual;
@@ -120,13 +113,6 @@ type
     procedure Init; virtual;
     procedure Open; virtual;
     procedure Close; virtual;
-    procedure WriteByte(AValue: byte); virtual;
-    procedure WriteInteger(AValue: integer); virtual;
-    procedure WriteWord(AValue: word); virtual;
-    procedure WriteLong(AValue: longint); virtual;
-    procedure WriteDouble(AValue: double); virtual;
-    procedure WriteReal(AValue: real); virtual;
-    procedure WriteBool(AValue: boolean); virtual;
   end;
 
 implementation
@@ -622,86 +608,14 @@ begin
     end;
     if bytesWritten = 0 then
       break;
+
+    if Position + bytesWritten >= Size then
+      Size := Position + bytesWritten;
     Inc(buffer, bytesWritten);
     Inc(total, bytesWritten);
     Inc(Position, bytesWritten);
-    Inc(Size, bytesWritten);
   end;
   Write := total;
-end;
-
-function TFileStream.ReadByte: byte;
-var
-  aNum: byte;
-begin
-  if not CheckRead then
-    exit;
-  aNum := 0;
-  inherited Read(@aNum, SizeOf(byte));
-  ReadByte := aNum;
-end;
-
-function TFileStream.ReadInteger: integer;
-var
-  aNum: integer;
-begin
-  if not CheckRead then
-    exit;
-  aNum := 0;
-  Read(@aNum, SizeOf(integer));
-  ReadInteger := aNum;
-end;
-
-function TFileStream.ReadWord: word;
-var
-  aNum: word;
-begin
-  if not CheckRead then
-    exit;
-  aNum := 0;
-  Read(@aNum, SizeOf(word));
-  ReadWord := aNum;
-end;
-
-function TFileStream.ReadLong: longint;
-var
-  aNum: longint;
-begin
-  if not CheckRead then
-    exit;
-  Read(@aNum, SizeOf(longint));
-  ReadLong := aNum;
-end;
-
-function TFileStream.ReadDouble: double;
-var
-  aNum: double;
-begin
-  if not CheckRead then
-    exit;
-  Read(@aNum, SizeOf(double));
-  ReadDouble := aNum;
-end;
-
-function TFileStream.ReadReal: real;
-var
-  aNum: real;
-begin
-  if not CheckRead then
-    exit;
-  Read(@aNum, SizeOf(real));
-  ReadReal := aNum;
-end;
-
-function TFileStream.ReadBool: boolean;
-var
-  aBool: boolean;
-begin
-  if not CheckRead then
-    exit;
-  aBool := false;
-  Read(@aBool, SizeOf(boolean));
-  ReadBool := aBool;
 end;
 
 function TFileStream.WriteToStream(AStream: PStream; ACount: longint): longint;
@@ -757,55 +671,6 @@ end;
 function TFileStream.CanSeek: boolean;
 begin
   CanSeek := true;
-end;
-
-procedure TFileStream.WriteByte(AValue: byte);
-begin
-  if not CheckWrite then
-    exit;
-  Write(@AValue, SizeOf(byte));
-end;
-
-procedure TFileStream.WriteInteger(AValue: integer);
-begin
-  if not CheckWrite then
-    exit;
-  Write(@AValue, SizeOf(integer));
-end;
-
-procedure TFileStream.WriteWord(AValue: word);
-begin
-  if not CheckWrite then
-    exit;
-  Write(@AValue, SizeOf(word));
-end;
-
-procedure TFileStream.WriteLong(AValue: longint);
-begin
-  if not CheckWrite then
-    exit;
-  Write(@AValue, SizeOf(longint));
-end;
-
-procedure TFileStream.WriteDouble(AValue: double);
-begin
-  if not CheckWrite then
-    exit;
-  Write(@AValue, SizeOf(double));
-end;
-
-procedure TFileStream.WriteReal(AValue: real);
-begin
-  if not CheckWrite then
-    exit;
-  Write(@AValue, SizeOf(real));
-end;
-
-procedure TFileStream.WriteBool(AValue: boolean);
-begin
-  if not CheckWrite then
-    exit;
-  Write(@AValue, SizeOf(boolean));
 end;
 
 function TFileStream.Seek(AOffset: longint; AOrigin: TSeekOrigin): longint;

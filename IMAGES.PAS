@@ -266,7 +266,7 @@ begin
     end;
     icLzw: begin
       lzw.Create;
-      lzw.DecompressStream(ASource, Buffer);
+      lzw.DecompressStream(ASource, Buffer, -1);
       Buffer^.Seek(0, soFromBeginning);
       if Lzw.HasException then
         Raise(Lzw.Exception^.Code);

@@ -39,13 +39,13 @@ type
     constructor Create;
     function CompressStream(ASource, ADest: PStream; ALength: longint): longint; virtual;
     function ReadByte: byte;
-    function WriteBits(ANum: word; ABitCount: shortint): boolean;
-    function ReadBits(ABitCount: shortint; var AResult: word): boolean;
+    function ReadBits(ABitCount: shortint): word;
     function FlushWriteBuffer: boolean;
     function GetOriginalSize(ASource: PStream): longint; virtual;
+    procedure WriteBits(ANum: word; ABitCount: shortint);
     procedure WriteByte(AByte: byte);
     procedure EndWriteBits;
-    procedure DecompressStream(ASource, ADest: PStream); virtual;
+    procedure DecompressStream(ASource, ADest: PStream; AOriginalSize: longint); virtual;
     procedure Init; virtual;
     procedure InitCompression; virtual;
     procedure UpdateProgress(const AMax, ACurrent: longint);
@@ -179,11 +179,10 @@ begin
   Inc(FReadPos);
 end;
 
-function TCompressor.WriteBits(ANum: word; ABitCount: shortint): boolean;
+procedure TCompressor.WriteBits(ANum: word; ABitCount: shortint);
 var
   aByte: byte;
 begin
-  WriteBits := true;
   FWriteBitBuffer := FWriteBitBuffer or (longint(ANum) shl FWriteBitCounter);
   Inc(FWriteBitCounter, ABitCount);
   while FWriteBitCounter >= 8 do begin
@@ -194,19 +193,17 @@ begin
   end;
 end;
 
-function TCompressor.ReadBits(ABitCount: shortint; var AResult: word): boolean;
+function TCompressor.ReadBits(ABitCount: shortint): word;
 var
   readResult: word;
   bytesRead: word;
 begin
-  AResult := 0;
-  ReadBits := true;
   while FReadBitCounter < ABitCount do begin
     readResult := ReadByte;
     FReadBitBuffer := FReadBitBuffer or (readResult shl FReadBitCounter);
     Inc(FReadBitCounter, 8);
   end;
-  AResult := word(FReadBitBuffer and ((1 shl longint(ABitCount)) - 1));
+  ReadBits := word(FReadBitBuffer and ((1 shl longint(ABitCount)) - 1));
   FReadBitBuffer := FReadBitBuffer shr ABitCount;
   Dec(FReadBitCounter, ABitCount);
 end;
@@ -284,7 +281,7 @@ begin
   CompressStream := 0;
 end;
 
-procedure TCompressor.DecompressStream(ASource, ADest: PStream);
+procedure TCompressor.DecompressStream(ASource, ADest: PStream; AOriginalSize: longint);
 begin
   Source := ASource;
   Dest := ADest;

@@ -49,11 +49,11 @@ type
     FSorted: boolean;
     FComparer: TComparer;
     FCapacity: integer;
-    FBuffer: PListBuffer;
     function GetSortedIndex(AItem: pointer): integer;
     procedure QuickSort(AComparer: TComparer; ALowIndex, AHighIndex: integer);
   public
     Count: integer;
+    Items: PListBuffer;
     constructor CreateCapacity(ACapacity: integer);
     constructor CreateSorted(AComparer: TComparer);
     constructor CreateSortedCapacity(AComparer: TComparer; ACapacity: integer);
@@ -246,8 +246,8 @@ end;
 destructor TList.Free;
 begin
   Clear;
-  if Assigned(FBuffer) then
-    FreeMem(FBuffer, FCapacity * PointerSize);
+  if Assigned(Items) then
+    FreeMem(Items, FCapacity * PointerSize);
   inherited Free;
 end;
 
@@ -295,9 +295,9 @@ begin
     dataSize := MaxVarSize;
     ACapacity := MaxVarSize div PointerSize;
   end;
-  if not Assigned(FBuffer) then begin
-    GetMem(FBuffer, dataSize);
-    if not Assigned(FBuffer) then begin
+  if not Assigned(Items) then begin
+    GetMem(Items, dataSize);
+    if not Assigned(Items) then begin
       Raise(ecNotEnoughMemory);
       exit;
     end;
@@ -312,10 +312,10 @@ begin
   if FCapacity > 0 then begin
     if ACapacity > FCapacity then
       dataSize := FCapacity * PointerSize;
-    Move(FBuffer^, newBuffer^, dataSize);
-    FreeMem(FBuffer, FCapacity * PointerSize);
+    Move(Items^, newBuffer^, dataSize);
+    FreeMem(Items, FCapacity * PointerSize);
   end;
-  FBuffer := newBuffer;
+  Items := newBuffer;
   FCapacity := ACapacity;
   if Count > FCapacity then
     Count := FCapacity;
@@ -340,7 +340,7 @@ begin
   if FSorted then
     index := GetSortedIndex(AItem);
   if index = Count then begin
-    FBuffer^[index] := AItem;
+    Items^[index] := AItem;
     Inc(Count);
   end
   else
@@ -352,10 +352,10 @@ procedure TList.Clear;
 begin
   while Count > 0 do
     Delete(0);
-  if Assigned(FBuffer) then
-    FreeMem(FBuffer, FCapacity *  PointerSize);
+  if Assigned(Items) then
+    FreeMem(Items, FCapacity *  PointerSize);
   Count := 0;
-  FBuffer := nil;
+  Items := nil;
   FCapacity := 0;
 end;
 
@@ -445,7 +445,7 @@ begin
   inherited Init;
   FSorted := false;
   FComparer := nil;
-  FBuffer := nil;
+  Items := nil;
   FCapacity := 0;
   Count := 0;
 end;
@@ -462,7 +462,7 @@ begin
     Raise(ecIndexOutOfBounds);
     exit;
   end;
-  GetItem := FBuffer^[AIndex];
+  GetItem := Items^[AIndex];
 end;
 
 procedure TList.SetItem(AIndex: integer; AItem: pointer);
@@ -471,7 +471,7 @@ begin
     Raise(ecIndexOutOfBounds);
     exit;
   end;
-  FBuffer^[AIndex] := AItem;
+  Items^[AIndex] := AItem;
 end;
 
 function TList.IndexOf(AItem: pointer): integer;
@@ -533,7 +533,7 @@ begin
     Add(AItem);
     exit;
   end;
-    ptr := pointer(FBuffer);
+    ptr := pointer(Items);
   Inc(ptr, AIndex);
   next := ptr;
   Inc(next);
@@ -550,7 +550,7 @@ begin
     Raise(ecIndexOutOfBounds);
     exit;
   end;
-  ptr := pointer(FBuffer);
+  ptr := pointer(Items);
   Inc(ptr, AIndex);
   next := ptr;
   Inc(next);

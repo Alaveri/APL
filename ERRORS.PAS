@@ -74,6 +74,7 @@ const
 
   { Compression errors }
   ecInvalidCompressionSource = 601;
+  ecCompressionBitSizeError = 602;
 
   { List Errors }
   ecListCapacityOverflow = 701;
@@ -220,6 +221,7 @@ begin
     ecInvalidOperation: ErrorMessage := 'Invalid operation';
     ecUnsupportedPaletteFormat: ErrorMessage := 'Unsupported palette format';
     ecInvalidPalette: ErrorMessage := 'Invalid palette';
+    ecCompressionBitSizeError: ErrorMessage := 'Compression bit size too large';
     else begin
       if AErrorCode >= ecUser then begin
         if Assigned(CustomErrorMessage) then begin

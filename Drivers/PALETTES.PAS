@@ -95,11 +95,11 @@ type
     procedure SaveToFile(AFilename: string);
     procedure SaveToStream(AStream: PStream);
     procedure SaveToStreamFormat(AStream: PStream; AFormat: TPaletteFormat);
-    procedure SaveToStreamWriter(AStream: PStream; AWriter: PPaletteWriter);
+    procedure SaveToStreamWriter(AWriter: PPaletteWriter);
     procedure SaveToFileFormat(AFilename: string; AFormat: TPaletteFormat);
-    procedure SaveToFileWriter(AFilename: string; AWriter: PPaletteWriter);
     procedure LoadFromFile(AFilename: string; AFormat: TPaletteFormat);
     procedure LoadFromStream(AStream: PStream; AFormat: TPaletteFormat);
+    procedure LoadFromStreamReader(AReader: PPaletteReader);
     procedure SetFormat(AFormat: TPaletteFormat);
     procedure Init; virtual;
     destructor Free; virtual;
@@ -107,60 +107,66 @@ type
 
   TPaletteWriter = object(TStatusObject)
   private
+    FStream: PStream;
   public
+    constructor Create(AStream: PStream);
     function Format: TPaletteFormat; virtual;
-    procedure WritePalette(APalette: PRgbColorList; AStream: PStream); virtual;
-    procedure WriteLine(AStream: PStream; ALine: string);
+    procedure WritePalette(APalette: PRgbColorList); virtual;
+    procedure WriteLine(ALine: string);
+    procedure SetStream(AStream: PStream);
   end;
 
   TPaletteReader = object(TStatusObject)
   private
+    FStream: PStream;
   public
+    constructor Create(AStream: PStream);
     function Format: TPaletteFormat; virtual;
-    function ReadPalette(AStream: PStream): PRgbColorList; virtual;
-    function ReadLine(AStream: PStream): string;
+    function ReadPalette: PRgbColorList; virtual;
+    function ReadLine: string;
+    procedure SetStream(AStream: PStream);
   end;
 
   TAplPaletteWriter = object(TPaletteWriter)
   private
   public
     function Format: TPaletteFormat; virtual;
-    procedure WritePalette(APalette: PRgbColorList; AStream: PStream); virtual;
+    procedure WritePalette(APalette: PRgbColorList); virtual;
   end;
 
   TAplPaletteReader = object(TPaletteReader)
   private
   public
     function Format: TPaletteFormat; virtual;
-    function ReadPalette(AStream: PStream): PRgbColorList; virtual;
+    function ReadPalette: PRgbColorList; virtual;
   end;
 
   TGimpPaletteWriter = object(TPaletteWriter)
   private
   public
     function Format: TPaletteFormat; virtual;
-    procedure WritePalette(APalette: PRgbColorList; AStream: PStream); virtual;
+    procedure WritePalette(APalette: PRgbColorList); virtual;
   end;
 
   TGimpPaletteReader = object(TPaletteReader)
   private
   public
     function Format: TPaletteFormat; virtual;
-    function ReadPalette(AStream: PStream): PRgbColorList; virtual;
+    function ReadPalette: PRgbColorList; virtual;
   end;
 
   TJascPaletteWriter = object(TPaletteWriter)
   private
   public
     function Format: TPaletteFormat; virtual;
-    procedure WritePalette(APalette: PRgbColorList; AStream: PStream); virtual;
+    procedure WritePalette(APalette: PRgbColorList); virtual;
   end;
 
   TJascPaletteReader = object(TPaletteReader)
   private
   public
     function Format: TPaletteFormat; virtual;
-    function ReadPalette(AStream: PStream): PRgbColorList; virtual;
+    function ReadPalette: PRgbColorList; virtual;
   end;
 
 const
@@ -424,17 +430,6 @@ begin
   FreeAndNil(stream);
 end;
 
-procedure TRgbPalette.SaveToFileWriter(AFilename: string; AWriter: PPaletteWriter);
-var
-  stream: PStream;
-begin
-  stream := New(PFileStream, Create(AFilename, fmWrite));
-  SaveToStreamWriter(stream, AWriter);
-  if stream^.HasException then
-    Raise(stream^.Exception^.Code);
-  FreeAndNil(stream);
-end;
-
 procedure TRgbPalette.SaveToStream(AStream: PStream);
 begin
   SaveToStreamFormat(AStream, FFormat);
@@ -445,21 +440,21 @@ var
   writer: PPaletteWriter;
 begin
   case AFormat of
-    pfGimp: writer := New(PGimpPaletteWriter, Create);
-    pfJasc: writer := New(PJascPaletteWriter, Create);
-    pfApl: writer := New(PAplPaletteWriter, Create);
+    pfGimp: writer := New(PGimpPaletteWriter, Create(AStream));
+    pfJasc: writer := New(PJascPaletteWriter, Create(AStream));
+    pfApl: writer := New(PAplPaletteWriter, Create(AStream));
     else begin
       Raise(ecUnsupportedPaletteFormat);
       exit;
     end;
   end;
-  SaveToStreamWriter(AStream, writer);
+  SaveToStreamWriter(writer);
   FreeAndNil(writer);
 end;
 
-procedure TRgbPalette.SaveToStreamWriter(AStream: PStream; AWriter: PPaletteWriter);
+procedure TRgbPalette.SaveToStreamWriter(AWriter: PPaletteWriter);
 begin
-  AWriter^.WritePalette(FColors, AStream);
+  AWriter^.WritePalette(FColors);
   if AWriter^.HasException then
     Raise(AWriter^.Exception^.Code);
 end;
@@ -479,18 +474,24 @@ procedure TRgbPalette.LoadFromStream(AStream: PStream; AFormat: TPaletteFormat);
 var
   reader: PPaletteReader;
 begin
-  FreeAndNil(FColors);
   case AFormat of
-    pfGimp: reader := New(PGimpPaletteReader, Create);
+    pfGimp: reader := New(PGimpPaletteReader, Create(AStream));
+    pfJasc: reader := New(PJascPaletteReader, Create(AStream));
     else begin
       Raise(ecUnsupportedPaletteFormat);
       exit;
     end;
   end;
-  FColors := reader^.ReadPalette(AStream);
-  if reader^.HasException then
-    Raise(reader^.Exception^.Code);
+  LoadFromStreamReader(reader);
   FreeAndNil(reader);
+end;
+
+procedure TRgbPalette.LoadFromStreamReader(AReader: PPaletteReader);
+begin
+  FreeAndNil(FColors);
+  FColors := AReader^.ReadPalette;
+  if AReader^.HasException then
+    Raise(AReader^.Exception^.Code);
 end;
 
 procedure TRgbPalette.SetFormat(AFormat: TPaletteFormat);
@@ -538,17 +539,28 @@ begin
   GetPaletteData := result;
 end;
 
-procedure TPaletteWriter.WriteLine(AStream: PStream; ALine: string);
+constructor TPaletteWriter.Create(AStream: PStream);
+begin
+  inherited Create;
+  FStream := AStream;
+end;
+
+procedure TPaletteWriter.WriteLine(ALine: string);
 var
   buffer: string;
 begin
   buffer := ALine + #13#10;
-  AStream^.Write(@buffer[1], Length(buffer));
-  if AStream^.HasException then
-    Raise(AStream^.Exception^.Code);
+  FStream^.Write(@buffer[1], Length(buffer));
+  if FStream^.HasException then
+    Raise(FStream^.Exception^.Code);
 end;
 
-procedure TPaletteWriter.WritePalette(APalette: PRgbColorList; AStream: PStream);
+procedure TPaletteWriter.SetStream(AStream: PStream);
+begin
+  FStream := AStream;
+end;
+
+procedure TPaletteWriter.WritePalette(APalette: PRgbColorList);
 begin
   Abstract;
 end;
@@ -558,21 +570,32 @@ begin
   Format := pfNone;
 end;
 
-function TPaletteReader.ReadPalette(AStream: PStream): PRgbColorList;
+procedure TPaletteReader.SetStream(AStream: PStream);
+begin
+  FStream := AStream;
+end;
+
+constructor TPaletteReader.Create(AStream: PStream);
+begin
+  inherited Create;
+  FStream := AStream;
+end;
+
+function TPaletteReader.ReadPalette: PRgbColorList;
 begin
   Abstract;
 end;
 
-function TPaletteReader.ReadLine(AStream: PStream): string;
+function TPaletteReader.ReadLine: string;
 var
   buffer: string;
   ch: char;
 begin
   buffer := '';
-  while not AStream^.EndOfStream do begin
-    ch := Char(AStream^.ReadByte);
-    if AStream^.HasException then
-      Raise(AStream^.Exception^.Code);
+  while not FStream^.EndOfStream do begin
+    ch := Char(FStream^.ReadByte);
+    if FStream^.HasException then
+      Raise(FStream^.Exception^.Code);
     if ch = #13 then
       continue;
     if ch = #10 then
@@ -593,16 +616,15 @@ begin
   Format := pfGimp;
 end;
 
-procedure TGimpPaletteWriter.WritePalette(APalette: PRgbColorList; AStream: PStream);
+procedure TGimpPaletteWriter.WritePalette(APalette: PRgbColorList);
 var
   index: integer;
   color: PRgbColor;
 begin
-  WriteLine(AStream, 'GIMP Palette');
-   {38  33  68	Untitled}
+  WriteLine('GIMP Palette');
   for index := 0 to APalette^.Count - 1 do begin
     color := APalette^.GetItem(index);
-    WriteLine(AStream,
+    WriteLine(
       LeftPad(IntToStr(color^.Red), 3, ' ') + ' '
       + LeftPad(IntToStr(color^.Green), 3, ' ') + ' '
       + LeftPad(IntToStr(color^.Blue), 3, ' ') + ' '
@@ -616,7 +638,7 @@ begin
   Format := pfGimp;
 end;
 
-function TGimpPaletteReader.ReadPalette(AStream: PStream): PRgbColorList;
+function TGimpPaletteReader.ReadPalette: PRgbColorList;
 var
   line: string;
   color: TRgbColor;
@@ -624,8 +646,8 @@ var
   result: PRgbColorList;
 begin
   New(result, Create);
-  while not AStream^.EndOfStream do begin
-    line := ReadLine(AStream);
+  while not FStream^.EndOfStream do begin
+    line := ReadLine;
     if StartsWith(line, '#') then
       continue;
     color.Red := StrToInt(Trim(Copy(line, 1, 3)), 0);
@@ -641,17 +663,17 @@ begin
   Format := pfJasc;
 end;
 
-procedure TJascPaletteWriter.WritePalette(APalette: PRgbColorList; AStream: PStream);
+procedure TJascPaletteWriter.WritePalette(APalette: PRgbColorList);
 var
   index: integer;
   color: PRgbColor;
 begin
-  WriteLine(AStream, 'JASC-PAL');
-  WriteLine(AStream, '0100');
-  WriteLine(AStream, IntToStr(APalette^.Count));
+  WriteLine('JASC-PAL');
+  WriteLine('0100');
+  WriteLine(IntToStr(APalette^.Count));
   for index := 0 to APalette^.Count - 1 do begin
     color := APalette^.GetItem(index);
-    WriteLine(AStream,
+    WriteLine(
       IntToStr(color^.Red) + ' '
       + IntToStr(color^.Green) + ' '
       + IntToStr(color^.Blue)
@@ -664,7 +686,7 @@ begin
   Format := pfJasc;
 end;
 
-function TJascPaletteReader.ReadPalette(AStream: PStream): PRgbColorList;
+function TJascPaletteReader.ReadPalette: PRgbColorList;
 var
   line: string;
   color: TRgbColor;
@@ -672,26 +694,26 @@ var
   count: integer;
 begin
   New(result, Create);
-  line := ReadLine(AStream);
+  line := ReadLine;
   if line <> 'JASC-PAL' then begin
     Raise(ecInvalidPalette);
     exit;
   end;
-  line := ReadLine(AStream);
+  line := ReadLine;
   if line <> '0100' then begin
     Raise(ecInvalidPalette);
     exit;
   end;
-  line := ReadLine(AStream);
+  line := ReadLine;
   count := StrToInt(line, 0);
-  if AStream^.HasException then begin
-    Raise(AStream^.Exception^.Code);
+  if FStream^.HasException then begin
+    Raise(FStream^.Exception^.Code);
     exit;
   end;
-  while not AStream^.EndOfStream do begin
-    line := ReadLine(AStream);
-    if AStream^.HasException then begin
-      Raise(AStream^.Exception^.Code);
+  while not FStream^.EndOfStream do begin
+    line := ReadLine;
+    if FStream^.HasException then begin
+      Raise(FStream^.Exception^.Code);
       exit;
     end;
     {// Change this to not read padding for each color component}
@@ -708,7 +730,7 @@ begin
   Format := pfApl;
 end;
 
-function TAplPaletteReader.ReadPalette(AStream: PStream): PRgbColorList;
+function TAplPaletteReader.ReadPalette: PRgbColorList;
 var
   line: string;
   color: PRgbColor;
@@ -717,16 +739,16 @@ var
   index: word;
 begin
   New(result, Create);
-  count := AStream^.ReadWord;
-  if AStream^.HasException then begin
-    Raise(AStream^.Exception^.Code);
+  count := FStream^.ReadWord;
+  if FStream^.HasException then begin
+    Raise(FStream^.Exception^.Code);
     exit;
   end;
   for index := 0 to count - 1 do begin
     color := New(PRgbColor);
-    AStream^.Read(PByte(color), SizeOf(TRgbColor));
-    if AStream^.HasException then begin
-      Raise(AStream^.Exception^.Code);
+    FStream^.Read(PByte(color), SizeOf(TRgbColor));
+    if FStream^.HasException then begin
+      Raise(FStream^.Exception^.Code);
       exit;
     end;
     result^.Add(color);
@@ -738,21 +760,21 @@ begin
   Format := pfApl;
 end;
 
-procedure TAplPaletteWriter.WritePalette(APalette: PRgbColorList; AStream: PStream);
+procedure TAplPaletteWriter.WritePalette(APalette: PRgbColorList);
 var
   index: integer;
   color: PRgbColor;
 begin
-  AStream^.WriteWord(APalette^.Count);
-  if AStream^.HasException then begin
-    Raise(AStream^.Exception^.Code);
+  FStream^.WriteWord(APalette^.Count);
+  if FStream^.HasException then begin
+    Raise(FStream^.Exception^.Code);
     exit;
   end;
   for index := 0 to APalette^.Count - 1 do begin
     color := APalette^.GetItem(index);
-    AStream^.Write(PByte(color), SizeOf(TRgbColor));
-    if AStream^.HasException then begin
-      Raise(AStream^.Exception^.Code);
+    FStream^.Write(PByte(color), SizeOf(TRgbColor));
+    if FStream^.HasException then begin
+      Raise(FStream^.Exception^.Code);
       exit;
     end;
   end;

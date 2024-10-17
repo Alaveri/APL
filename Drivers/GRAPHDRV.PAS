@@ -184,8 +184,6 @@ type
     ViewPort: TRect;
     FrameBuffer: PByte;
     BufferMode: boolean;
-    Region: PRegion;
-    RegionMode: TRegionMode;
     FontColor: TStandardColor;
     FontShade: byte;
     procedure Init; virtual;
@@ -205,7 +203,6 @@ type
     function BackColor: longint; virtual;
     function XPos: byte; virtual;
     function YPos: byte; virtual;
-    function SupportsRegions: boolean; virtual;
     function GetScreenPointer(APX, APY: integer; var AOffset: longint): PByte; virtual;
     function GetBufferPointer(APX, APY: integer; var AOffset: longint): PByte; virtual;
     function GetDrawPointer(APX, APY: integer; var AOffset: longint): PByte;
@@ -226,7 +223,8 @@ type
     procedure VLine(APX, APY, AHeight: integer); virtual;
     procedure Rectangle(ARect: TRect); virtual;
     procedure FillRect(ARect: TRect); virtual;
-    procedure Bezier(AP1: TPoint; AP2: TPoint; AControl: TPoint; AResolution: integer);
+    procedure BezierQuad(AP1: TPoint; AP2: TPoint; AControl: TPoint; AResolution: integer);
+    procedure BezierCubic(AP1: TPoint; AP2: TPoint; AControl1: TPoint; AControl2: TPoint; AResolution: integer);
     procedure Ellipse(AX1, AY1, AX2, AY2: integer); virtual;
     procedure EllipseRect(ARect: TRect); virtual;
     procedure EllipsePoints(AP1, AP2: TPoint); virtual;
@@ -247,6 +245,7 @@ type
     procedure DrawImageStreamSectionT(ASourceRect: TRect; ADestX, ADestY: integer); virtual;
     procedure DrawText(APX, APY: integer; AText: string); virtual;
     procedure DrawTextLarge(APX, APY: integer; AText: PChar); virtual;
+    procedure GetDrawRect(var ARect: TRect); virtual;
     procedure GetImageDrawRects(APX, APY, AWidth, AHeight: longint;
       var AImageRect, ADrawRect: TRect); virtual;
     procedure PushState; virtual;
@@ -255,12 +254,6 @@ type
     procedure Init; virtual;
     procedure WaitForVSync; virtual;
     procedure ResetMode; virtual;
-    procedure FillLine(ADest: PByte; APX, APY, AWidth: integer; AColor: byte);
-    procedure MoveLine(ASource, ADest: PByte; APX, APY, AWidth: integer);
-    procedure FillRegion(ADest: PByte; APX, APY, AWidth: integer; AColor: byte); virtual;
-    procedure RenderRegion(ASource, ADest: PByte; APX, APY, AWidth: integer; AColor: byte; AMove: boolean); virtual;
-    procedure SetRegionPixel(ADest: PByte; APX, APY: integer; AForeColor: byte);
-    procedure MoveRegion(ASource, ADest: PByte; APX, APY, AWidth: integer); virtual;
     procedure GetFontFormats(AFont: PFont; var AFormats: TFontFormats);
     destructor Free; virtual;
   end;
@@ -303,11 +296,6 @@ begin
   State.Create;
   StateStack.Create;
   MoveTo(0, 0);
-end;
-
-function TGraphicsDriver.SupportsRegions: boolean;
-begin
-  SupportsRegions := false;
 end;
 
 procedure TGraphicsDriver.RenderText(APX, APY, ALength: integer; AText: PChar);
@@ -398,89 +386,9 @@ begin
   AFormats := PFontFormats(@formatByte)^;
 end;
 
-procedure TGraphicsDriver.SetRegionPixel(ADest: PByte; APX, APY: integer; AForeColor: byte);
+procedure TGraphicsDriver.GetDrawRect(var ARect: TRect);
 begin
-end;
-
-procedure TGraphicsDriver.FillRegion(ADest: PByte; APX, APY, AWidth: integer; AColor: byte);
-begin
-  RenderRegion(nil, ADest, APX, APY, AWidth, AColor, false);
-end;
-
-procedure TGraphicsDriver.MoveRegion(ASource, ADest: PByte; APX, APY, AWidth: integer);
-begin
-  RenderRegion(ASource, ADest, APX, APY, AWidth, 0, true);
-end;
-
-procedure TGraphicsDriver.RenderRegion(ASource, ADest: PByte; APX, APY, AWidth: integer; AColor: byte; AMove: boolean);
-var
-  region: PRegion;
-  points: PInversionPointList;
-  point: PInversionPoint;
-  size, start, index, level: integer;
-  dest, source: PByte;
-  rect: TRect;
-  draw, contains: boolean;
-  procedure RenderLine;
-  begin
-    Inc(dest, start - APX + 1);
-    Inc(source, start - APX + 1);
-    if size > 0 then begin
-      if AMove then
-        Move(ASource^, dest^, size)
-      else
-        FillChar(dest^, size, AColor);
-    end;
-    start := 0;
-  end;
-begin
-  region := State.Region;
-  draw := false;
-  contains := region^.Contains(APX, APY);
-  if (State.RegionMode = rmInclude) and contains then
-    draw := true;
-  if (State.RegionMode = rmExclude) and not contains then
-    draw := true;
-  points := region^.GetInversionPoints(State.RegionMode, APY, APX, APX + AWidth - 1);
-  if draw and (points^.Count = 0) then begin
-    if AMove then
-      Move(ASource^, ADest^, AWidth)
-    else
-      FillChar(ADest^, AWidth, AColor);
-    FreeAndNil(points);
-    exit;
-  end;
-  level := 0;
-  start := 0;
-  size := 0;
-  if draw then begin
-    start := APX - 1;
-    Inc(level);
-  end;
-  for index := 0 to points^.Count - 1 do begin
-    dest := ADest;
-    source := ASource;
-    point := Points^.GetItem(index);
-    if point^.On then begin
-      if level = 0 then
-        start := point^.Position;
-      Inc(level);
-    end
-    else begin
-      Dec(level);
-      if level = 0 then begin
-        size := point^.Position - start - 1;
-        RenderLine;
-      end;
-    end;
-  end;
-  FreeAndNil(points);
-  size := APX + AWidth - start + 1;
-  if (level = 0) or (size = 0) then
-    exit;
-  dest := ADest;
-  source := ASource;
-  RenderLine;
+  Mode^.Bounds.GetIntersection(State.ViewPort, ARect);
 end;
 
 function TGraphicsDriver.GetPixel(APX, APY: integer): byte;
@@ -507,23 +415,7 @@ begin
   if not drawRect.Contains(APX, APY) then
     exit;
   ptr := GetDrawPointer(APX, APY, offset);
-  FillLine(ptr, APX, APY, 1, ForeColor);
-end;
-
-procedure TGraphicsDriver.MoveLine(ASource, ADest: PByte; APX, APY, AWidth: integer);
-begin
-  if not Assigned(State.Region) then
-    Move(ASource^, ADest^, AWidth)
-  else
-    MoveRegion(ASource, ADest, APX, APY, AWidth);
-end;
-
-procedure TGraphicsDriver.FillLine(ADest: PByte; APX, APY, AWidth: integer; AColor: byte);
-begin
-  if not Assigned(State.Region) then
-    FillChar(ADest^, AWidth, AColor)
-  else
-    FillRegion(ADest, APX, APY, AWidth, AColor);
+  ptr^ := ForeColor;
 end;
 
 procedure TGraphicsDriver.SetMode(AMode: PGraphicsMode);
@@ -582,7 +474,7 @@ begin
   State.ForeColor := tempColor;
 end;
 
-procedure TGraphicsDriver.Bezier(AP1: TPoint; AP2: TPoint; AControl: TPoint; AResolution: integer);
+procedure TGraphicsDriver.BezierQuad(AP1: TPoint; AP2: TPoint; AControl: TPoint; AResolution: integer);
 var
   v1, v2, v3: TVector2;
   previous, next: TVector2;
@@ -594,7 +486,26 @@ begin
   v3.CreatePoint(AP2);
   previous.CreateVector(v1);
   for index := 1 to AResolution do begin
-    BezierInterpolation(v1, v2, v3, index / AResolution, next);
+    BezierInterpolationQuad(v1, v2, v3, index / AResolution, next);
+    Line(Round(previous.X), Round(previous.Y), Round(next.X), round(next.Y));
+    previous.Assign(next);
+  end;
+end;
+
+procedure TGraphicsDriver.BezierCubic(AP1: TPoint; AP2: TPoint; AControl1: TPoint; AControl2: TPoint; AResolution: integer);
+var
+  v1, v2, v3, v4: TVector2;
+  previous, next: TVector2;
+  value: integer;
+  index: integer;
+begin
+  v1.CreatePoint(AP1);
+  v2.CreatePoint(AControl1);
+  v3.CreatePoint(AControl2);
+  v4.CreatePoint(AP2);
+  previous.CreateVector(v1);
+  for index := 1 to AResolution do begin
+    BezierInterpolationCubic(v1, v2, v3, v4, index / AResolution, next);
     Line(Round(previous.X), Round(previous.Y), Round(next.X), round(next.Y));
     previous.Assign(next);
   end;
@@ -1263,7 +1174,7 @@ begin
   SetCharWidths;
 
   stream.Create(FFontDataSize);
-  stream.Write(FFontData, FFontDataSize);
+  stream.Write(PByte(FFontData), FFontDataSize);
   stream.Seek(0, soFromBeginning);
   if stream.HasException then
     Raise(stream.Exception^.Code)
@@ -1330,7 +1241,7 @@ begin
       end;
       fcLzw: begin
         lzw.CreateBitSize(13);
-        lzw.DecompressStream(AStream, @stream);
+        lzw.DecompressStream(AStream, @stream, header.DataSize);
         if lzw.HasException then
           Raise(lzw.Exception^.Code);
         lzw.Free;
@@ -1445,8 +1356,6 @@ begin
   ViewPort.Create;
   BufferMode := false;
   FrameBuffer := nil;
-  Region := nil;
-  RegionMode := rmInclude;
   FontColor := scWhite;
   FontShade := 0;
 end;
@@ -1465,8 +1374,6 @@ begin
   FrameBuffer := state^.FrameBuffer;
   ViewPort.SetRect(state^.ViewPort);
   BufferMode := state^.BufferMode;
-  Region := state^.Region;
-  RegionMode := state^.RegionMode;
 end;
 
 function TFontList.GetItem(AIndex: integer): PFont;

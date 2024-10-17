@@ -146,6 +146,10 @@ type
     function Bottom: integer;
     function Contains(APX, APY: integer): boolean;
     function ContainsPoint(APoint: TPoint): boolean;
+    function ContainsX(APX: integer): boolean;
+    function ContainsY(APY: integer): boolean;
+    function ClampX(APX: integer): integer;
+    function ClampY(APY: integer): integer;
     function IntersectsRect(ARect: TRect): boolean;
   end;
 
@@ -179,8 +183,11 @@ type
 procedure LinearInterpolation(AStart: TVector2; AEnd: TVector2;
   AValue: real; var AResult: TVector2); far;
 
-procedure BezierInterpolation(AP1: TVector2; AP2: TVector2; AP3: TVector2;
+procedure BezierInterpolationQuad(AP1: TVector2; AP2: TVector2; AP3: TVector2;
   AValue: real; var AResult: TVector2); far;
+
+procedure BezierInterpolationCubic(AP1: TVector2; AP2: TVector2; AP3: TVector2;
+  AP4: TVector2; AValue: real; var AResult: TVector2); far;
 
 procedure LineDraw(AX1, AY1, AX2, AY2: integer; ADrawRect: TRect;
   ASetPixelProc: PSetPixelProc; AData: pointer); far;
@@ -195,13 +202,23 @@ begin
   AResult.Y := AStart.Y + (AEnd.Y - AStart.Y) * AValue;
 end;
 
-procedure BezierInterpolation(AP1: TVector2; AP2: TVector2; AP3: TVector2;
+procedure BezierInterpolationQuad(AP1: TVector2; AP2: TVector2; AP3: TVector2;
   AValue: real; var AResult: TVector2);
 var
   intermediateA, intermediateB: TVector2;
 begin
   LinearInterpolation(AP1, AP2, AValue, intermediateA);
   LinearInterpolation(AP2, AP3, AValue, intermediateB);
+  LinearInterpolation(intermediateA, intermediateB, AValue, AResult);
+end;
+
+procedure BezierInterpolationCubic(AP1: TVector2; AP2: TVector2; AP3: TVector2;
+  AP4: TVector2; AValue: real; var AResult: TVector2);
+var
+  intermediateA, intermediateB, intermediateC: TVector2;
+begin
+  BezierInterpolationQuad(AP1, AP2, AP3, AValue, intermediateA);
+  BezierInterpolationQuad(AP2, AP3, AP4, AValue, intermediateB);
   LinearInterpolation(intermediateA, intermediateB, AValue, AResult);
 end;
 
@@ -338,9 +355,75 @@ begin
   Bottom := Y + Height - 1;
 end;
 
+function TRect.ClampX(APX: integer): integer; assembler;
+asm
+  mov ax, APX
+  mov dx, ES:[DI].TRect.X
+  cmp ax, dx
+  jge @right
+  mov ax, dx
+  jmp @end
+@right:
+  add dx, ES:[DI].TRect.Width
+  dec dx
+  cmp ax, dx
+  jle @end
+  mov ax, dx
+@end:
+end;
+
+function TRect.ClampY(APY: integer): integer; assembler;
+asm
+  mov ax, APY
+  mov dx, ES:[DI].TRect.Y
+  cmp ax, dx
+  jge @bottom
+  mov ax, dx
+  jmp @end
+@bottom:
+  add dx, ES:[DI].TRect.Height
+  dec dx
+  cmp ax, dx
+  jle @end
+  mov ax, dx
+@end:
+end;
+
+function TRect.ContainsX(APX: integer): boolean; assembler;
+asm
+    xor ax, ax
+    mov bx, APX
+    mov dx, ES:[DI].TRect.X
+    cmp bx, dx
+    jl @end
+    add dx, ES:[DI].Width
+    dec dx
+    cmp bx, dx
+    jg @end
+    inc ax
+    jmp @end
+  @end:
+end;
+
+function TRect.ContainsY(APY: integer): boolean; assembler;
+asm
+    xor ax, ax
+    mov bx, APY
+    mov dx, ES:[DI].TRect.Y
+    cmp bx, dx
+    jl @end
+    add dx, ES:[DI].TRect.Height
+    dec dx
+    cmp bx, dx
+    jg @end
+    inc ax
+    jmp @end
+  @end:
+end;
+
 function TRect.Contains(APX, APY: integer): boolean; assembler;
 asm
-    mov al, 0
+    xor ax, ax
     les di, self
     mov bx, APX
     mov dx, ES:[DI].TRect.X
