@@ -24,6 +24,9 @@ const
 type
   PImage = ^TImage;
   PImageList = ^TImageList;
+  PImageListProc = ^TImageListProc;
+
+  TImageListProc = procedure(ASender: PImageList; AItem: PImage);
 
   TImageCompression = (
     icNone,
@@ -76,10 +79,17 @@ type
     destructor Free; virtual;
   end;
 
-  TImageList = object(TObjectList)
+  TImageList = object(TIdentifiableList)
   private
   public
+    function GetItemById(const AID: string): PImage;
     function GetItem(AIndex: integer): PImage;
+    function Add(AItem: PImage): integer;
+    function IndexOf(AItem: PImage): integer;
+    procedure ForEach(AProc: PImageListProc);
+    procedure SetItem(AIndex: integer; AItem: PImage);
+    procedure Insert(AIndex: integer; AItem: PImage);
+
   end;
 
 implementation
@@ -256,7 +266,7 @@ begin
     end;
     icLzw: begin
       lzw.Create;
-      lzw.DecompressStream(ASource, Buffer);
+      lzw.DecompressStream(ASource, Buffer, -1);
       Buffer^.Seek(0, soFromBeginning);
       if Lzw.HasException then
         Raise(Lzw.Exception^.Code);
@@ -376,6 +386,36 @@ end;
 function TImageList.GetItem(AIndex: integer): PImage;
 begin
   GetItem := PImage(inherited GetItem(AIndex));
+end;
+
+function TImageList.GetItemById(const AID: string): PImage;
+begin
+  GetItemById := PImage(inherited GetItemById(AID));
+end;
+
+function TImageList.Add(AItem: PImage): integer;
+begin
+  Add := inherited Add(AItem);
+end;
+
+function TImageList.IndexOf(AItem: PImage): integer;
+begin
+  IndexOf := inherited IndexOf(AItem);
+end;
+
+procedure TImageList.ForEach(AProc: PImageListProc);
+begin
+  TList.ForEach(PListProc(AProc));
+end;
+
+procedure TImageList.SetItem(AIndex: integer; AItem: PImage);
+begin
+  inherited SetItem(AIndex, AItem);
+end;
+
+procedure TImageList.Insert(AIndex: integer; AItem: PImage);
+begin
+  inherited Insert(AIndex, AItem);
 end;
 
 end.

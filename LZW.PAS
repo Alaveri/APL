@@ -7,18 +7,38 @@ uses
   Compress,
   Errors,
   AplTypes,
+  AplObj,
   Streams,
   Common;
 
 type
   PDictEntry = ^TDictEntry;
   PLzw = ^TLzw;
+  PLzwCodes = ^TLzwCodes;
+  PSetLzwCodesProc = ^TSetLzwCodesProc;
+
+  TLzwCompressionLevels = array[TAplCompressionLevel] of byte;
 
   TDictEntry = record
     Code: word;
     Prefix: word;
     Char: byte;
   end;
+
+  TLzwCodes = record
+    EndOfStream: word;
+    IncreaseCodeSize: word;
+    ClearDict: word;
+    EmptyCode: word;
+    FirstCode: word;
+    DeferredClear: boolean;
+    { If true, the bit size of the data is encoded in the stream. }
+    { If false, data is assumed to be 8-bit bytes. }
+    { TODO: Implement this for GIF. }
+    EncodeDataBitSize: boolean;
+  end;
+
+  TSetLzwCodesProc = procedure(var ACodes: TLzwCodes; ABitSize: byte);
 
   TLzw = object(TCompressor)
   private
@@ -32,9 +52,10 @@ type
     FNextCode: word;
     FOverflow: boolean;
     FHashShift: byte;
+    FCodes: TLzwCodes;
     function AllocateDictionary: boolean;
     function AllocateDecodeBuffer: boolean;
-    function FindEntry(AIndex: word; AChar: byte): word;
+    function FindEntry(APrefix: word; AChar: byte): word;
     function DecodeString(ACount: word; ACode: word): word;
     procedure DeallocateDictionary;
     procedure DeallocateDecodeBuffer;
@@ -42,15 +63,48 @@ type
     procedure InitCompression; virtual;
   public
     BitSize: byte;
+    SetLzwCodesProc: PSetLzwCodesProc;
+    DeferredClear: boolean;
     constructor CreateBitSize(ABitSize: byte);
+    constructor CreateCodes(ASetCodesProc: PSetLzwCodesProc);
+    constructor CreateAll(ABitSize: byte; ASetCodesProc: PSetLzwCodesProc);
     destructor Free; virtual;
     function CompressStream(ASource, ADest: PStream; ALength: longint): longint; virtual;
     function GetOriginalSize(ASource: PStream): longint; virtual;
     procedure Init; virtual;
-    procedure DecompressStream(ASource, ADest: PStream); virtual;
+    procedure DecompressStream(ASource, ADest: PStream; AOriginalSize: longint); virtual;
+    procedure SetCompressionLevel(ALevel: TAplCompressionLevel); virtual;
   end;
 
+procedure SetAplLzwCodes(var ACodes: TLzwCodes; ABitSize: byte); far;
+procedure SetGifLzwCodes(var ACodes: TLzwCodes; ABitSize: byte); far;
+
+const
+  LzwCompressionBitSize: TLzwCompressionLevels = (12, 12, 13);
+
 implementation
+
+procedure SetAplLzwCodes(var ACodes: TLzwCodes; ABitSize: byte);
+begin
+  ACodes.EndOfStream := 256;
+  ACodes.IncreaseCodeSize := 257;
+  ACodes.ClearDict := 258;
+  ACodes.EmptyCode := 259;
+  ACodes.FirstCode := 260;
+  ACodes.DeferredClear := false;
+  ACodes.EncodeDataBitSize := false;
+end;
+
+procedure SetGifLzwCodes(var ACodes: TLzwCodes; ABitSize: byte);
+begin
+  ACodes.ClearDict := 256;
+  ACodes.EndOfStream := ACodes.ClearDict + 1;
+  ACodes.FirstCode := ACodes.ClearDict + 2;
+  ACodes.IncreaseCodeSize := ACodes.ClearDict + 3;
+  ACodes.EmptyCode := $FFFF;
+  ACodes.DeferredClear := true;
+  ACodes.EncodeDataBitSize := true;
+end;
 
 const
   SupportedBitSizes = [12, 13];
@@ -58,11 +112,6 @@ const
 const
   DefaultBitSize = 13;
   StartBitSize = 9;
-  EndOfStream = 256;
-  IncreaseCodeSize = 257;
-  ClearDict = 258;
-  EmptyCode = 259;
-  FirstCode = 260;
 
 constructor TLzw.CreateBitSize(ABitSize: byte);
 begin
@@ -93,6 +142,9 @@ begin
   FOverflow := false;
   FNextCode := 0;
   FCurrentBitSize := BitSize;
+  SetLzwCodesProc := nil;
+  DeferredClear := false;
+  AddTotalToStream := true;
 end;
 
 function TLzw.AllocateDecodeBuffer: boolean;
@@ -133,21 +185,21 @@ begin
   FDict := nil;
 end;
 
-function TLzw.FindEntry(AIndex: word; AChar: byte): word;
+function TLzw.FindEntry(APrefix: word; AChar: byte): word;
 var
   index, offset: longint;
   entry: PDictEntry;
 begin
-  index := (AChar shl FHashShift) xor AIndex;
+  index := (AChar shl FHashShift) xor APrefix;
   offset := 1;
   if index <> 0 then
     offset :=  FDictEntries - index;
   repeat
     entry := FDict;
     Inc(entry, index);
-    if entry^.Code = EmptyCode then
+    if entry^.Code = FCodes.EmptyCode then
       break;
-    if (entry^.Prefix = AIndex) and (entry^.Char = AChar) then
+    if (entry^.Prefix = APrefix) and (entry^.Char = AChar) then
       break;
     Dec(index, offset);
     if index < 0 then
@@ -176,9 +228,31 @@ begin
   DecodeString := ACount;
 end;
 
+constructor TLzw.CreateCodes(ASetCodesProc: PSetLzwCodesProc);
+begin
+  Create;
+  SetLzwCodesProc := ASetCodesProc;
+end;
+
+constructor TLzw.CreateAll(ABitSize: byte; ASetCodesProc: PSetLzwCodesProc);
+begin
+  CreateBitSize(ABitSize);
+  SetLzwCodesProc := ASetCodesProc;
+end;
+
+procedure TLzw.SetCompressionLevel(ALevel: TAplCompressionLevel);
+begin
+  BitSize := LzwCompressionBitSize[ALevel];
+end;
+
 procedure TLzw.InitCompression;
 begin
   inherited InitCompression;
+  if Assigned(SetLzwCodesProc) then
+    TSetLzwCodesProc(SetLzwCodesProc)(FCodes, BitSize)
+  else
+    SetAplLzwCodes(FCodes, BitSize);
+
   if BitSize = 12 then
     FDictEntries := 5021
   else if BitSize = 13 then
@@ -201,10 +275,10 @@ begin
   FCurrentBitSize := StartBitSize;
   FMaxCode := 1 shl BitSize - 1;
   FCurrentMaxCode := 1 shl FCurrentBitSize - 1;
-  FNextCode := FirstCode;
+  FNextCode := FCodes.FirstCode;
   entry := FDict;
   for index := 0 to FDictEntries - 1 do begin
-    entry^.Code := EmptyCode;
+    entry^.Code := FCodes.EmptyCode;
     Inc(entry);
   end;
   FOverflow := false;
@@ -218,11 +292,10 @@ var
 begin
   GetOriginalSize := 0;
   startPos := ASource^.Position;
-  ASource^.Read(@bits, SizeOf(byte));
-  ASource^.Read(@total, SizeOf(total));
+  bits := ASource^.ReadByte;
+  total := ASource^.ReadLong;
   ASource^.Seek(startPos, soFromBeginning);
-  if ASource^.HasException then
-    Raise(ASource^.Exception^.Code);
+  CheckReraise(ASource);
   if HasException then
     exit;
   GetOriginalSize := total;
@@ -235,42 +308,39 @@ var
   index: word;
   entry: PDictEntry;
   endPos, startPos: longint;
-  total, written: longint;
-  bits: byte;
+  written: longint;
+  destStart: longint;
 begin
   inherited CompressStream(ASource, ADest, ALength);
+  destStart := ADest^.Position;
 
   if Source^.Position + ALength > Source^.Size then
     Raise(ecReadPastStreamEnd);
   if HasException then
     exit;
 
-  total := 0;
-  bits := BitSize;
-  ADest^.Write(@bits, SizeOf(byte));
-
+  ADest^.WriteByte(BitSize);
   startPos := ADest^.Position;
-  ADest^.Write(@total, SizeOf(total));
-  if ADest^.HasException then begin
+  code := ReadByte;
+  if ASource^.HasException then begin
     Raise(ADest^.Exception^.Code);
     exit;
   end;
 
-  code := ReadByte;
-  if HasException then
-    exit;
+  if AddTotalToStream then
+    ADest^.WriteLong(ALength);
 
   while ReadTotal < ALength do begin
     character:= ReadByte;
     if HasException then
-      break;
+      exit;
 
     UpdateProgress(ALength, ReadTotal);
     index := FindEntry(code, character);
     entry := FDict;
     Inc(entry, index);
 
-    if entry^.Code <> EmptyCode then begin
+    if entry^.Code <> FCodes.EmptyCode then begin
       code := Entry^.Code;
       continue;
     end;
@@ -285,67 +355,51 @@ begin
       FOverflow := true;
 
     if (code >= FCurrentMaxCode) and (FCurrentBitSize < BitSize) then begin
-      if not WriteBits(IncreaseCodeSize, FCurrentBitSize) then
-        break;
+      WriteBits(FCodes.IncreaseCodeSize, FCurrentBitSize);
       Inc(FCurrentBitSize);
       FCurrentMaxCode := 1 shl FCurrentBitSize - 1;
     end;
 
-    if not WriteBits(code, FCurrentBitSize) then
-      break;
-
+    WriteBits(code, FCurrentBitSize);
     code := character;
-
     if FOverflow then begin
-      if not WriteBits(ClearDict, FCurrentBitSize) then
-        break;
+      WriteBits(FCodes.ClearDict, FCurrentBitSize);
       InitCoder;
     end;
   end;
   WriteBits(code, FCurrentBitSize);
-  WriteBits(EndOfStream, FCurrentBitSize);
+  WriteBits(FCodes.EndOfStream, FCurrentBitSize);
   EndWriteBits;
-  total := ReadTotal;
-  endPos := ADest^.Position;
-  ADest^.Seek(startPos, soFromBeginning);
-  ADest^.Write(@total, SizeOf(total));
-  ADest^.Seek(endPos, soFromBeginning);
   UpdateProgress(ALength, ReadTotal);
-  CompressStream := WriteTotal;
+  CompressStream := ADest^.Position - destStart;
 end;
 
-procedure TLzw.DecompressStream(ASource, ADest: PStream);
+procedure TLzw.DecompressStream(ASource, ADest: PStream; AOriginalSize: longint);
 var
   oldCode, code: word;
   character: word;
   count, index: word;
   decodePtr: PByte;
   entry: PDictEntry;
-  total: longint;
-  bits: byte;
 begin
-  inherited DecompressStream(ASource, ADest);
+  inherited DecompressStream(ASource, ADest, AOriginalSize);
 
   if HasException then
     exit;
 
-  bits := 0;
-  Source^.Read(@bits, SizeOf(byte));
-  if not (bits in SupportedBitSizes) then begin
+  BitSize := ASource^.ReadByte;
+  if not (BitSize in SupportedBitSizes) then begin
     Raise(ecStreamFormatNotSupported);
     exit;
   end;
-  Source^.Read(@total, SizeOf(total));
-  if ASource^.HasException then
-    Raise(Source^.Exception^.Code);
+  if AddTotalToStream then
+    AOriginalSize := Source^.ReadLong;
 
-  BitSize := bits;
   InitCoder;
   AllocateDecodeBuffer;
 
-  if not ReadBits(FCurrentBitSize, oldCode) then
-    exit;
-  if HasException or (oldCode = EndOfStream) then
+  oldCode := ReadBits(FCurrentBitSize);
+  if HasException or (oldCode = FCodes.EndOfStream) then
     exit;
 
   character := oldCode;
@@ -354,24 +408,21 @@ begin
     exit;
 
   repeat
-    if not ReadBits(FCurrentBitSize, code) then begin
-      break;
-    end;
-    case code of
-      IncreaseCodeSize: begin
-        Inc(FCurrentBitSize);
-        continue;
-      end;
-      ClearDict: begin
-        InitCoder;
-        if not ReadBits(FCurrentBitSize, oldCode) or (oldCode = EndOfStream) then
-          break;
-        WriteByte(oldCode);
-        continue;
-      end;
-      EndOfStream:
+    code := ReadBits(FCurrentBitSize);
+    if code = FCodes.IncreaseCodeSize then begin
+      Inc(FCurrentBitSize);
+      continue;
+    end
+    else if code = FCodes.ClearDict then begin
+      InitCoder;
+      oldCode := ReadBits(FCurrentBitSize);
+      if oldCode = FCodes.EndOfStream then
         break;
-    end;
+      WriteByte(oldCode);
+      continue;
+    end
+    else if code = FCodes.EndOfStream then
+      break;
     if code >= FNextCode then begin
       FDecodeBuffer^ := character;
       count := DecodeString(1, oldCode);
@@ -389,7 +440,7 @@ begin
     end;
     if HasException then
       break;
-    UpdateProgress(total, WriteTotal);
+    UpdateProgress(AOriginalSize, WriteTotal);
 
     if FNextCode <= FMaxCode then begin
       entry := FDict;
@@ -397,6 +448,10 @@ begin
       entry^.Prefix := oldCode;
       entry^.Char := character;
       Inc(FNextCode);
+      if FCodes.DeferredClear and (FNextCode >= FMaxCode) and (FCurrentBitSize < BitSize) then begin
+        FCurrentBitSize := BitSize;
+        FMaxCode := FMaxCode shl 1;
+      end;
     end;
     oldCode := code;
   until false;

@@ -8,6 +8,7 @@ uses
   MouseDrv,
   StrUtils,
   AplTypes,
+  Math,
   VTypes,
   Common,
   Lists;
@@ -17,9 +18,11 @@ type
   PActionUpdateProc = ^TActionUpdateProc;
   PActionList = ^TActionList;
   PActionExecuteProc = ^TActionExecuteProc;
+  PActionListProc = ^TActionListProc;
 
   TActionUpdateProc = procedure(ASender: PObject; AAction: PAction; AActionId: integer);
   TActionExecuteProc = procedure(ASender: PObject; AAction: PAction);
+  TActionListProc = procedure(ASender: PObject; AAction: PAction);
 
   TAction = object(TObject)
   private
@@ -50,6 +53,7 @@ type
     function GetActionById(AActionId: integer): PAction;
     function GetHelpMaxWidth(AControl: pointer): integer;
     function Add(AItem: pointer): integer; virtual;
+    procedure ForEach(AProc: PActionListProc);
     procedure Init; virtual;
     destructor Free; virtual;
   end;
@@ -136,7 +140,7 @@ begin
       continue;
     txt := StrPas(action^.HelpText);
     control := PControl(AControl);
-    maxWidth := MaxWord(control^.TrueTextWidth(txt), maxWidth);
+    maxWidth := MaxW(control^.TrueTextWidth(txt), maxWidth);
   end;
   GetHelpMaxWidth := maxWidth;
 end;
@@ -165,6 +169,11 @@ begin
       exit;
     end;
   end;
+end;
+
+procedure TActionList.ForEach(AProc: PActionListProc);
+begin
+  TList.ForEach(PListProc(AProc));
 end;
 
 procedure TActionList.Init;

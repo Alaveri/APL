@@ -5,6 +5,7 @@ interface
 
 const
   PointerSize: longint = SizeOf(Pointer);
+  MaxVarSize = $FFF8;
 
 type
   String1 = string[1];

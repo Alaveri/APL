@@ -23,6 +23,9 @@ type
   PTextState = ^TTextState;
   PTextMode = ^TTextMode;
   PTextModeList = ^TTextModeList;
+  PTextModeListProc = ^TTextModeListProc;
+
+  TTextModeListProc = procedure(ASender: PTextModeList; AItem: PTextMode);
 
   TTextChar = record
     Character: char;
@@ -61,6 +64,7 @@ type
     function IndexOfId(const AId: string): integer; virtual;
     function IndexOf(AItem: PTextMode): integer;
     function Add(AItem: PTextMode): integer;
+    procedure ForEach(AProc: PTextModeListProc); virtual;
     procedure Insert(AIndex: integer; AItem: PTextMode);
   end;
 
@@ -175,6 +179,11 @@ end;
 function TTextModeList.IndexOfId(const AId: string): integer;
 begin
   IndexOfId := inherited IndexOfId(AId);
+end;
+
+procedure TTextModeList.ForEach(AProc: PTextModeListProc);
+begin
+  TList.ForEach(TListProc(AProc));
 end;
 
 function TTextModeList.IndexOf(AItem: PTextMode): integer;

@@ -9,7 +9,10 @@ uses
   {$ENDIF}
   AplObj,
   AplTypes,
+  AplConst,
   Errors,
+  DateTime,
+  Math,
   Common,
   Lists,
   MemDrv;
@@ -18,8 +21,13 @@ type
   PStream = ^TStream;
   PMemoryStream = ^TMemoryStream;
   PFileStream = ^TFileStream;
-  PStreamReader = ^TStreamReader;
-  PTextReader = ^TTextReader;
+  PStreamList = ^TStreamList;
+  PMemoryStreamList = ^TMemoryStreamList;
+  PStreamListProc = ^TStreamListProc;
+  PMemoryStreamListProc = ^TMemoryStreamListProc;
+
+  TStreamListProc = procedure(ASender: PObject; AItem: PStream);
+  TMemoryStreamListProc = procedure(ASender: PObject; AItem: PMemoryStream);
 
   TSeekOrigin =
   (
@@ -39,21 +47,23 @@ type
     function CanRead: boolean; virtual;
     function CanWrite: boolean; virtual;
     function CanSeek: boolean; virtual;
-    function Read(ABuffer: PByte; ACount: longint): longint; virtual;
+    function Read(ABuffer: pointer; ACount: longint): longint; virtual;
     function ReadByte: byte; virtual;
     function ReadInteger: integer; virtual;
     function ReadWord: word; virtual;
     function ReadLong: longint; virtual;
     function ReadString: string; virtual;
+    function ReadPChar: PChar; virtual;
     function ReadDouble: double; virtual;
     function ReadBool: boolean; virtual;
     function ReadReal: real; virtual;
-    function Write(ABuffer: PByte; ACount: longint): longint; virtual;
+    function Write(ABuffer: pointer; ACount: longint): longint; virtual;
     function Seek(AOffset: longint; AOrigin: TSeekOrigin): longint; virtual;
     function WriteToStream(AStream: PStream; ACount: longint): longint; virtual;
     function ReadFromStream(AStream: PStream; ACount: longint): longint; virtual;
     procedure Init; virtual;
     procedure Close; virtual;
+    procedure ReadDateTime(var ADateTime: TDateTime); virtual;
     procedure WriteByte(AValue: byte); virtual;
     procedure WriteInteger(AValue: integer); virtual;
     procedure WriteWord(AValue: word); virtual;
@@ -62,6 +72,8 @@ type
     procedure WriteDouble(AValue: double); virtual;
     procedure WriteReal(AValue: real); virtual;
     procedure WriteBool(AValue: boolean); virtual;
+    procedure WriteDateTime(const ADateTime: TDateTime); virtual;
+    procedure WritePChar(AValue: PChar); virtual;
   end;
 
   TMemoryStream = object(TStream)
@@ -69,9 +81,11 @@ type
     FReferences: PReferenceList;
   public
     constructor Create(ASize: longint);
+    constructor CreateBuffer(ABuffer: pointer; ASize: word);
     destructor Free; virtual;
-    function Read(ABuffer: PByte; ACount: longint): longint; virtual;
-    function Write(ABuffer: PByte; ACount: longint): longint; virtual;
+    destructor FreePreserveBuffers; virtual;
+    function Read(ABuffer: pointer; ACount: longint): longint; virtual;
+    function Write(ABuffer: pointer; ACount: longint): longint; virtual;
     function WriteToStream(AStream: PStream; ACount: longint): longint; virtual;
     function ReadFromStream(AStream: PStream; ACount: longint): longint; virtual;
     function CanRead: boolean; virtual;
@@ -101,15 +115,8 @@ type
     constructor Create(AFilename: string; AMode: TFileStreamMode);
     constructor CreateBufferSize(AFilename: string; AMode: TFileStreamMode; ABufferSize: word);
     destructor Done; virtual;
-    function Read(ABuffer: PByte; ACount: longint): longint; virtual;
-    function ReadByte: byte; virtual;
-    function ReadInteger: integer; virtual;
-    function ReadWord: word; virtual;
-    function ReadLong: longint; virtual;
-    function ReadDouble: double; virtual;
-    function ReadBool: boolean; virtual;
-    function ReadReal: real; virtual;
-    function Write(ABuffer: PByte; ACount: longint): longint; virtual;
+    function Read(ABuffer: pointer; ACount: longint): longint; virtual;
+    function Write(ABuffer: pointer; ACount: longint): longint; virtual;
     function WriteToStream(AStream: PStream; ACount: longint): longint; virtual;
     function ReadFromStream(AStream: PStream; ACount: longint): longint; virtual;
     function CanRead: boolean; virtual;
@@ -119,34 +126,39 @@ type
     procedure Init; virtual;
     procedure Open; virtual;
     procedure Close; virtual;
-    procedure WriteByte(AValue: byte); virtual;
-    procedure WriteInteger(AValue: integer); virtual;
-    procedure WriteWord(AValue: word); virtual;
-    procedure WriteLong(AValue: longint); virtual;
-    procedure WriteDouble(AValue: double); virtual;
-    procedure WriteReal(AValue: real); virtual;
-    procedure WriteBool(AValue: boolean); virtual;
   end;
 
-  TStreamReader = object(TStatusObject)
-  private
-    FStream: PStream;
-  public
-    constructor Create(AStream: PStream);
-    destructor Free; virtual;
-    procedure Init; virtual;
-  end;
-
-  TTextReader = object(TStreamReader)
+  TStreamList = object(TObjectList)
   private
   public
     procedure Init; virtual;
-    destructor Free; virtual;
-    function ReadLine: string;
-    function ReadAllLines: PStringList;
+    function Add(AItem: PStream): integer;
+    function GetItem(AIndex: integer): PStream;
+    function IndexOf(AItem: PStream): integer;
+    procedure SetItem(AIndex: integer; AItem: PStream);
+    procedure Insert(AIndex: integer; AItem: PStream);
+    procedure Delete(AIndex: integer); virtual;
+    procedure ForEach(AProc: TStreamListProc);
+  end;
+
+  TMemoryStreamList = object(TStreamList)
+  private
+  public
+    procedure Init; virtual;
+    function Add(AItem: PMemoryStream): integer;
+    function GetItem(AIndex: integer): PMemoryStream;
+    function IndexOf(AItem: PMemoryStream): integer;
+    procedure SetItem(AIndex: integer; AItem: PMemoryStream);
+    procedure Insert(AIndex: integer; AItem: PMemoryStream);
+    procedure Delete(AIndex: integer); virtual;
+    procedure ForEach(AProc: TMemoryStreamListProc);
   end;
 
 implementation
+
+uses
+  Strings,
+  StrUtils;
 
 const
   DefaultFileStreamBufferSize = 4096;
@@ -177,11 +189,11 @@ begin
   CanSeek := true;
 end;
 
-function TStream.Read(ABuffer: PByte; ACount: longint): longint;
+function TStream.Read(ABuffer: pointer; ACount: longint): longint;
 begin
 end;
 
-function TStream.Write(ABuffer: PByte; ACount: longint): longint;
+function TStream.Write(ABuffer: pointer; ACount: longint): longint;
 begin
 end;
 
@@ -204,7 +216,7 @@ begin
       newPos := Position + AOffset;
     end;
   end;
-  Position := MinLong(MaxLong(0, newPos), Size);
+  Position := ClampL(newPos, 0, size);
 end;
 
 function TStream.ReadByte: byte;
@@ -291,9 +303,60 @@ begin
   FClosed := true;
 end;
 
+procedure TStream.ReadDateTime(var ADateTime: TDateTime);
+var
+  ticks: double;
+begin
+  Read(@ticks, SizeOf(double));
+  ADateTime.CreateTicks(ticks);
+end;
+
+procedure TStream.WriteDateTime(const ADateTime: TDateTime);
+var
+  ticks: double;
+begin
+  ticks := ADateTime.Ticks;
+  Write(@ticks, SizeOf(double));
+end;
+
 procedure TStream.WriteByte(AValue: byte);
 begin
   Write(@AValue, SizeOf(byte));
+end;
+
+procedure TStream.WritePChar(AValue: PChar);
+var
+  len: word;
+begin
+  if not Assigned(AValue) then begin
+    len := 0;
+    WriteWord(len);
+    exit;
+  end;
+  len := StrLen(AValue);
+  WriteWord(len);
+  Write(AValue, len);
+end;
+
+function TStream.ReadPChar: PChar;
+var
+  len: word;
+  result: PChar;
+begin
+  len := ReadWord;
+  if HasException then
+    exit;
+  len := ReadWord;
+  result := TString.Alloc(len);
+  if IsNilPtr(result, ecNotEnoughMemory) then
+    exit;
+  if len = 0 then begin
+    result[0] := #0;
+    ReadPChar := result;
+  end
+  else
+    Read(result, len);
+  ReadPChar := result;
 end;
 
 function TStream.ReadString: string;
@@ -357,7 +420,7 @@ begin
   Memory.BeginAllocTransaction;
   remaining := ASize;
   while remaining > 0 do begin
-    refSize := MinLong(remaining, MaxVarSize);
+    refSize := MinL(remaining, MaxVarSize);
     reference := Memory.Alloc(refSize);
     if Memory.HasException then begin
       Raise(Memory.Exception^.Code);
@@ -373,6 +436,19 @@ begin
   Memory.CommitAllocTransaction;
 end;
 
+constructor TMemoryStream.CreateBuffer(ABuffer: pointer; ASize: word);
+var
+  reference: PReference;
+begin
+  inherited Create;
+  reference := Memory.GetReference(ABuffer, ASize);
+  if not Assigned(reference) then begin
+    Raise(Memory.Exception^.Code);
+    exit;
+  end;
+  Size := ASize;
+end;
+
 destructor TMemoryStream.Free;
 var
   index: integer;
@@ -386,7 +462,23 @@ begin
   inherited Free;
 end;
 
-function TMemoryStream.Read(ABuffer: PByte; ACount: longint): longint;
+destructor TMemoryStream.FreePreserveBuffers;
+var
+  index: integer;
+  reference: PReference;
+begin
+  for index := FReferences^.Count - 1 downto 0 do begin
+    reference := FReferences^.GetItem(index);
+    if not Assigned(reference) then
+      continue;
+    Dispose(reference);
+    FReferences^.Delete(index);
+  end;
+  FreeAndNil(FReferences);
+  inherited Free;
+end;
+
+function TMemoryStream.Read(ABuffer: pointer; ACount: longint): longint;
 var
   bytesRead: longint;
   index: integer;
@@ -394,9 +486,11 @@ var
   reference: PReference;
   readSize: longint;
   ptr: PByte;
+  buffer: PByte;
 begin
   if HasException then
     exit;
+  buffer := PByte(ABuffer);
   Read := 0;
   bytesRead := 0;
   while bytesRead < ACount do begin
@@ -405,13 +499,13 @@ begin
       break;
     offset := Position mod MaxVarSize;
     reference := FReferences^.GetItem(index);
-    readSize := MinLong(reference^.Size - offset, ACount - bytesRead);
+    readSize := MinL(reference^.Size - offset, ACount - bytesRead);
     if readSize <= 0 then
       break;
     ptr := Memory.ReferencePointer(reference);
     Inc(ptr, offset);
-    Move(ptr^, ABuffer^, readSize);
-    Inc(ABuffer, readSize);
+    Move(ptr^, buffer^, readSize);
+    Inc(buffer, readSize);
     Inc(bytesRead, readSize);
     Inc(Position, readSize);
   end;
@@ -437,7 +531,7 @@ begin
       break;
     offset := Position mod MaxVarSize;
     reference := FReferences^.GetItem(index);
-    writeSize := MinLong(reference^.Size - offset, ACount - written);
+    writeSize := MinL(reference^.Size - offset, ACount - written);
     if writeSize <= 0 then
       exit;
     ptr := Memory.ReferencePointer(reference);
@@ -449,7 +543,7 @@ begin
   Fill := written;
 end;
 
-function TMemoryStream.Write(ABuffer: PByte; ACount: longint): longint;
+function TMemoryStream.Write(ABuffer: pointer; ACount: longint): longint;
 var
   index: integer;
   written: longint;
@@ -457,9 +551,11 @@ var
   offset: longint;
   writeSize: longint;
   ptr: PByte;
+  buffer: PByte;
 begin
   if HasException then
     exit;
+  buffer := PByte(ABuffer);
   Write := 0;
   written := 0;
   while written < ACount do begin
@@ -468,13 +564,13 @@ begin
       break;
     offset := Position mod MaxVarSize;
     reference := FReferences^.GetItem(index);
-    writeSize := MinLong(reference^.Size - offset, ACount - written);
+    writeSize := MinL(reference^.Size - offset, ACount - written);
     if writeSize <= 0 then
       break;
     ptr := Memory.ReferencePointer(reference);
     Inc(ptr, offset);
-    Move(ABuffer^, ptr^, writeSize);
-    Inc(ABuffer, writeSize);
+    Move(buffer^, ptr^, writeSize);
+    Inc(buffer, writeSize);
     Inc(written, writeSize);
     Inc(Position, writeSize);
   end;
@@ -501,7 +597,7 @@ begin
       break;
     offset := Position mod MaxVarSize;
     reference := FReferences^.GetItem(index);
-    writeSize := MinLong(reference^.Size - offset, ACount - total);
+    writeSize := MinL(reference^.Size - offset, ACount - total);
     if writeSize <= 0 then
       break;
     ptr := Memory.ReferencePointer(reference);
@@ -567,12 +663,14 @@ begin
   Close;
 end;
 
-function TFileStream.Read(ABuffer: PByte; ACount: longint): longint;
+function TFileStream.Read(ABuffer: pointer; ACount: longint): longint;
 var
   bytesRead: word;
   total: longint;
+  buffer: PByte;
 begin
   Read := 0;
+  buffer := PByte(ABuffer);
   if (ACount <= 0) or not CheckRead then
     exit;
   total := 0;
@@ -580,7 +678,7 @@ begin
     {$I-}
     if Eof(FFile) then
       break;
-    BlockRead(FFile, ABuffer^, MinLong(ACount, MaxVarSize), bytesRead);
+    BlockRead(FFile, buffer^, MinL(ACount, MaxVarSize), bytesRead);
     {$I+}
     if IOResult <> 0 then begin
       Raise(ecStreamReadError);
@@ -588,26 +686,28 @@ begin
     end;
     if bytesRead = 0 then
       break;
-    Inc(ABuffer, bytesRead);
+    Inc(buffer, bytesRead);
     Inc(total, bytesRead);
     Inc(Position, bytesRead);
   end;
   Read := total;
 end;
 
-function TFileStream.Write(ABuffer: PByte; ACount: longint): longint;
+function TFileStream.Write(ABuffer: pointer; ACount: longint): longint;
 var
   bytesWritten: word;
   total: longint;
+  buffer: PByte;
 begin
   Write := 0;
+  buffer := PByte(ABuffer);
   if (ACount <= 0) or not CheckWrite then
     exit;
   total := 0;
   while total < ACount do begin
     Seek(Position, soFromBeginning);
     {$I-}
-    BlockWrite(FFile, ABuffer^, MinLong(ACount, MaxVarSize), bytesWritten);
+    BlockWrite(FFile, buffer^, MinL(ACount, MaxVarSize), bytesWritten);
     {$I+}
     if IOResult <> 0 then begin
       Raise(ecStreamReadError);
@@ -615,86 +715,14 @@ begin
     end;
     if bytesWritten = 0 then
       break;
-    Inc(ABuffer, bytesWritten);
+
+    if Position + bytesWritten >= Size then
+      Size := Position + bytesWritten;
+    Inc(buffer, bytesWritten);
     Inc(total, bytesWritten);
     Inc(Position, bytesWritten);
-    Inc(Size, bytesWritten);
   end;
   Write := total;
-end;
-
-function TFileStream.ReadByte: byte;
-var
-  aNum: byte;
-begin
-  if not CheckRead then
-    exit;
-  aNum := 0;
-  inherited Read(@aNum, SizeOf(byte));
-  ReadByte := aNum;
-end;
-
-function TFileStream.ReadInteger: integer;
-var
-  aNum: integer;
-begin
-  if not CheckRead then
-    exit;
-  aNum := 0;
-  Read(@aNum, SizeOf(integer));
-  ReadInteger := aNum;
-end;
-
-function TFileStream.ReadWord: word;
-var
-  aNum: word;
-begin
-  if not CheckRead then
-    exit;
-  aNum := 0;
-  Read(@aNum, SizeOf(word));
-  ReadWord := aNum;
-end;
-
-function TFileStream.ReadLong: longint;
-var
-  aNum: longint;
-begin
-  if not CheckRead then
-    exit;
-  Read(@aNum, SizeOf(longint));
-  ReadLong := aNum;
-end;
-
-function TFileStream.ReadDouble: double;
-var
-  aNum: double;
-begin
-  if not CheckRead then
-    exit;
-  Read(@aNum, SizeOf(double));
-  ReadDouble := aNum;
-end;
-
-function TFileStream.ReadReal: real;
-var
-  aNum: real;
-begin
-  if not CheckRead then
-    exit;
-  Read(@aNum, SizeOf(real));
-  ReadReal := aNum;
-end;
-
-function TFileStream.ReadBool: boolean;
-var
-  aBool: boolean;
-begin
-  if not CheckRead then
-    exit;
-  aBool := false;
-  Read(@aBool, SizeOf(boolean));
-  ReadBool := aBool;
 end;
 
 function TFileStream.WriteToStream(AStream: PStream; ACount: longint): longint;
@@ -750,55 +778,6 @@ end;
 function TFileStream.CanSeek: boolean;
 begin
   CanSeek := true;
-end;
-
-procedure TFileStream.WriteByte(AValue: byte);
-begin
-  if not CheckWrite then
-    exit;
-  Write(@AValue, SizeOf(byte));
-end;
-
-procedure TFileStream.WriteInteger(AValue: integer);
-begin
-  if not CheckWrite then
-    exit;
-  Write(@AValue, SizeOf(integer));
-end;
-
-procedure TFileStream.WriteWord(AValue: word);
-begin
-  if not CheckWrite then
-    exit;
-  Write(@AValue, SizeOf(word));
-end;
-
-procedure TFileStream.WriteLong(AValue: longint);
-begin
-  if not CheckWrite then
-    exit;
-  Write(@AValue, SizeOf(longint));
-end;
-
-procedure TFileStream.WriteDouble(AValue: double);
-begin
-  if not CheckWrite then
-    exit;
-  Write(@AValue, SizeOf(double));
-end;
-
-procedure TFileStream.WriteReal(AValue: real);
-begin
-  if not CheckWrite then
-    exit;
-  Write(@AValue, SizeOf(real));
-end;
-
-procedure TFileStream.WriteBool(AValue: boolean);
-begin
-  if not CheckWrite then
-    exit;
-  Write(@AValue, SizeOf(boolean));
 end;
 
 function TFileStream.Seek(AOffset: longint; AOrigin: TSeekOrigin): longint;
@@ -876,56 +855,84 @@ begin
   end;
 end;
 
-constructor TStreamReader.Create(AStream: PStream);
-begin
-  inherited Create;
-  FStream := AStream;
-end;
-
-destructor TStreamReader.Free;
-begin
-  inherited Free;
-end;
-
-procedure TStreamReader.Init;
-begin
-  inherited Init;
-  FStream := nil;
-end;
-
-procedure TTextReader.Init;
+procedure TStreamList.Init;
 begin
   inherited Init;
 end;
 
-destructor TTextReader.Free;
+function TStreamList.Add(AItem: PStream): integer;
 begin
-  inherited Free;
+  Add := inherited Add(AItem);
 end;
 
-function TTextReader.ReadLine: string;
-var
-  ch: char;
-  line: string;
-  charIndex : integer;
+function TStreamList.GetItem(AIndex: integer): PStream;
 begin
-  {TODO: this}
-  FillChar(line, SizeOf(Byte), 0);
-  charIndex := 1;
-  while FStream^.EndOfStream do begin
-    if charIndex > High(byte) then
-      break;
-    ch := Chr(FStream^.ReadByte);
-    if ch = #13 then begin
-
-    end;
-    Inc(charIndex);
-  end;
-  line[0] := Chr(charIndex - 1);
+  GetItem := PStream(inherited GetItem(AIndex));
 end;
 
-function TTextReader.ReadAllLines: PStringList;
+function TStreamList.IndexOf(AItem: PStream): integer;
 begin
+  IndexOf := inherited IndexOf(AItem);
+end;
+
+procedure TStreamList.SetItem(AIndex: integer; AItem: PStream);
+begin
+  inherited SetItem(AIndex, AItem);
+end;
+
+procedure TStreamList.Insert(AIndex: integer; AItem: PStream);
+begin
+  inherited Insert(AIndex, AItem);
+end;
+
+procedure TStreamList.Delete(AIndex: integer);
+begin
+  inherited Delete(AIndex);
+end;
+
+procedure TStreamList.ForEach(AProc: TStreamListProc);
+begin
+  TList.ForEach(@AProc);
+end;
+
+procedure TMemoryStreamList.Init;
+begin
+  inherited Init;
+end;
+
+function TMemoryStreamList.Add(AItem: PMemoryStream): integer;
+begin
+  Add := inherited Add(AItem);
+end;
+
+function TMemoryStreamList.GetItem(AIndex: integer): PMemoryStream;
+begin
+  GetItem := PMemoryStream(inherited GetItem(AIndex));
+end;
+
+function TMemoryStreamList.IndexOf(AItem: PMemoryStream): integer;
+begin
+  IndexOf := inherited IndexOf(AItem);
+end;
+
+procedure TMemoryStreamList.SetItem(AIndex: integer; AItem: PMemoryStream);
+begin
+  inherited SetItem(AIndex, AItem);
+end;
+
+procedure TMemoryStreamList.Insert(AIndex: integer; AItem: PMemoryStream);
+begin
+  inherited Insert(AIndex, AItem);
+end;
+
+procedure TMemoryStreamList.Delete(AIndex: integer);
+begin
+  inherited Delete(AIndex);
+end;
+
+procedure TMemoryStreamList.ForEach(AProc: TMemoryStreamListProc);
+begin
+  TList.ForEach(@AProc);
 end;
 
 begin

@@ -26,9 +26,11 @@ type
   PGraphics8Driver = ^TGraphics8Driver;
   PMouseCursor = ^TMouseCursor;
   PMouseCursorList = ^TMouseCursorList;
+  PMouseCursorListProc = ^TMouseCursorListProc;
 
   TLargeMouseCursorImage = array[0..14, 0..7] of byte;
   TSmallMouseCursorImage = array[0..8, 0..7] of byte;
+  TMouseCursorListProc = procedure(ASender: PMouseCursorList; AMouseCursor: PMouseCursor);
 
   TMouseCursor = object(TIdentifiable)
   private
@@ -77,6 +79,12 @@ type
   public
     function GetItem(AIndex: integer): PMouseCursor;
     function GetItemById(const AId: string): PMouseCursor;
+    function Add(AItem: PMouseCursor): integer;
+    function IndexOf(AItem: PMouseCursor): integer;
+    procedure ForEach(AProc: PMouseCursorListProc);
+    procedure SetItem(AIndex: integer; AItem: PMouseCursor);
+    procedure Insert(AIndex: integer; AItem: PMouseCursor);
+
     procedure Init; virtual;
   end;
 
@@ -375,6 +383,31 @@ end;
 function TMouseCursorList.GetItemById(const AId: string): PMouseCursor;
 begin
   GetItemById := PMouseCursor(inherited GetItemById(AId));
+end;
+
+function TMouseCursorList.Add(AItem: PMouseCursor): integer;
+begin
+  Add := inherited Add(AItem);
+end;
+
+function TMouseCursorList.IndexOf(AItem: PMouseCursor): integer;
+begin
+  IndexOf := inherited IndexOf(AItem);
+end;
+
+procedure TMouseCursorList.ForEach(AProc: PMouseCursorListProc);
+begin
+  TList.ForEach(PListProc(AProc));
+end;
+
+procedure TMouseCursorList.SetItem(AIndex: integer; AItem: PMouseCursor);
+begin
+  inherited SetItem(AIndex, AItem);
+end;
+
+procedure TMouseCursorList.Insert(AIndex: integer; AItem: PMouseCursor);
+begin
+  inherited Insert(AIndex, AItem);
 end;
 
 end.

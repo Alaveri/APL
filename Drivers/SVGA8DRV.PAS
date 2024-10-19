@@ -13,12 +13,13 @@ uses
   Drawing,
   Common,
   StrUtils,
+  Math,
   Streams,
   GraphDrv,
   GrDrv8,
   MemDrv,
   Palettes,
-  SVgaType;
+  VbeTypes;
 
 type
   PSVga8Mode = ^TSvga8Mode;
@@ -149,7 +150,7 @@ begin
     end;
     newMode := New(PSVga8Mode, Create);
     with newMode^ do begin
-      Id := vbeModeIndex;
+      ModeId := vbeModeIndex;
       case vbeMode.v1.Bpp of
           4: colors := '16';
           8: colors := '256';
@@ -300,8 +301,8 @@ begin
     fore := State.ForeColor;
     linePtr := State.Font^.FontData;
     Inc(linePtr, Ord(ch) * height);
-    minX := MaxLong(0, drawRect.X - sx);
-    maxX := MinLong(State.Font^.TextWidth(ch) - 1, drawRect.Right - sx);
+    minX := MaxL(0, drawRect.X - sx);
+    maxX := MinL(State.Font^.TextWidth(ch) - 1, drawRect.Right - sx);
     sy := AY;
     for yIndex := 0 to height - 1 do begin
       currentLine := linePtr^;
@@ -316,7 +317,8 @@ begin
       px := AX;
       for xIndex := minX to maxX do begin
         if (currentLine and ($8000 shr xIndex)) > 0 then
-          FillLine(screen, px, sy, 1, fore);
+          {FillLine(screen, px, sy, 1, fore);}
+          screen^ := fore;
         Inc(px);
         Inc(screen);
         Inc(offset);
@@ -357,14 +359,14 @@ begin
   color := byte(State.ForeColor);
   if AWidth + offset > FWinSize then begin
     partialWidth := FWinSize - offset + 1;
-    FillLine(screen, AX, AY, partialWidth, color);
+    FillChar(screen^, partialWidth, color);
     SetBank(FCurrentBank + 1);
     screen := Mode^.FrameBuffer;
     Dec(AWidth, partialWidth);
-    FillLine(screen, AX, AY, AWidth, color);
+    FillChar(screen^, AWidth, color);
   end
   else
-    FillLine(screen, AX, AY, AWidth, color);
+    FillChar(screen^, AWidth, color);
 end;
 
 procedure TSVga8Driver.VLine(AX, AY, AHeight: integer);
@@ -379,13 +381,13 @@ begin
   Mode^.Bounds.GetIntersection(State.ViewPort, drawRect);
   if (AX < drawRect.X) or (AX > drawRect.Right) then
     exit;
-  CheckRange(AY, drawRect.Y, drawRect.Bottom);
-  AHeight := MinLong(drawRect.Height, AHeight);
+  AY := Clamp(AY, drawRect.Y, drawRect.Bottom);
+  AHeight := MinL(drawRect.Height, AHeight);
   if AHeight <= 0 then
     exit;
-  for index := MaxLong(AY, 0) to MinLong(AY + AHeight - 1, Mode^.MaxY) do begin
+  for index := MaxL(AY, 0) to MinL(AY + AHeight - 1, Mode^.MaxY) do begin
     screen := GetDrawPointer(AX, index, offset);
-    FillLine(screen, AX, AY, 1, ForeColor);
+    screen^ := ForeColor;
   end;
 end;
 
@@ -411,15 +413,15 @@ begin
     Inc(image, (yIndex + imageRect.Y) * imageRect.Width + imageRect.X);
     if offset + lineWidth > FWinSize then begin
       partialWidth := FWinSize - offset + 1;
-      MoveLine(image, screen, drawRect.X, sy, partialWidth);
+      Move(image^, screen^, partialWidth);
       Inc(image, partialWidth);
       SetBank(FCurrentBank + 1);
       screen := Mode^.FrameBuffer;
-      MoveLine(image, screen, drawRect.X, sy, lineWidth - partialWidth);
+      Move(image^, screen^, lineWidth - partialWidth);
       Inc(image, lineWidth - partialWidth);
     end
     else begin
-      MoveLine(image, screen, drawRect.X, sy, lineWidth);
+      Move(image^, screen^, lineWidth);
       Inc(image, lineWidth);
     end;
     Inc(sy);
@@ -445,7 +447,7 @@ begin
     Inc(image, (yIndex + imageRect.Y) * imageRect.Width + imageRect.X);
     for xIndex := 0 to drawRect.Width - 1 do begin
       if image^ <> TransparentColor then
-        MoveLine(image, screen, drawRect.X, sy, 1);
+        screen^ := image^;
       Inc(image);
       Inc(screen);
       Inc(offset);

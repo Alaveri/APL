@@ -50,7 +50,7 @@ begin
   for index := 0 to Graph^.Modes.Count - 1 do begin
     mode := Graph^.Modes.GetItem(index);
     if (mode^.Width = AWidth) and (mode^.Height = AHeight) and (mode^.Bpp = ABpp) then begin
-      GetGraphicsModeId := mode^.Id;
+      GetGraphicsModeId := mode^.ModeId;
       exit;
     end;
   end;
@@ -61,7 +61,7 @@ var
   mode: PGraphicsMode;
 begin
   SetMode := true;
-  mode := Graph^.Modes.GetItemById(AModeId);
+  mode := Graph^.Modes.GetModeById(AModeId);
   if not Assigned(mode) then begin
     SetMode := false;
     exit;

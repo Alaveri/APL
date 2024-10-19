@@ -74,6 +74,8 @@ const
 
   { Compression errors }
   ecInvalidCompressionSource = 601;
+  ecCompressionBitSizeError = 602;
+  ecCompressorNotSpecified = 603;
 
   { List Errors }
   ecListCapacityOverflow = 701;
@@ -145,11 +147,17 @@ type
     procedure RaiseInvalidOperation(AMessage: string);
     procedure RaiseWarning(ACode: TExceptionCode);
     procedure RaiseHint(ACode: TExceptionCode);
+    procedure Reraise(AObject: PStatusObject);
+    procedure RaiseSeverity(ACode: TExceptionCode; ASeverity: TExceptionSeverity);
     procedure ClearException;
     procedure Assign(var ASource: TObject); virtual;
     function HasException: boolean;
     function NoException: boolean;
     function GetBaseException: PException;
+    function CheckReraise(AObject: PStatusObject): boolean;
+    function IsNilPtr(APtr: pointer; ACode: TExceptionCode): boolean;
+    function IsNilPtrSeverity(APtr: pointer; ACode: TExceptionCode;
+      ASeverity: TExceptionSeverity): boolean;
     destructor Free; virtual;
   end;
 
@@ -220,6 +228,8 @@ begin
     ecInvalidOperation: ErrorMessage := 'Invalid operation';
     ecUnsupportedPaletteFormat: ErrorMessage := 'Unsupported palette format';
     ecInvalidPalette: ErrorMessage := 'Invalid palette';
+    ecCompressionBitSizeError: ErrorMessage := 'Compression bit size too large';
+    ecCompressorNotSpecified: ErrorMessage := 'Compressor not specified';
     else begin
       if AErrorCode >= ecUser then begin
         if Assigned(CustomErrorMessage) then begin
@@ -325,18 +335,64 @@ begin
 end;
 {$ENDIF}
 
-procedure TStatusObject.RaiseWarning(ACode: TExceptionCode);
+procedure TStatusObject.RaiseSeverity(ACode: TExceptionCode; ASeverity: TExceptionSeverity);
 begin
   Raise(ACode);
-  Exception^.Severity := esWarning;
-  Status := sWarning;
+  Exception^.Severity := ASeverity;
+end;
+
+function TStatusObject.CheckReraise(AObject: PStatusObject): boolean;
+var
+  result: boolean;
+begin
+  CheckReraise := false;
+  if not Assigned(AObject) then
+    exit;
+  result := AObject^.HasException;
+  if result then begin
+    Reraise(AObject);
+    AObject^.ClearException;
+  end;
+  CheckReraise := result;
+end;
+
+function TStatusObject.IsNilPtr(APtr: pointer; ACode: TExceptionCode): boolean;
+var
+  result: boolean;
+begin
+  result := not Assigned(APtr);
+  if result then
+    Raise(ACode);
+  IsNilPtr := result;
+end;
+
+function TStatusObject.IsNilPtrSeverity(APtr: pointer; ACode: TExceptionCode;
+  ASeverity: TExceptionSeverity): boolean;
+var
+  result: boolean;
+begin
+  result := not Assigned(APtr);
+  if result then
+    RaiseSeverity(ACode, ASeverity);
+  IsNilPtrSeverity := result;
+end;
+
+procedure TStatusObject.Reraise(AObject: PStatusObject);
+begin
+  if not (Assigned(AObject) and AObject^.HasException) then
+    exit;
+  RaiseSeverity(AObject^.Exception^.Code, AObject^.Exception^.Severity);
+  AObject^.ClearException;
+end;
+
+procedure TStatusObject.RaiseWarning(ACode: TExceptionCode);
+begin
+  RaiseSeverity(ACode, esWarning);
 end;
 
 procedure TStatusObject.RaiseHint(ACode: TExceptionCode);
 begin
-  Raise(ACode);
-  Exception^.Severity := esHint;
-  Status := sHint;
+  RaiseSeverity(ACode, esHint);
 end;
 
 procedure TStatusObject.ClearException;

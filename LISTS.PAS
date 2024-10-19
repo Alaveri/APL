@@ -11,11 +11,12 @@ uses
   AplTypes,
   Common,
   Errors,
+  Math,
   StrUtils,
   AplObj;
 
 const
-  ListBufferSize = $FFF8 div 4;
+  ListBufferSize = $FFF8 div SizeOf(Pointer);
   DefaultListSize = 4;
 
 type
@@ -30,21 +31,30 @@ type
   PComparer = ^TComparer;
   PListBuffer = ^TListBuffer;
   PListNode = ^TListNode;
+  PListProc = ^TListProc;
+  PIdentifiableList = ^TIdentifiableList;
+  PIdentifiableListProc = ^TIdentifiableListProc;
+  PObjectListProc = ^TObjectListProc;
+  PStringListProc = ^TStringListProc;
 
   TSortFunc = procedure(AList: PList; AComparer: TComparer);
   TListBuffer = array[0..ListBufferSize] of pointer;
+  TListProc = procedure(ASender: PObject; AItem: pointer);
+  TObjectListProc = procedure(ASender: PObject; AItem: PObject);
+  TStringListProc = procedure(ASender: PObject; AItem: PChar);
+  TIdentifiableListProc = procedure(ASender: PObject; AItem: PIdentifiable);
+  TListGrowFunc = function(ACapacity: integer): integer;
 
   TList = object(TStatusObject)
   private
     FSorted: boolean;
     FComparer: TComparer;
     FCapacity: integer;
-    FBuffer: PListBuffer;
-    procedure Grow;
     function GetSortedIndex(AItem: pointer): integer;
     procedure QuickSort(AComparer: TComparer; ALowIndex, AHighIndex: integer);
   public
     Count: integer;
+    Items: PListBuffer;
     constructor CreateCapacity(ACapacity: integer);
     constructor CreateSorted(AComparer: TComparer);
     constructor CreateSortedCapacity(AComparer: TComparer; ACapacity: integer);
@@ -54,7 +64,12 @@ type
     function Sorted: boolean;
     function GetItem(AIndex: integer): pointer;
     function IndexOf(AItem: pointer): integer;
+    function BinarySearchUsing(AComparer: TComparer; var AValue): integer;
+    function BinarySearch(var AValue): integer;
     function Capacity: integer;
+    procedure Grow; virtual;
+    procedure GrowUsing(AGrowFunc: TListGrowFunc);
+    procedure ForEach(AProc: PListProc);
     procedure SetComparer(AComparer: TComparer); virtual;
     procedure Swap(AIndex1, AIndex2: integer); virtual;
     procedure SetItem(AIndex: integer; AItem: pointer);
@@ -106,6 +121,7 @@ type
     procedure SetItem(AIndex: integer; AItem: PObject);
     procedure Insert(AIndex: integer; AItem: PObject);
     procedure Delete(AIndex: integer); virtual;
+    procedure ForEach(AProc: TObjectListProc);
     procedure Clear; virtual;
     destructor Free; virtual;
   end;
@@ -164,6 +180,7 @@ type
     function GetString(AIndex: integer): string;
     procedure Clear; virtual;
     procedure Delete(AIndex: integer); virtual;
+    procedure ForEach(AProc: PStringListProc);
     procedure Init; virtual;
   end;
 
@@ -173,6 +190,11 @@ type
     function GetItemById(const AId: string): PIdentifiable;
     function GetItem(AIndex: integer): PIdentifiable;
     function IndexOfId(const AId: string): integer; virtual;
+    function Add(AItem: PIdentifiable): integer;
+    function IndexOf(AItem: PIdentifiable): integer;
+    procedure ForEach(AProc: PIdentifiableListProc);
+    procedure SetItem(AIndex: integer; AItem: PIdentifiable);
+    procedure Insert(AIndex: integer; AItem: PIdentifiable);
   end;
 
   TStringComparer = object(TObject)
@@ -184,6 +206,8 @@ type
 
 var
   TStringCompare: TStringComparer;
+
+function DefaultListGrow(ACapacity: integer): integer; far;
 
 implementation
 
@@ -223,22 +247,35 @@ end;
 destructor TList.Free;
 begin
   Clear;
-  if Assigned(FBuffer) then
-    FreeMem(FBuffer, FCapacity * PointerSize);
+  if Assigned(Items) then
+    FreeMem(Items, FCapacity * PointerSize);
   inherited Free;
 end;
 
-procedure TList.Grow;
+procedure TList.GrowUsing(AGrowFunc: TListGrowFunc);
 var
   newCapacity: integer;
 begin
-  if FCapacity >= 64 then
-    newCapacity := (FCapacity * 3) div 2
-  else if FCapacity >= 8 then
-    newCapacity := FCapacity + 16
-  else
-    newCapacity := FCapacity + 4;
+  newCapacity := AGrowFunc(FCapacity);
   SetCapacity(newCapacity);
+end;
+
+function DefaultListGrow(ACapacity: integer): integer;
+var
+  newCapacity: integer;
+begin
+  if ACapacity >= 64 then
+    newCapacity := (ACapacity * 3) div 2
+  else if ACapacity >= 8 then
+    newCapacity := ACapacity + 16
+  else
+    newCapacity := ACapacity + 4;
+  DefaultListGrow := newCapacity;
+end;
+
+procedure TList.Grow;
+begin
+  GrowUsing(DefaultListGrow);
 end;
 
 procedure TList.SetCapacity(ACapacity: integer);
@@ -259,9 +296,9 @@ begin
     dataSize := MaxVarSize;
     ACapacity := MaxVarSize div PointerSize;
   end;
-  if not Assigned(FBuffer) then begin
-    GetMem(FBuffer, dataSize);
-    if not Assigned(FBuffer) then begin
+  if not Assigned(Items) then begin
+    GetMem(Items, dataSize);
+    if not Assigned(Items) then begin
       Raise(ecNotEnoughMemory);
       exit;
     end;
@@ -276,10 +313,10 @@ begin
   if FCapacity > 0 then begin
     if ACapacity > FCapacity then
       dataSize := FCapacity * PointerSize;
-    Move(FBuffer^, newBuffer^, dataSize);
-    FreeMem(FBuffer, FCapacity * PointerSize);
+    Move(Items^, newBuffer^, dataSize);
+    FreeMem(Items, FCapacity * PointerSize);
   end;
-  FBuffer := newBuffer;
+  Items := newBuffer;
   FCapacity := ACapacity;
   if Count > FCapacity then
     Count := FCapacity;
@@ -304,7 +341,7 @@ begin
   if FSorted then
     index := GetSortedIndex(AItem);
   if index = Count then begin
-    FBuffer^[index] := AItem;
+    Items^[index] := AItem;
     Inc(Count);
   end
   else
@@ -316,10 +353,10 @@ procedure TList.Clear;
 begin
   while Count > 0 do
     Delete(0);
-  if Assigned(FBuffer) then
-    FreeMem(FBuffer, FCapacity *  PointerSize);
+  if Assigned(Items) then
+    FreeMem(Items, FCapacity *  PointerSize);
   Count := 0;
-  FBuffer := nil;
+  Items := nil;
   FCapacity := 0;
 end;
 
@@ -398,7 +435,6 @@ begin
   SetCapacity(ACapacity);
 end;
 
-
 procedure TList.SetComparer(AComparer: TComparer);
 begin
   FComparer := AComparer;
@@ -410,7 +446,7 @@ begin
   inherited Init;
   FSorted := false;
   FComparer := nil;
-  FBuffer := nil;
+  Items := nil;
   FCapacity := 0;
   Count := 0;
 end;
@@ -427,7 +463,7 @@ begin
     Raise(ecIndexOutOfBounds);
     exit;
   end;
-  GetItem := FBuffer^[AIndex];
+  GetItem := Items^[AIndex];
 end;
 
 procedure TList.SetItem(AIndex: integer; AItem: pointer);
@@ -436,7 +472,7 @@ begin
     Raise(ecIndexOutOfBounds);
     exit;
   end;
-  FBuffer^[AIndex] := AItem;
+  Items^[AIndex] := AItem;
 end;
 
 function TList.IndexOf(AItem: pointer): integer;
@@ -473,29 +509,12 @@ end;
 
 function TList.GetSortedIndex(AItem: pointer): integer;
 var
-  compared: integer;
-  upper, lower, middle: integer;
-  item2: pointer;
+  result: integer;
 begin
-  GetSortedIndex := 0;
-  if Count = 0 then
-    exit;
-  lower := 0;
-  upper := Count - 1;
-  while lower <= upper do begin
-    middle := lower + (upper - lower) shr 1;
-    item2 := GetItem(middle);
-    compared := FComparer(item2, AItem);
-    if compared = 0 then begin
-      GetSortedIndex := middle;
-      exit;
-    end;
-    if compared < 0 then
-      lower := middle + 1
-    else if compared > 0 then
-      upper := middle - 1;
-  end;
-  GetSortedIndex := lower;
+  result := BinarySearch(AItem);
+  if result < 0 then
+    result := -result - 1;
+  GetSortedIndex := result;
 end;
 
 procedure TList.Insert(AIndex: integer; AItem: pointer);
@@ -515,7 +534,7 @@ begin
     Add(AItem);
     exit;
   end;
-    ptr := pointer(FBuffer);
+    ptr := pointer(Items);
   Inc(ptr, AIndex);
   next := ptr;
   Inc(next);
@@ -532,12 +551,49 @@ begin
     Raise(ecIndexOutOfBounds);
     exit;
   end;
-  ptr := pointer(FBuffer);
+  ptr := pointer(Items);
   Inc(ptr, AIndex);
   next := ptr;
   Inc(next);
   Move(next^, ptr^, (Count - AIndex - 1) * PointerSize);
   Dec(Count);
+end;
+
+procedure TList.ForEach(AProc: PListProc);
+var
+  index: integer;
+begin
+  for index := 0 to Count - 1 do
+    TListProc(AProc)(@self, GetItem(index));
+end;
+
+function TList.BinarySearch(var AValue): integer;
+begin
+  BinarySearch := BinarySearchUsing(FComparer, AValue);
+end;
+
+function TList.BinarySearchUsing(AComparer: TComparer; var AValue): integer;
+var
+  compared: integer;
+  upper, lower, middle: integer;
+  item2: pointer;
+begin
+  lower := 0;
+  upper := Count - 1;
+  while lower <= upper do begin
+    middle := lower + (upper - lower) shr 1;
+    item2 := GetItem(middle);
+    compared := AComparer(item2, pointer(AValue));
+    if compared = 0 then begin
+      BinarySearchUsing := middle;
+      exit;
+    end;
+    if compared < 0 then
+      lower := middle + 1
+    else if compared > 0 then
+      upper := middle - 1;
+  end;
+  BinarySearchUsing := -(lower + 1);
 end;
 
 procedure TObjectList.Init;
@@ -598,6 +654,11 @@ end;
 function TObjectList.GetItem(AIndex: integer): PObject;
 begin
   GetItem := inherited GetItem(AIndex);
+end;
+
+procedure TObjectList.ForEach(AProc: TObjectListProc);
+begin
+  TList.ForEach(@AProc);
 end;
 
 procedure TQueue.Init;
@@ -705,6 +766,11 @@ begin
   DisposeStrings := true;
 end;
 
+procedure TStringList.ForEach(AProc: PStringListProc);
+begin
+  TList.ForEach(PListProc(AProc));
+end;
+
 function TStringList.GetString(AIndex: integer): string;
 var
   result: PChar;
@@ -774,6 +840,31 @@ begin
       break;
     end;
   end;
+end;
+
+function TIdentifiableList.Add(AItem: PIdentifiable): integer;
+begin
+  Add := inherited Add(AItem);
+end;
+
+function TIdentifiableList.IndexOf(AItem: PIdentifiable): integer;
+begin
+  IndexOf := inherited IndexOf(AItem);
+end;
+
+procedure TIdentifiableList.ForEach(AProc: PIdentifiableListProc);
+begin
+  TList.ForEach(PListProc(AProc));
+end;
+
+procedure TIdentifiableList.SetItem(AIndex: integer; AItem: PIdentifiable);
+begin
+  inherited SetItem(AIndex, AItem);
+end;
+
+procedure TIdentifiableList.Insert(AIndex: integer; AItem: PIdentifiable);
+begin
+  inherited Insert(AIndex, AItem);
 end;
 
 procedure TLinkedList.Init;
@@ -881,7 +972,7 @@ var
   prev, item, newNode: PListNode;
   head: PListNode;
 begin
-  AIndex := MaxLong(AIndex, 0);
+  AIndex := MaxL(AIndex, 0);
   if AIndex >= Count then begin
     FTail := Add(AItem);
     exit;
