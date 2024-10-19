@@ -216,7 +216,7 @@ begin
       newPos := Position + AOffset;
     end;
   end;
-  Position := ClampL(newPos, 0, size - 1);
+  Position := ClampL(newPos, 0, size);
 end;
 
 function TStream.ReadByte: byte;

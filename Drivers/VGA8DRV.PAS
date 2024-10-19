@@ -230,8 +230,8 @@ var
   drawRect: TRect;
   charIndex, yIndex: integer;
   ch: char;
-  sx, sy, minX, maxX: integer;
-  minXb: byte;
+  sx, sy: integer;
+  minX, maxX: byte;
   width: integer;
   linePtr: PWord;
   height: integer;
@@ -269,7 +269,6 @@ begin
     Inc(linePtr, Ord(ch) * height);
     minX := Max(0, drawRect.X - sx);
     maxX := Min(State.Font^.TextWidth(ch) - 1, drawRect.Right - sx);
-    minXb := minX;
     for yIndex := 0 to height - 1 do begin
           currentLine := linePtr^;
       if sy < drawRect.Y then begin
@@ -285,7 +284,7 @@ begin
         push ds
         les di, screen { Load screen pointer into ES:DI }
         mov cx, count { Load count into CX as the loop counter }
-        mov dl, minXb { Load starting x index into DL }
+        mov dl, minX { Load starting x index into DL }
         mov dh, fore { Load foreground color into DH }
         mov ax, currentLine { Load current character line into AX }
         @loop:

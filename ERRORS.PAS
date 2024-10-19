@@ -345,7 +345,7 @@ function TStatusObject.CheckReraise(AObject: PStatusObject): boolean;
 var
   result: boolean;
 begin
-  result := false;
+  CheckReraise := false;
   if not Assigned(AObject) then
     exit;
   result := AObject^.HasException;

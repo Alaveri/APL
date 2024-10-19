@@ -176,11 +176,8 @@ begin
       Raise(ecReadPastStreamEnd);
       exit;
     end;
-    if Source^.HasException then begin
-      Raise(Source^.Exception^.Code);
-      Source^.ClearException;
+    if CheckReraise(Source) then
       exit;
-    end;
     FReadPos := 0;
     FReadPtr := FReadBuffer;
     FReadSize := bytesRead;
