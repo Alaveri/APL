@@ -5,13 +5,22 @@ interface
 
 uses
   AplTypes,
+  AplConst,
   Errors,
   Streams,
   Common;
 
 type
   PCompressor = ^TCompressor;
+  PNonCompressor = ^TNonCompressor;
   PCompressProgressProc = ^TCompressProgressProc;
+
+  TAplCompressionLevel = (
+    clLow,
+    clMedium,
+    clHigh
+  );
+
 
   TCompressProgressProc = procedure(ASender: PCompressor; AMax, ACurrent: longint);
 
@@ -35,6 +44,7 @@ type
     Source, Dest: PStream;
     ProgressIncrement: word;
     ReadTotal, WriteTotal: longint;
+    AddTotalToStream: boolean;
     constructor CreateBufferSize(AReadBufferSize, AWriteBufferSize: word);
     constructor Create;
     function CompressStream(ASource, ADest: PStream; ALength: longint): longint; virtual;
@@ -44,18 +54,22 @@ type
     function GetOriginalSize(ASource: PStream): longint; virtual;
     procedure WriteBits(ANum: word; ABitCount: shortint);
     procedure WriteByte(AByte: byte);
-    procedure EndWriteBits;
+    procedure EndWriteBits; virtual;
     procedure DecompressStream(ASource, ADest: PStream; AOriginalSize: longint); virtual;
     procedure Init; virtual;
     procedure InitCompression; virtual;
     procedure UpdateProgress(const AMax, ACurrent: longint);
+    procedure SetCompressionLevel(ALevel: TAplCompressionLevel); virtual;
     destructor Free; virtual;
   end;
 
-implementation
+  TNonCompressor = object(TCompressor)
+    function CompressStream(ASource, ADest: PStream; ALength: longint): longint; virtual;
+    function GetOriginalSize(ASource: PStream): longint; virtual;
+    procedure DecompressStream(ASource, ADest: PStream; AOriginalSize: longint); virtual;
+  end;
 
-uses
-  MemDrv;
+implementation
 
 const
   DefaultProgressIncrement = 4096;
@@ -101,6 +115,7 @@ begin
   FWriteBitBuffer := 0;
   FReadBuffer := nil;
   FWriteBuffer := nil;
+  AddTotalToStream := false;
   ProgressIncrement := DefaultProgressIncrement;
 end;
 
@@ -119,11 +134,8 @@ begin
       Raise(ecWritePastStreamEnd);
       exit;
     end;
-    if Dest^.HasException then begin
-      Raise(Dest^.Exception^.Code);
-      Dest^.ClearException;
+    if CheckReraise(Dest) then
       exit;
-    end;
     FWritePos := 0;
     FWritePtr := FWriteBuffer;
     FWriteSize := written;
@@ -286,6 +298,26 @@ begin
   Source := ASource;
   Dest := ADest;
   InitCompression;
+end;
+
+procedure TCompressor.SetCompressionLevel(ALevel: TAplCompressionLevel);
+begin
+end;
+
+function TNonCompressor.CompressStream(ASource, ADest: PStream; ALength: longint): longint;
+begin
+  ASource^.WriteToStream(ADest, ALength);
+  CompressStream := ALength;
+end;
+
+function TNonCompressor.GetOriginalSize(ASource: PStream): longint;
+begin
+  GetOriginalSize := ASource^.Size;
+end;
+
+procedure TNonCompressor.DecompressStream(ASource, ADest: PStream; AOriginalSize: longint);
+begin
+  ASource^.WriteToStream(ADest, AOriginalSize);
 end;
 
 end.

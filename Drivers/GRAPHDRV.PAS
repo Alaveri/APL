@@ -10,6 +10,7 @@ uses
   {$ENDIF}
   AplObj,
   AplTypes,
+  Math,
   Errors,
   Common,
   Streams,
@@ -1135,8 +1136,8 @@ begin
     Inc(linePtr, charIndex * Height);
     for yIndex := 0 to Height - 1 do begin
       for xIndex := 0 to MaxWidth - 1 do begin
-        if (linePtr^ and (32768 shr xIndex)) > 0 then
-          width := MaxWord(xIndex + 1, width);
+        if (linePtr^ and ($8000 shr xIndex)) > 0 then
+          width := MaxW(xIndex + 1, width);
       end;
       Inc(linePtr);
     end;
@@ -1242,8 +1243,7 @@ begin
       fcLzw: begin
         lzw.CreateBitSize(13);
         lzw.DecompressStream(AStream, @stream, header.DataSize);
-        if lzw.HasException then
-          Raise(lzw.Exception^.Code);
+        CheckReraise(@lzw);
         lzw.Free;
         stream.Seek(0, soFromBeginning);
         stream.Read(PByte(FFontData), header.DataSize);

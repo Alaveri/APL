@@ -7,7 +7,6 @@ uses
   GraphDrv,
   Svga8Drv,
   SvgaBgi8,
-  FastVga8,
   Vga8Drv;
 
 type
@@ -15,8 +14,7 @@ type
   (
     gdVga8,
     gdSVga8,
-    gdSVgaBgi8,
-    gdFastVga8
+    gdSVgaBgi8
 {    gdEga,
     gdCga,
     gdHercules,
@@ -34,7 +32,6 @@ begin
 {    gdCga: Graph := New(PCgaDriver, Create);
     gdEga: Graph := New(PEgaDriver, Create);}
     gdVga8: Graph := New(PVga8Driver, Create);
-    gdFastVga8: Graph := New(PFastVgaDriver, Create);
     gdSVga8: Graph := New(PSVga8Driver, Create);
     gdSVgaBgi8: Graph := New(PSVgaBgiDriver, Create);
 {    gdVgaModeX: Graph := New(PVgaModeXDriver, Create);}

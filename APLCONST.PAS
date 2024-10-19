@@ -5,6 +5,7 @@ interface
 
 const
   PointerSize: longint = SizeOf(Pointer);
+  MaxVarSize = $FFF8;
 
 type
   String1 = string[1];
@@ -36,11 +37,6 @@ type
   String75 = string[75];
   String80 = string[80];
   String100 = string[100];
-
-const
-  RadianConvert: real = 57.295779513082320876798154814105;
-  DegreeConvert: real = 0.017453292519943295769236907684886;
-
 
 implementation
 

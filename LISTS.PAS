@@ -11,6 +11,7 @@ uses
   AplTypes,
   Common,
   Errors,
+  Math,
   StrUtils,
   AplObj;
 
@@ -971,7 +972,7 @@ var
   prev, item, newNode: PListNode;
   head: PListNode;
 begin
-  AIndex := MaxLong(AIndex, 0);
+  AIndex := MaxL(AIndex, 0);
   if AIndex >= Count then begin
     FTail := Add(AItem);
     exit;

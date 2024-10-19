@@ -6,6 +6,7 @@ interface
 uses
   AplObj,
   Lists,
+  Math,
   Common;
 
 type
@@ -180,46 +181,46 @@ type
     function HasRect(var ARect: TRect): boolean;
   end;
 
-procedure LinearInterpolation(AStart: TVector2; AEnd: TVector2;
-  AValue: real; var AResult: TVector2); far;
+procedure LinearInterpolation(const AStart, AEnd: TVector2;
+  ATValue: real; var AResult: TVector2); far;
 
-procedure BezierInterpolationQuad(AP1: TVector2; AP2: TVector2; AP3: TVector2;
-  AValue: real; var AResult: TVector2); far;
+procedure BezierInterpolationQuad(const AP1, AP2, AP3: TVector2;
+  ATValue: real; var AResult: TVector2); far;
 
-procedure BezierInterpolationCubic(AP1: TVector2; AP2: TVector2; AP3: TVector2;
-  AP4: TVector2; AValue: real; var AResult: TVector2); far;
+procedure BezierInterpolationCubic(const AP1, AP2, AP3, AP4: TVector2;
+  ATValue: real;  var AResult: TVector2); far;
 
 procedure LineDraw(AX1, AY1, AX2, AY2: integer; ADrawRect: TRect;
   ASetPixelProc: PSetPixelProc; AData: pointer); far;
 
 implementation
 
-procedure LinearInterpolation(AStart: TVector2; AEnd: TVector2;
-  AValue: real; var AResult: TVector2);
+procedure LinearInterpolation(const AStart, AEnd: TVector2;
+  ATValue: real; var AResult: TVector2);
 begin
   AResult.Create;
-  AResult.X := AStart.X + (AEnd.X - AStart.X) * AValue;
-  AResult.Y := AStart.Y + (AEnd.Y - AStart.Y) * AValue;
+  AResult.X := AStart.X + (AEnd.X - AStart.X) * ATValue;
+  AResult.Y := AStart.Y + (AEnd.Y - AStart.Y) * ATValue;
 end;
 
-procedure BezierInterpolationQuad(AP1: TVector2; AP2: TVector2; AP3: TVector2;
-  AValue: real; var AResult: TVector2);
+procedure BezierInterpolationQuad(const AP1, AP2, AP3: TVector2;
+  ATValue: real; var AResult: TVector2);
 var
   intermediateA, intermediateB: TVector2;
 begin
-  LinearInterpolation(AP1, AP2, AValue, intermediateA);
-  LinearInterpolation(AP2, AP3, AValue, intermediateB);
-  LinearInterpolation(intermediateA, intermediateB, AValue, AResult);
+  LinearInterpolation(AP1, AP2, ATValue, intermediateA);
+  LinearInterpolation(AP2, AP3, ATValue, intermediateB);
+  LinearInterpolation(intermediateA, intermediateB, ATValue, AResult);
 end;
 
-procedure BezierInterpolationCubic(AP1: TVector2; AP2: TVector2; AP3: TVector2;
-  AP4: TVector2; AValue: real; var AResult: TVector2);
+procedure BezierInterpolationCubic(const AP1, AP2, AP3, AP4: TVector2;
+  ATValue: real; var AResult: TVector2);
 var
   intermediateA, intermediateB, intermediateC: TVector2;
 begin
-  BezierInterpolationQuad(AP1, AP2, AP3, AValue, intermediateA);
-  BezierInterpolationQuad(AP2, AP3, AP4, AValue, intermediateB);
-  LinearInterpolation(intermediateA, intermediateB, AValue, AResult);
+  BezierInterpolationQuad(AP1, AP2, AP3, ATValue, intermediateA);
+  BezierInterpolationQuad(AP2, AP3, AP4, ATValue, intermediateB);
+  LinearInterpolation(intermediateA, intermediateB, ATValue, AResult);
 end;
 
 function InversionCompare(AItem1, AItem2: pointer): integer; far;
@@ -355,38 +356,14 @@ begin
   Bottom := Y + Height - 1;
 end;
 
-function TRect.ClampX(APX: integer): integer; assembler;
-asm
-  mov ax, APX
-  mov dx, ES:[DI].TRect.X
-  cmp ax, dx
-  jge @right
-  mov ax, dx
-  jmp @end
-@right:
-  add dx, ES:[DI].TRect.Width
-  dec dx
-  cmp ax, dx
-  jle @end
-  mov ax, dx
-@end:
+function TRect.ClampX(APX: integer): integer;
+begin
+  ClampX := Clamp(APX, X, Right);
 end;
 
-function TRect.ClampY(APY: integer): integer; assembler;
-asm
-  mov ax, APY
-  mov dx, ES:[DI].TRect.Y
-  cmp ax, dx
-  jge @bottom
-  mov ax, dx
-  jmp @end
-@bottom:
-  add dx, ES:[DI].TRect.Height
-  dec dx
-  cmp ax, dx
-  jle @end
-  mov ax, dx
-@end:
+function TRect.ClampY(APY: integer): integer;
+begin
+  ClampY := Clamp(APY, Y, Bottom);
 end;
 
 function TRect.ContainsX(APX: integer): boolean; assembler;
@@ -470,9 +447,6 @@ asm
     jmp @end
   @end:
 end;
-{begin
-  ContainsPoint := Contains(APoint.X, APoint.Y);
-end;}
 
 function TRect.IntersectsRect(ARect: TRect): boolean;
 begin
@@ -503,8 +477,8 @@ begin
     SetDims(0, 0, 0, 0);
     exit;
   end;
-  SetCoords(MaxLong(X, ARect.X), MaxLong(Y, ARect.Y),
-    MinLong(Right, ARect.Right), MinLong(Bottom, ARect.Bottom));
+  SetCoords(MaxL(X, ARect.X), MaxL(Y, ARect.Y),
+    MinL(Right, ARect.Right), MinL(Bottom, ARect.Bottom));
 end;
 
 procedure TRect.GetIntersection(ARect: TRect; var AResult: TRect);
@@ -512,8 +486,8 @@ begin
   AResult.Create;
   if not IntersectsRect(ARect) then
     exit;
-  AResult.SetCoords(MaxLong(X, ARect.X), MaxLong(Y, ARect.Y),
-    MinLong(Right, ARect.Right), MinLong(Bottom, ARect.Bottom));
+  AResult.SetCoords(MaxL(X, ARect.X), MaxL(Y, ARect.Y),
+    MinL(Right, ARect.Right), MinL(Bottom, ARect.Bottom));
 end;
 
 procedure TRect.GetInversionPoints(AList: PInversionPointList;

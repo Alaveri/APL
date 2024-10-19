@@ -4,7 +4,8 @@ unit AplTypes;
 interface
 
 uses
-  AplObj;
+  AplObj,
+  AplConst;
 
 type
 
@@ -16,6 +17,7 @@ type
   PByteArray = ^TByteArray;
   PInteger = ^integer;
   PLongint = ^longint;
+  PBufferArray = ^TBufferArray;
 
   Int64 = comp;
 
@@ -43,6 +45,7 @@ type
   TBits16 = set of TBit16;
   THexString = string[9];
   TByteArray = array[byte] of byte;
+  TBufferArray = array[0..MaxVarSize] of byte;
   TCharSet = set of char;
 
   TLongLowHigh = record

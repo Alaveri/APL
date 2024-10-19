@@ -9,12 +9,11 @@ uses
   {$ENDIF}
   AplTypes,
   AplObj,
+  AplConst,
   Errors,
   Common,
+  Math,
   Lists;
-
-const
-  MaxVarSize = $FFF8;
 
 type
   PReferenceList = ^TReferenceList;
@@ -89,6 +88,7 @@ type
     function CurrentReference: PReference;
     function ReferencePointer(AReference: PReference): pointer;
     function Alloc(ASize: word): Preference;
+    function GetReference(ABuffer: pointer; ASize: word): PReference;
     procedure InitXms;
     procedure Init; virtual;
     procedure SetCurrentReference(AReference: PReference);
@@ -138,7 +138,6 @@ var
 implementation
 
 uses
-  AplConst,
   StrUtils;
 
 var
@@ -489,6 +488,23 @@ begin
   end;
 end;
 
+function TMemoryDriver.GetReference(ABuffer: pointer; ASize: word): PReference;
+var
+  reference: PReference;
+begin
+  reference := New(PReference);
+  if not Assigned(reference) then begin
+    Raise(ecNotEnoughMemory);
+    GetReference := nil;
+    exit;
+  end;
+  reference^.Size := ASize;
+  reference^.Ptr := ABuffer;
+  reference^.Xms := false;
+  FReferences^.Add(reference);
+  GetReference := reference;
+end;
+
 function TMemoryDriver.Alloc(ASize: word): PReference;
 var
   reference: PReference;
@@ -768,7 +784,7 @@ procedure TBuffer.FillByte(AByte: byte; ASize: word);
 begin
   if (ASize = 0) or (ASize = 0) then
     exit;
-  ASize := MinWord(ASize, Size);
+  ASize := MinW(ASize, Size);
   System.FillChar(Data^, ASize, AByte);
 end;
 

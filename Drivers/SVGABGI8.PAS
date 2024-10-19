@@ -8,6 +8,7 @@ uses
   GrDrv8,
   Common,
   AplTypes,
+  Math,
   BgiInter,
   Streams,
   Palettes,
@@ -296,8 +297,8 @@ begin
     fore := State.ForeColor;
     linePtr := State.Font^.FontData;
     Inc(linePtr, Ord(ch) * height);
-    minX := MaxLong(0, drawRect.X - sx);
-    maxX := MinLong(State.Font^.TextWidth(ch) - 1, drawRect.Right - sx);
+    minX := MaxL(0, drawRect.X - sx);
+    maxX := MinL(State.Font^.TextWidth(ch) - 1, drawRect.Right - sx);
     sy := APY;
     for yIndex := 0 to height - 1 do begin
       currentLine := linePtr^;

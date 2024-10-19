@@ -33,18 +33,6 @@ function BoolToYN(ABool: boolean): string;
 function BoolToYesNo(ABool: boolean): string;
 function BoolToInt(ABool: boolean): byte;
 function BoolToIntStr(ABool: boolean): string;
-function Min(ANum1, ANum2: integer): integer;
-function MinShort(ANum1, ANum2: shortint): shortint;
-function MinByte(ANum1, ANum2: byte): byte;
-function MinWord(ANum1, ANum2: word): word;
-function MinLong(ANum1, ANum2: longint): longint;
-function Max(ANum1, ANum2: integer): integer;
-function MaxShort(ANum1, ANum2: shortint): shortint;
-function MaxByte(ANum1, ANum2: byte): byte;
-function MaxWord(ANum1, ANum2: word): word;
-function MaxLong(ANum1, ANum2: longint): longint;
-function MinReal(ANum1, ANum2: real): real;
-function MaxReal(ANum1, ANum2: real): real;
 function FileExists(const AFilename: string): boolean;
 function DirectoryExists(const ADir: string): boolean;
 function GetExtension(const AFilename: string): string;
@@ -71,16 +59,6 @@ procedure SwapByte(var ANum1: byte; var ANum2: byte);
 procedure SwapWord(var ANum1: word; var ANum2: word);
 procedure SwapLong(var ANum1: longint; var ANum2: longint);
 procedure SwapPointer(var APointer1: pointer; var APointer2: pointer);
-procedure CheckRange(var ANum: integer; AMin, AMax: integer);
-procedure CheckShortRange(var ANum: shortint; AMin, AMax: shortint);
-procedure CheckByteRange(var ANum: byte; AMin, AMax: byte);
-procedure CheckWordRange(var ANum: word; AMin, AMax: word);
-procedure CheckLongRange(var ANum: longint; AMin, AMax: longint);
-function EnsureRange(ANum: integer; AMin, AMax: integer): integer;
-function EnsureShortRange(ANum: shortint; AMin, AMax: shortint): shortint;
-function EnsureByteRange(ANum: byte; AMin, AMax: byte): byte;
-function EnsureWordRange(ANum: word; AMin, AMax: word): word;
-function EnsureLongRange(ANum: longint; AMin, AMax: longint): longint;
 function GetCurrentDirectory: string;
 function ChangeDirectory(const ADirectory: string): boolean;
 function StringsEqualInsensitive(const AString1, AString2: string): boolean;
@@ -94,6 +72,7 @@ implementation
 
 uses
   MemDrv,
+  Math,
   Files;
 
 var
@@ -256,165 +235,6 @@ begin
   if Length(result) > 1 then
     result[1] := UpCase(result[1]);
   FirstUpper := result;
-end;
-
-function Min(ANum1, ANum2: integer): integer;
-begin
-  Min := ANum1;
-  if ANum2 < ANum1 then
-    Min := ANum2;
-end;
-
-function MinShort(ANum1, ANum2: shortint): shortint;
-begin
-  MinShort := ANum1;
-  if ANum2 < ANum1 then
-    MinShort := ANum2;
-end;
-
-function MinByte(ANum1, ANum2: byte): byte;
-begin
-  MinByte := ANum1;
-  if ANum2 < ANum1 then
-    MinByte := ANum2;
-end;
-
-function MinWord(ANum1, ANum2: word): word;
-begin
-  MinWord := ANum1;
-  if ANum2 < ANum1 then
-    MinWord := ANum2;
-end;
-
-function MinLong(ANum1, ANum2: longint): longint;
-begin
-  MinLong := ANum1;
-  if ANum2 < ANum1 then
-    MinLong := ANum2;
-end;
-
-function MinReal(ANum1, ANum2: real): real;
-begin
-  MinReal := ANum1;
-  if ANum2 < ANum1 then
-    MinReal := ANum2;
-end;
-
-function MaxReal(ANum1, ANum2: real): real;
-begin
-  MaxReal := ANum1;
-  if ANum2 > ANum1 then
-    MaxReal := ANum2;
-end;
-
-function Max(ANum1, ANum2: integer): integer;
-begin
-  Max := ANum1;
-  if ANum2 > ANum1 then
-    Max := ANum2;
-end;
-
-function MaxShort(ANum1, ANum2: shortint): shortint;
-begin
-  MaxShort := ANum1;
-  if ANum2 > ANum1 then
-    MaxShort := ANum2;
-end;
-
-function MaxByte(ANum1, ANum2: byte): byte;
-begin
-  MaxByte := ANum1;
-  if ANum2 > ANum1 then
-    MaxByte := ANum2;
-end;
-
-function MaxWord(ANum1, ANum2: word): word;
-begin
-  MaxWord := ANum1;
-  if ANum2 > ANum1 then
-    MaxWord := ANum2;
-end;
-
-function MaxLong(ANum1, ANum2: longint): longint;
-begin
-  MaxLong := ANum1;
-  if ANum2 > ANum1 then
-    MaxLong := ANum2;
-end;
-
-procedure CheckRange(var ANum: integer; AMin, AMax: integer);
-begin
-  ANum := Min(ANum, AMax);
-  ANum := Max(ANum, AMin);
-end;
-
-procedure CheckShortRange(var ANum: shortint; AMin, AMax: shortint);
-begin
-  ANum := MinShort(ANum, AMax);
-  ANum := MaxShort(ANum, AMin);
-end;
-
-procedure CheckByteRange(var ANum: byte; AMin, AMax: byte);
-begin
-  ANum := MinByte(ANum, AMax);
-  ANum := MaxByte(ANum, AMin);
-end;
-
-procedure CheckWordRange(var ANum: word; AMin, AMax: word);
-begin
-  ANum := MinWord(ANum, AMax);
-  ANum := MaxWord(ANum, AMin);
-end;
-
-procedure CheckLongRange(var ANum: longint; AMin, AMax: longint);
-begin
-  ANum := MinLong(ANum, AMax);
-  ANum := MaxLong(ANum, AMin);
-end;
-
-function EnsureRange(ANum: integer; AMin, AMax: integer): integer;
-var
-  result: integer;
-begin
-  result := Min(ANum, AMax);
-  result := Max(result, AMin);
-  EnsureRange := result;
-end;
-
-function EnsureShortRange(ANum: shortint; AMin, AMax: shortint): shortint;
-var
-  result: shortint;
-begin
-  result := MinShort(ANum, AMax);
-  result := MaxShort(result, AMin);
-  EnsureShortRange := result;
-end;
-
-function EnsureByteRange(ANum: byte; AMin, AMax: byte): byte;
-var
-  result: byte;
-begin
-  result := MinByte(ANum, AMax);
-  result := MaxByte(result, AMin);
-  EnsureByteRange := result;
-end;
-
-function EnsureWordRange(ANum: word; AMin, AMax: word): word;
-var
-  result: word;
-begin
-  result := MinWord(ANum, AMax);
-  result := MaxWord(result, AMin);
-  EnsureWordRange := result;
-end;
-
-function EnsureLongRange(ANum: longint; AMin, AMax: longint): longint;
-var
-  result: longint;
-begin
-  result := MinLong(ANum, AMax);
-  result := MaxLong(result, AMin);
-  EnsureLongRange := result;
 end;
 
 function IntToStr(ANum: longint): string;

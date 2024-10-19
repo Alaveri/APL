@@ -8,6 +8,7 @@ uses
   MouseDrv,
   StrUtils,
   AplTypes,
+  Math,
   VTypes,
   Common,
   Lists;
@@ -139,7 +140,7 @@ begin
       continue;
     txt := StrPas(action^.HelpText);
     control := PControl(AControl);
-    maxWidth := MaxWord(control^.TrueTextWidth(txt), maxWidth);
+    maxWidth := MaxW(control^.TrueTextWidth(txt), maxWidth);
   end;
   GetHelpMaxWidth := maxWidth;
 end;

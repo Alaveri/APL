@@ -13,12 +13,13 @@ uses
   Drawing,
   Common,
   StrUtils,
+  Math,
   Streams,
   GraphDrv,
   GrDrv8,
   MemDrv,
   Palettes,
-  SVgaType;
+  VbeTypes;
 
 type
   PSVga8Mode = ^TSvga8Mode;
@@ -300,8 +301,8 @@ begin
     fore := State.ForeColor;
     linePtr := State.Font^.FontData;
     Inc(linePtr, Ord(ch) * height);
-    minX := MaxLong(0, drawRect.X - sx);
-    maxX := MinLong(State.Font^.TextWidth(ch) - 1, drawRect.Right - sx);
+    minX := MaxL(0, drawRect.X - sx);
+    maxX := MinL(State.Font^.TextWidth(ch) - 1, drawRect.Right - sx);
     sy := AY;
     for yIndex := 0 to height - 1 do begin
       currentLine := linePtr^;
@@ -380,11 +381,11 @@ begin
   Mode^.Bounds.GetIntersection(State.ViewPort, drawRect);
   if (AX < drawRect.X) or (AX > drawRect.Right) then
     exit;
-  CheckRange(AY, drawRect.Y, drawRect.Bottom);
-  AHeight := MinLong(drawRect.Height, AHeight);
+  AY := Clamp(AY, drawRect.Y, drawRect.Bottom);
+  AHeight := MinL(drawRect.Height, AHeight);
   if AHeight <= 0 then
     exit;
-  for index := MaxLong(AY, 0) to MinLong(AY + AHeight - 1, Mode^.MaxY) do begin
+  for index := MaxL(AY, 0) to MinL(AY + AHeight - 1, Mode^.MaxY) do begin
     screen := GetDrawPointer(AX, index, offset);
     screen^ := ForeColor;
   end;
