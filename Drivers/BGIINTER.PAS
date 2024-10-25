@@ -57,8 +57,8 @@ end;
 
 procedure TBgiInterface.FillRect(ARect: TRect);
 begin
-  ARect.Intersect(Graph8^.State.ViewPort);
-  SetFillStyle(SolidFill, Graph8^.State.BackColor);
+  ARect.Intersect(Graph8^.State^.ViewPort);
+  SetFillStyle(SolidFill, Graph8^.State^.BackColor);
   Bar(ARect.X, ARect.Y, ARect.Right, ARect.Bottom);
 end;
 

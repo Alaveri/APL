@@ -14,6 +14,7 @@ type
   PBoolean = ^boolean;
   PProc = ^TProc;
   PByte = ^byte;
+  PLong = ^longint;
   PByteArray = ^TByteArray;
   PInteger = ^integer;
   PLongint = ^longint;

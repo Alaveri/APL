@@ -59,6 +59,7 @@ procedure SwapByte(var ANum1: byte; var ANum2: byte);
 procedure SwapWord(var ANum1: word; var ANum2: word);
 procedure SwapLong(var ANum1: longint; var ANum2: longint);
 procedure SwapPointer(var APointer1: pointer; var APointer2: pointer);
+procedure FillCharLarge(var APtr; ACount: longint; AValue: byte);
 function GetCurrentDirectory: string;
 function ChangeDirectory(const ADirectory: string): boolean;
 function StringsEqualInsensitive(const AString1, AString2: string): boolean;
@@ -72,12 +73,27 @@ implementation
 
 uses
   MemDrv,
+  AplConst,
   Math,
   Files;
 
 var
   PreviousExitProc: PProc;
   LastDir: string;
+
+procedure FillCharLarge(var APtr; ACount: longint; AValue: byte);
+var
+  ptr: PByte;
+  bytes: longint;
+begin
+  ptr := @APtr;
+  while ACount > 0 do begin
+    bytes := MinL(ACount, MaxVarSize);
+    FillChar(ptr^, bytes, AValue);
+    Inc(ptr, bytes);
+    Dec(ACount, bytes);
+  end;
+end;
 
 function StartsWith(const AString, AStartsWith: string): boolean;
 begin

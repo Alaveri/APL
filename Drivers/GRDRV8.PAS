@@ -197,7 +197,7 @@ end;
 
 procedure TGraphics8Driver.ShowMouseCursor;
 begin
-  State.ViewPort.SetDims(0, 0, Mode^.Width, Mode^.Height);
+  State^.ViewPort.SetDims(0, 0, Mode^.Width, Mode^.Height);
   Mouse.ShowMouse;
   Mouse.UpdateState;
   MouseCursor^.Visible := true;
@@ -208,7 +208,7 @@ procedure TGraphics8Driver.HideMouseCursor;
 begin
   if not MouseCursor^.Visible then
     exit;
-  State.ViewPort.SetDims(0, 0, Mode^.Width, Mode^.Height);
+  State^.ViewPort.SetDims(0, 0, Mode^.Width, Mode^.Height);
   EraseMouseCursor(Mouse.State);
   MouseCursor^.Visible := false;
   Mouse.HideMouse;
@@ -333,7 +333,7 @@ begin
   if not Visible then
     exit;
   Graph^.PushState;
-  Graph^.State.ViewPort.SetRect(Graph^.Mode^.Bounds);
+  Graph^.State^.ViewPort.SetRect(Graph^.Mode^.Bounds);
   Paint;
   Graph^.PopState;
 end;
@@ -346,7 +346,7 @@ begin
   Dec(AY, OffsetY);
   rect.CreateDims(AX, AY, Width, Height);
   Graph^.PushState;
-  Graph^.State.ViewPort.SetRect(Graph^.Mode^.Bounds);
+  Graph^.State^.ViewPort.SetRect(Graph^.Mode^.Bounds);
   Graph^.GetImage(AX, AY, Width, Height, FBackData);
   Graph^.PopState;
 end;

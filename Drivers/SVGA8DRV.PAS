@@ -47,18 +47,18 @@ type
     procedure Render4BppText(AX, AY, ALength: integer; AText: PChar); virtual;
   public
     function SupportsRegions: boolean; virtual;
-    function GetScreenPointer(AX, AY: integer; var AOffset: longint): PByte; virtual;
-    procedure GetImage(AX, AY, AWidth, AHeight: longint; ABuffer: PByte); virtual;
-    procedure GetImageStream(AX, AY, AWidth, AHeight: longint; AStream: PStream); virtual;
+    function GetScreenPointer(APX, APY: integer; var AOffset: longint): PByte; virtual;
+    procedure GetImage(APX, APY, AWidth, AHeight: longint; ABuffer: PByte); virtual;
+    procedure GetImageStream(APX, APY, AWidth, AHeight: longint; AStream: PStream); virtual;
     procedure SetMode(AMode: PGraphicsMode); virtual;
-    procedure RenderText(AX, AY, ALength: integer; AText: PChar); virtual;
+    procedure RenderText(APX, APY, ALength: integer; AText: PChar); virtual;
     procedure Line(AX1, AY1, AX2, AY2: integer); virtual;
-    procedure HLine(AX, AY, AWidth: integer); virtual;
-    procedure VLine(AX, AY, AHeight: integer); virtual;
-    procedure DrawImage(AX, AY, AWidth, AHeight: integer; AImage: PByte); virtual;
-    procedure DrawImageT(AX, AY, AWidth, AHeight: integer; AImage: PByte); virtual;
-    procedure DrawImageStream(AX, AY, AWidth, AHeight: integer; AStream: PStream); virtual;
-    procedure DrawImageStreamT(AX, AY, AWidth, AHeight: integer; AStream: PStream); virtual;
+    procedure HLine(APX, APY, AWidth: integer); virtual;
+    procedure VLine(ApX, APY, AHeight: integer); virtual;
+    procedure DrawImage(APX, APY, AWidth, AHeight: integer; AImage: PByte); virtual;
+    procedure DrawImageT(APX, APY, AWidth, AHeight: integer; AImage: PByte); virtual;
+    procedure DrawImageStream(APX, APY, AWidth, AHeight: integer; AStream: PStream); virtual;
+    procedure DrawImageStreamT(APX, APY, AWidth, AHeight: integer; AStream: PStream); virtual;
     procedure WaitForVSync; virtual;
     procedure Init; virtual;
     destructor Free; virtual;
@@ -185,12 +185,12 @@ begin
   end;
 end;
 
-function TSVga8Driver.GetScreenPointer(AX, AY: integer; var AOffset: longint): PByte;
+function TSVga8Driver.GetScreenPointer(APX, APY: integer; var AOffset: longint): PByte;
 var
   bank: integer;
   screen: PByte;
 begin
-  AOffset := AY * Mode^.BytesPerScanLine + AX;
+  AOffset := APY * Mode^.BytesPerScanLine + APX;
   screen := Mode^.FrameBuffer;
   bank := AOffset shr 16;
   AOffset := AOffset and FWinSize;
@@ -215,7 +215,7 @@ begin
   Mouse.SetMouseResolution(AMode^.Width - 1, AMode^.Height - 1);
   if HasException then
     exit;
-  State.FrameBuffer := AMode^.FrameBuffer;
+  State^.FrameBuffer := AMode^.FrameBuffer;
   SetStandardPalette;
   FWinSize := longint(SVgaMode^.FWinSize) * 1024 - 1;
   FWinFunc := SVgaMode^.FWinFuncPtr;
@@ -251,81 +251,68 @@ var
   height: integer;
   drawRect: TRect;
 begin
-  Mode^.Bounds.GetIntersection(State.ViewPort, drawRect);
-  height := State.Font^.Height;
+  Mode^.Bounds.GetIntersection(State^.ViewPort, drawRect);
+  height := State^.Font^.Height;
   sx := AX;
 end;
 
-procedure TSVga8Driver.RenderText(AX, AY, ALength: integer; AText: PChar);
+procedure TSVga8Driver.RenderText(APX, APY, ALength: integer; AText: PChar);
 var
   drawRect: TRect;
-  charIndex, yIndex, xIndex: integer;
   ch: char;
-  sx, sy, minX, maxX: integer;
+  xIndex, maxY, sx, sy, minX, maxX: integer;
   width: integer;
   linePtr: PWord;
-  height: word;
+  shift, currentLine, height: word;
   screen: PByte;
-  fore: byte;
+  charIndex, fore: byte;
   offset: longint;
-  currentLine: word;
-  px: integer;
-  format: TFontFormats;
 begin
   if HasException then
     exit;
-  Mode^.Bounds.GetIntersection(State.ViewPort, drawRect);
-  if AX > drawRect.Right then
+  Mode^.Bounds.GetIntersection(State^.ViewPort, drawRect);
+  if drawRect.IsEmpty then
     exit;
-  if AY > drawRect.Bottom then
+  if APX > drawRect.Right then
     exit;
-  height := State.Font^.Height;
-  if AY + height < drawRect.Y then
+  if APY > drawRect.Bottom then
     exit;
-  GetFontFormats(State.Font, format);
-  if ff4Bpp in format then begin
-    Render4BppText(AX, AY, ALength, AText);
+  height := State^.Font^.Height;
+  if APY + height < drawRect.Y then
     exit;
-  end;
-  sx := AX;
-  for charIndex := 0 to ALength - 1 do begin
+  sx := APX;
+  charIndex := 0;
+  maxY := Min(drawRect.Bottom, APY + height - 1);
+  fore := State^.ForeColor;
+  while charIndex < ALength  do begin
     ch := AText[charIndex];
-    width := State.Font^.TextWidth(ch);
+    Inc(charIndex);
+    width := State^.Font^.TextWidth(ch);
     if sx > drawRect.Right then
       exit;
     if sx + width < drawRect.X then begin
       Inc(sx, width);
       continue;
     end;
-    sy := AY;
-    fore := State.ForeColor;
-    linePtr := State.Font^.FontData;
-    Inc(linePtr, Ord(ch) * height);
-    minX := MaxL(0, drawRect.X - sx);
-    maxX := MinL(State.Font^.TextWidth(ch) - 1, drawRect.Right - sx);
-    sy := AY;
-    for yIndex := 0 to height - 1 do begin
+    linePtr := State^.Font^.FontData;
+    minX := Max(0, drawRect.X - sx);
+    maxX := Min(width - 1, drawRect.Right - sx);
+    sy := Max(drawRect.Y, APY);
+    Inc(linePtr, Ord(ch) * height + (sy - APY));
+    while sy <= maxY do begin
       currentLine := linePtr^;
-      if sy < drawRect.Y then begin
-        Inc(linePtr);
-        Inc(sy);
-        continue;
-      end;
-      if sy > drawRect.Bottom then
-        break;
+      Inc(linePtr);
       screen := GetDrawPointer(sx + minX, sy, offset);
-      px := AX;
+      shift := $8000 shr minX;
       for xIndex := minX to maxX do begin
-        if (currentLine and ($8000 shr xIndex)) > 0 then
-          {FillLine(screen, px, sy, 1, fore);}
+        if currentLine and shift > 0 then
           screen^ := fore;
-        Inc(px);
         Inc(screen);
         Inc(offset);
+        shift := shift shr 1;
         if offset > FWinSize then
           screen := GetDrawPointer(sx + xIndex + 1, sy, offset);
       end;
-      Inc(linePtr);
       Inc(sy);
     end;
     Inc(sx, width);
@@ -336,7 +323,7 @@ procedure TSVga8Driver.Line(AX1, AY1, AX2, AY2: integer);
 begin
 end;
 
-procedure TSVga8Driver.HLine(AX, AY, AWidth: integer);
+procedure TSVga8Driver.HLine(APX, APY, AWidth: integer);
 var
   screen: PByte;
   partialWidth, lineWidth: integer;
@@ -346,17 +333,17 @@ var
 begin
   if HasException then
     exit;
-  Mode^.Bounds.GetIntersection(State.ViewPort, drawRect);
-  if (AY < drawRect.Y) or (AY > drawRect.Bottom) then
+  Mode^.Bounds.GetIntersection(State^.ViewPort, drawRect);
+  if (APY < drawRect.Y) or (APY > drawRect.Bottom) then
     exit;
-  if AX < drawRect.X then
-    AX := drawRect.X;
-  if AX + AWidth > drawRect.Right then
-    AWidth := drawRect.Right - AX + 1;
+  if APX < drawRect.X then
+    APX := drawRect.X;
+  if APX + AWidth > drawRect.Right then
+    AWidth := drawRect.Right - APX + 1;
   if AWidth <= 0 then
     exit;
-  screen := GetDrawPointer(AX, AY, offset);
-  color := byte(State.ForeColor);
+  screen := GetDrawPointer(APX, APY, offset);
+  color := byte(State^.ForeColor);
   if AWidth + offset > FWinSize then begin
     partialWidth := FWinSize - offset + 1;
     FillChar(screen^, partialWidth, color);
@@ -369,7 +356,7 @@ begin
     FillChar(screen^, AWidth, color);
 end;
 
-procedure TSVga8Driver.VLine(AX, AY, AHeight: integer);
+procedure TSVga8Driver.VLine(APX, APY, AHeight: integer);
 var
   index: integer;
   offset: longint;
@@ -378,20 +365,20 @@ var
 begin
   if HasException then
     exit;
-  Mode^.Bounds.GetIntersection(State.ViewPort, drawRect);
-  if (AX < drawRect.X) or (AX > drawRect.Right) then
+  Mode^.Bounds.GetIntersection(State^.ViewPort, drawRect);
+  if (APX < drawRect.X) or (APX > drawRect.Right) then
     exit;
-  AY := Clamp(AY, drawRect.Y, drawRect.Bottom);
+  APY := Clamp(APY, drawRect.Y, drawRect.Bottom);
   AHeight := MinL(drawRect.Height, AHeight);
   if AHeight <= 0 then
     exit;
-  for index := MaxL(AY, 0) to MinL(AY + AHeight - 1, Mode^.MaxY) do begin
-    screen := GetDrawPointer(AX, index, offset);
+  for index := MaxL(APY, 0) to MinL(APY + AHeight - 1, Mode^.MaxY) do begin
+    screen := GetDrawPointer(APX, index, offset);
     screen^ := ForeColor;
   end;
 end;
 
-procedure TSVga8Driver.DrawImage(AX, AY, AWidth, AHeight: integer; AImage: PByte);
+procedure TSVga8Driver.DrawImage(APX, APY, AWidth, AHeight: integer; AImage: PByte);
 var
   imageRect, drawRect: TRect;
   yIndex: integer;
@@ -402,7 +389,7 @@ var
 begin
   if HasException then
     exit;
-  GetImageDrawRects(AX, AY, AWidth, AHeight, imageRect, drawRect);
+  GetImageDrawRects(APX, APY, AWidth, AHeight, imageRect, drawRect);
   if drawRect.IsEmpty then
     exit;
   sy := drawRect.Y;
@@ -428,7 +415,7 @@ begin
   end;
 end;
 
-procedure TSVga8Driver.DrawImageT(AX, AY, AWidth, AHeight: integer; AImage: PByte);
+procedure TSVga8Driver.DrawImageT(APX, APY, AWidth, AHeight: integer; AImage: PByte);
 var
   imageRect, drawRect: TRect;
   xIndex, yIndex: integer;
@@ -437,7 +424,7 @@ var
 begin
   if HasException then
     exit;
-  GetImageDrawRects(AX, AY, AWidth, AHeight, imageRect, drawRect);
+  GetImageDrawRects(APX, APY, AWidth, AHeight, imageRect, drawRect);
   if drawRect.IsEmpty then
     exit;
   sy := drawRect.Y;
@@ -458,7 +445,7 @@ begin
   end;
 end;
 
-procedure TSVga8Driver.DrawImageStream(AX, AY, AWidth, AHeight: integer; AStream: PStream);
+procedure TSVga8Driver.DrawImageStream(APX, APY, AWidth, AHeight: integer; AStream: PStream);
 var
   imageRect, drawRect: TRect;
   yIndex: integer;
@@ -470,7 +457,7 @@ var
 begin
   if AStream^.HasException or HasException then
     exit;
-  GetImageDrawRects(AX, AY, AWidth, AHeight, imageRect, drawRect);
+  GetImageDrawRects(APX, APY, AWidth, AHeight, imageRect, drawRect);
   if drawRect.IsEmpty then
     exit;
   sy := drawRect.Y;
@@ -496,7 +483,7 @@ begin
     Raise(AStream^.Exception^.Code);
 end;
 
-procedure TSVga8Driver.DrawImageStreamT(AX, AY, AWidth, AHeight: integer; AStream: PStream);
+procedure TSVga8Driver.DrawImageStreamT(APX, APY, AWidth, AHeight: integer; AStream: PStream);
 var
   imageRect, drawRect: TRect;
   xIndex, yIndex: integer;
@@ -509,7 +496,7 @@ var
 begin
   if AStream^.HasException or HasException then
     exit;
-  GetImageDrawRects(AX, AY, AWidth, AHeight, imageRect, drawRect);
+  GetImageDrawRects(APX, APY, AWidth, AHeight, imageRect, drawRect);
   if drawRect.IsEmpty then
     exit;
   lineWidth := drawRect.Width;
@@ -542,7 +529,7 @@ begin
   FreeMem(imageLine, lineWidth);
 end;
 
-procedure TSVga8Driver.GetImage(AX, AY, AWidth, AHeight: longint; ABuffer: PByte);
+procedure TSVga8Driver.GetImage(APX, APY, AWidth, AHeight: longint; ABuffer: PByte);
 var
   imageRect, drawRect: TRect;
   yIndex: integer;
@@ -553,7 +540,7 @@ var
 begin
   if HasException then
     exit;
-  GetImageDrawRects(AX, AY, AWidth, AHeight, imageRect, drawRect);
+  GetImageDrawRects(APX, APY, AWidth, AHeight, imageRect, drawRect);
   if drawRect.IsEmpty then
     exit;
   sy := drawRect.Y;
@@ -579,7 +566,7 @@ begin
   end;
 end;
 
-procedure TSVga8Driver.GetImageStream(AX, AY, AWidth, AHeight: longint; AStream: PStream);
+procedure TSVga8Driver.GetImageStream(APX, APY, AWidth, AHeight: longint; AStream: PStream);
 var
   imageRect, drawRect: TRect;
   yIndex: integer;
@@ -591,7 +578,7 @@ var
 begin
   if AStream^.HasException or HasException then
     exit;
-  GetImageDrawRects(AX, AY, AWidth, AHeight, imageRect, drawRect);
+  GetImageDrawRects(APX, APY, AWidth, AHeight, imageRect, drawRect);
   if drawRect.IsEmpty then
     exit;
   sy := drawRect.Y;

@@ -14,207 +14,285 @@ uses
   Errors;
 
 const
-  AplImageIdentifier = 'APLIMG';
+  AplImageIdentifier: string[6] = 'APLIMG';
   AplImageExtension = 'APG';
   AplImageMajorVersion = 1;
   AplImageMinorVersion = 0;
 
 type
-  PAplImage = ^TAplImage;
+  PAplImageHeader = ^TAplImageHeader;
   PAplImageReader = ^TAplImageReader;
   PAplImageWriter = ^TAplImageWriter;
+  PAplImageStreamReader = ^TAplImageStreamReader;
+  PAplImageStreamWriter = ^TAplImageStreamWriter;
+  PAplImageBufferReader = ^TAplImageBufferReader;
+  PAplImageBufferWriter = ^TAplImageBufferWriter;
+  PAplImage = ^TAplImage;
+  PAplBufferImage = ^TAplBufferImage;
+  PAplStreamImage = ^TAplStreamImage;
 
-  TAplImageCompression = (
-    icNone,
-    icLzw,
-    icGif
-  );
-
-  TAplImageCompressionManager = object(TStatusObject)
+  TAplImageHeader = object(TStatusObject)
   private
   public
-    function GetCompressor(const ACompression: TAplImageCompression;
-      const ALevel: TAplCompressionLevel): PCompressor;
-  end;
-
-  TAplImageHeader = record
     Identifier: array[0..5] of char;
     MajorVersion: byte;
     MinorVersion: byte;
     Width: word;
     Height: word;
     Bpp: byte;
-    Compression: TAplImageCompression;
-    CompressionLevel: TAplCompressionLevel;
-    BitPlanes: byte;
-    BlockSize: word;
-    ImageCount: word;
+    Planes: byte;
     HasPalette: boolean;
-    ExtendedData: boolean;
+    PaletteSize: word;
+    Compression: TAplCompression;
+    CompressionLevel: TCompressionLevel;
+    DataSize: longint;
+    HasExtendedData: boolean;
+    constructor CreateFromStream(AStream: PStream);
+    procedure Init; virtual;
+    procedure Assign(var ASource: TObject); virtual;
+    procedure SaveToStream(AStream: PStream); virtual;
+    procedure LoadFromStream(AStream: PStream); virtual;
   end;
 
   TAplImageReader = object(TStatusObject)
   private
     FStream: PStream;
-    FCompressor: PCompressor;
+    FFreeStream: boolean;
   public
-    constructor Create(const AStream: PStream; ACompressor: PCompressor);
+    constructor Create(const AStream: PStream);
+    constructor CreateFile(const AFileName: string);
+    destructor Free; virtual;
     procedure Init; virtual;
     procedure ReadHeader(var AHeader: TAplImageHeader); virtual;
-    procedure SetCompressionLevel(ALevel: TAplCompressionLevel); virtual;
+    function GetHeader: PAplImageHeader; virtual;
     function ReadPalette: PRgbPalette; virtual;
-    function ReadImageData: PMemoryStream; virtual;
-    destructor Free; virtual;
   end;
 
   TAplImageWriter = object(TStatusObject)
   private
     FStream: PStream;
-    FCompressor: PCompressor;
+    FFreeStream: boolean;
   public
-    constructor Create(const AStream: PStream; ACompressor: PCompressor);
-    procedure WriteHeader(const AHeader: TAplImageHeader); virtual;
-    procedure WritePalette(const APalette: PRgbPalette); virtual;
-    procedure WriteImageData(AImageData: PMemoryStream); virtual;
-    procedure Init; virtual;
+    constructor Create(const AStream: PStream);
+    constructor CreateFile(const AFileName: string);
     destructor Free; virtual;
+    procedure Init; virtual;
+    procedure WriteHeader(var AHeader: TAplImageHeader); virtual;
+    procedure WritePalette(var APalette: TRgbPalette); virtual;
+  end;
+
+  TAplImageStreamReader = object(TAplImageReader)
+  public
+    function ReadImage(var AHeader: TAplImageHeader): PMemoryStream;
+  end;
+
+  TAplImageStreamWriter = object(TAplImageWriter)
+  public
+    procedure WriteImage(AImageData: PMemoryStream; var AHeader: TAplImageHeader);
+  end;
+
+  TAplImageBufferReader = object(TAplImageReader)
+  private
+  public
+    function ReadImage(var AHeader: TAplImageHeader): pointer;
+  end;
+
+  TAplImageBufferWriter = object(TAplImageWriter)
+  public
+    procedure WriteImage(AImageData: pointer; var AHeader: TAplImageHeader);
   end;
 
   TAplImage = object(TStatusObject)
   private
-    FReader: PAplImageReader;
-    FWriter: PAplImageWriter;
-    FBuffers: PMemoryStreamList;
-    FWidth: integer;
-    FHeight: integer;
-    FSize: integer;
-    FBpp: byte;
-    FBitPlanes: byte;
-    FFreeBuffers: boolean;
+    FBuffer: pointer;
     FPalette: PRgbPalette;
-    FBlockSize: word;
-    FCompression: TAplImageCompression;
-    FCompressionLevel: TAplCompressionLevel;
+    FHeader: TAplImageHeader;
+    function CheckVersion(var AHeader: TAplImageHeader): word;
+    procedure SaveHeaderAndPalette(AStream: PStream; AWriter: PAplImageWriter);
+    procedure LoadHeaderAndPalette(AStream: PStream; AReader: PAplImageReader);
+    procedure InitAll(AWidth, AHeight, ABpp, APlanes: word;
+      APalette: PRgbPalette);
   public
-    constructor CreateSize(const AWidth, AHeight: integer);
-    constructor CreateSizeBpp(const AWidth, AHeight: integer; ABpp: byte);
-    constructor CreateSizeBppPlanes(const AWidth, AHeight: integer; ABpp, APlanes: byte);
+    FreePalette: boolean;
+    constructor Create(AWidth, AHeight, ABpp, APlanes: word;
+      APalette: PRgbPalette);
+    constructor CreateHeaderPalette(var AHeader: TAplImageHeader;
+      APalette: PRgbPalette);
+    constructor CreateHeader(var AHeader: TAplImageHeader);
     constructor CreateStream(const AStream: PStream);
     constructor CreateFile(const AFileName: string);
-    constructor CreateBuffer(const ABuffer: pointer; const AWidth, AHeight: integer; ABpp, APlanes: byte);
+    constructor CreateDimsBpp(const AWidth, AHeight, ABpp: word);
+    constructor CreateDims(const AWidth, AHeight: word);
+    function Compression: TAplCompression;
+    function CompressionLevel: TCompressionLevel;
+    function Width: word;
+    function Height: word;
+    function Bpp: byte;
+    function Planes: byte;
+    function DataSize: longint;
+    function HasExtendedData: boolean;
     function Palette: PRgbPalette;
-    function Buffer: PMemoryStream;
-    function Buffers: PMemoryStreamList;
-    function BufferAt(const AIndex: integer): PMemoryStream;
-    function PixelPtr(const AX, AY: integer): PByte;
-    function PixelPtrAt(const AIndex, AX, AY: integer): PByte;
-    function Compression: TAplImageCompression;
-    function CompressionLevel: TAplCompressionLevel;
-    procedure SetCompression(const ACompression: TAplImageCompression; const ALevel: TAplCompressionLevel);
-    procedure GetHeader(var AHeader: TAplImageHeader); virtual;
-    procedure SetHeader(const AHeader: TAplImageHeader); virtual;
-    procedure LoadFromStream(const AStream: PStream); virtual;
+    procedure CreateBuffer; virtual;
+    procedure SetPalette(APalette: PRgbPalette; var AHeader: TAplImageHeader);
+    procedure SetCompression(const ACompression: TAplCompression;
+      const ALevel: TCompressionLevel);
     procedure LoadFromFile(const AFileName: string); virtual;
-    procedure SaveToStream(const AStream: PStream); virtual;
+    procedure LoadFromStream(AStream: PStream); virtual;
     procedure SaveToFile(const AFileName: string); virtual;
+    procedure SaveToStream(AStream: PStream); virtual;
+    procedure Clear(AColor: byte); virtual;
+    procedure ClearWord(AColor: word); virtual;
+    procedure ClearLong(AColor: longint); virtual;
     procedure Init; virtual;
     destructor Free; virtual;
   end;
 
-var
-  AplImageCompressionManager: TAplImageCompressionManager;
+  TAplBufferImage = object(TAplImage)
+  private
+  public
+    function Buffer: PByte;
+    destructor Free; virtual;
+    procedure CreateBuffer; virtual;
+    procedure Clear(AColor: byte); virtual;
+    procedure ClearWord(AColor: word); virtual;
+    procedure ClearLong(AColor: longint); virtual;
+    procedure SaveToStream(AStream: PStream); virtual;
+    procedure LoadFromStream(AStream: PStream); virtual;
+  end;
+
+  TAplStreamImage = object(TAplImage)
+  public
+    function Buffer: PMemoryStream;
+    destructor Free; virtual;
+    procedure CreateBuffer; virtual;
+    procedure Clear(AColor: byte); virtual;
+    procedure ClearWord(AColor: word); virtual;
+    procedure ClearLong(AColor: longint); virtual;
+    procedure SaveToStream(AStream: PStream); virtual;
+    procedure LoadFromStream(AStream: PStream); virtual;
+  end;
 
 implementation
 
 uses
   Lzw;
 
-procedure TAplImage.Init;
+procedure TAplImageHeader.Init;
 begin
   inherited Init;
-  FReader := nil;
-  FWriter := nil;
-  FBuffers := New(PMemoryStreamList, Create);
-  FWidth := 0;
-  FHeight := 0;
-  FBpp := 8;
-  FSize := 0;
-  FBitPlanes := 1;
-  FPalette := nil;
-  FFreeBuffers := true;
-  FCompression := icLzw;
-  FCompressionLevel := clHigh;
-  FBlockSize := 0;
+  Move(AplImageIdentifier[1], Identifier, Length(AplImageIdentifier));
+  MajorVersion := AplImageMajorVersion;
+  MinorVersion := AplImageMinorVersion;
+  Width := 0;
+  Height := 0;
+  Bpp := 0;
+  Planes := 0;
+  HasPalette := false;
+  PaletteSize := 0;
+  Compression := acLzw;
+  CompressionLevel := clHigh;
+  DataSize := 0;
+  HasExtendedData := false;
 end;
 
-destructor TAplImage.Free;
-begin
-  if FFreeBuffers and Assigned(FBuffers) then
-    FreeAndNil(FBuffers);
-  if Assigned(FReader) then
-    FreeAndNil(FReader);
-  if Assigned(FWriter) then
-    FreeAndNil(FWriter);
-  inherited Free;
-end;
-
-constructor TAplImage.CreateSize(const AWidth, AHeight: integer);
-begin
-  CreateSizeBpp(AWidth, AHeight, 8);
-end;
-
-constructor TAplImage.CreateSizeBpp(const AWidth, AHeight: integer; ABpp: Byte);
-begin
-  CreateSizeBppPlanes(AWidth, AHeight, ABpp, 1);
-end;
-
-constructor TAplImage.CreateSizeBppPlanes(const AWidth, AHeight: integer; ABpp, APlanes: Byte);
+constructor TAplImageHeader.CreateFromStream(AStream: PStream);
 begin
   inherited Create;
-  FBpp := ABpp;
-  FBitPlanes := APlanes;
-  FWidth := AWidth;
-  FHeight := AHeight;
-  FSize := FWidth * FHeight * FBpp;
-  FBuffers^.Add(New(PMemoryStream, Create(FSize)));
+  LoadFromStream(AStream);
 end;
 
-constructor TAplImage.CreateBuffer(const ABuffer: pointer; const AWidth, AHeight: integer; ABpp, APlanes: Byte);
-begin
-  CreateSizeBppPlanes(AWidth, AHeight, ABpp, APlanes);
-  FBuffers^.Add(New(PMemoryStream, CreateBuffer(ABuffer, FSize)));
-end;
-
-function TAplImage.PixelPtrAt(const AIndex, AX, AY: integer): PByte;
+procedure TAplImageHeader.Assign(var ASource: TObject);
 var
-  result: PByte;
+  source: PAplImageHeader;
 begin
-  result := FBuffers^.Items^[AIndex];
-  if FBitPlanes = 1 then
-    Inc(result, (AY * FWidth + AX) * FBpp)
-  else
-    Inc(result, (AY div FBitPlanes * FWidth + AX mod FBitPlanes) * FBpp);
-  PixelPtrAt := result;
+  inherited Assign(ASource);
+  source := PAplImageHeader(@ASource);
+  Identifier := source^.Identifier;
+  MajorVersion := source^.MajorVersion;
+  MinorVersion := source^.MinorVersion;
+  Width := source^.Width;
+  Height := source^.Height;
+  Bpp := source^.Bpp;
+  Planes := source^.Planes;
+  HasPalette := source^.HasPalette;
+  PaletteSize := source^.PaletteSize;
+  Compression := source^.Compression;
+  CompressionLevel := source^.CompressionLevel;
+  DataSize := source^.DataSize;
+  HasExtendedData := source^.HasExtendedData;
 end;
 
-function TAplImage.PixelPtr(const AX, AY: integer): PByte;
+procedure TAplImageHeader.SaveToStream(AStream: PStream);
 begin
-  PixelPtr := PixelPtrAt(0, AX, AY);
+  if HasException then
+    exit;
+  AStream^.Write(@Identifier, SizeOf(Identifier));
+  AStream^.Write(@MajorVersion, SizeOf(MajorVersion));
+  AStream^.Write(@MinorVersion, SizeOf(MinorVersion));
+  AStream^.Write(@Width, SizeOf(Width));
+  AStream^.Write(@Height, SizeOf(Height));
+  AStream^.Write(@Bpp, SizeOf(Bpp));
+  AStream^.Write(@Planes, SizeOf(Planes));
+  AStream^.Write(@HasPalette, SizeOf(HasPalette));
+  AStream^.Write(@PaletteSize, SizeOf(PaletteSize));
+  AStream^.Write(@Compression, SizeOf(Compression));
+  AStream^.Write(@CompressionLevel, SizeOf(CompressionLevel));
+  AStream^.Write(@DataSize, SizeOf(DataSize));
+  AStream^.Write(@HasExtendedData, SizeOf(HasExtendedData));
+  CheckReraise(AStream);
 end;
 
-function TAplImage.Buffers: PMemoryStreamList;
+procedure TAplImageHeader.LoadFromStream(AStream: PStream);
 begin
-  Buffers := FBuffers;
+  if HasException then
+    exit;
+  AStream^.Read(@Identifier, SizeOf(Identifier));
+  AStream^.Read(@MajorVersion, SizeOf(MajorVersion));
+  AStream^.Read(@MinorVersion, SizeOf(MinorVersion));
+  AStream^.Read(@Width, SizeOf(Width));
+  AStream^.Read(@Height, SizeOf(Height));
+  AStream^.Read(@Bpp, SizeOf(Bpp));
+  AStream^.Read(@Planes, SizeOf(Planes));
+  AStream^.Read(@HasPalette, SizeOf(HasPalette));
+  AStream^.Read(@PaletteSize, SizeOf(PaletteSize));
+  AStream^.Read(@Compression, SizeOf(Compression));
+  AStream^.Read(@CompressionLevel, SizeOf(CompressionLevel));
+  AStream^.Read(@DataSize, SizeOf(DataSize));
+  AStream^.Read(@HasExtendedData, SizeOf(HasExtendedData));
+  CheckReraise(AStream);
 end;
 
-function TAplImage.BufferAt(const AIndex: integer): PMemoryStream;
+procedure TAplImage.InitAll(AWidth, AHeight, ABpp, APlanes: word;
+  APalette: PRgbPalette);
 begin
-  BufferAt := FBuffers^.Items^[AIndex];
+  FHeader.Create;
+  FHeader.Width := AWidth;
+  FHeader.Height := AHeight;
+  FHeader.Bpp := ABpp;
+  FHeader.Planes := APlanes;
+  FHeader.DataSize := longint(FHeader.Width) * FHeader.Height * FHeader.Bpp div 8;
+  SetPalette(APalette, FHeader);
+  CreateBuffer;
 end;
 
-function TAplImage.Buffer: PMemoryStream;
+constructor TAplImage.Create(AWidth, AHeight, ABpp, APlanes: word;
+  APalette: PRgbPalette);
 begin
-  Buffer := BufferAt(0);
+  inherited Create;
+  InitAll(AWidth, AHeight, ABpp, APlanes, APalette);
+end;
+
+constructor TAplImage.CreateHeaderPalette(var AHeader: TAplImageHeader;
+  APalette: PRgbPalette);
+begin
+  inherited Create;
+  InitAll(AHeader.Width, AHeader.Height, AHeader.Bpp, AHeader.Planes, APalette);
+end;
+
+constructor TAplImage.CreateHeader(var AHeader: TAplImageHeader);
+begin
+  inherited Create;
+  InitAll(AHeader.Width, AHeader.Height, AHeader.Bpp, AHeader.Planes, nil);
 end;
 
 constructor TAplImage.CreateStream(const AStream: PStream);
@@ -229,51 +307,102 @@ begin
   LoadFromFile(AFileName);
 end;
 
-procedure TAplImage.LoadFromStream(const AStream: PStream);
-var
-  header: TAplImageHeader;
-  image: PMemoryStream;
-  compressor: PCompressor;
-  index: integer;
+constructor TAplImage.CreateDimsBpp(const AWidth, AHeight, ABpp: word);
 begin
-  if not Assigned(FReader) then begin
-    compressor := AplImageCompressionManager.GetCompressor(FCompression, FCompressionLevel);
-    if IsNilPtr(compressor, ecNotEnoughMemory) then
-      exit;
-    FReader := New(PAplImageReader, Create(AStream, compressor));
-    if IsNilPtr(FReader, ecNotEnoughMemory) then
-      exit;
-  end;
-  FreeAndNil(FPalette);
-  FreeAndNil(FBuffers);
-  FReader^.ReadHeader(header);
-  if CheckReraise(FReader) then
-    exit;
-  if header.Identifier <> AplImageIdentifier then begin
-    Raise(ecInvalidImage);
-    exit;
-  end;
-  if (header.MajorVersion > AplImageMajorVersion) or
-    ((header.MajorVersion = AplImageMajorVersion) and (header.MinorVersion > AplImageMinorVersion)) then begin
-    Raise(ecImageVersionNotSupported);
-    exit;
-  end;
-  FReader^.SetCompressionLevel(FCompressionLevel);
-  SetHeader(header);
-  if header.HasPalette then
-    FPalette := FReader^.ReadPalette;
-  for index := 0 to header.ImageCount - 1 do begin
-    image := FReader^.ReadImageData;
-    if CheckReraise(image) then
-      exit;
-    FBuffers^.Add(image);
-  end;
+  inherited Create;
+  InitAll(AWidth, AHeight, ABpp, 1, nil);
+end;
+
+constructor TAplImage.CreateDims(const AWidth, AHeight: word);
+begin
+  inherited Create;
+  InitAll(AWidth, AHeight, 8, 1, nil);
+end;
+
+function TAplImage.CheckVersion(var AHeader: TAplImageHeader): word;
+begin
+  CheckVersion := ecNone;
+  if (AHeader.MajorVersion > AplImageMajorVersion) or
+    ((AHeader.MajorVersion = AplImageMajorVersion) and
+    (AHeader.MinorVersion > AplImageMinorVersion)) then
+    CheckVersion := ecImageVersionNotSupported
+  else if FHeader.Identifier <> AplImageIdentifier then
+    CheckVersion := ecInvalidImage;
+end;
+
+function TAplImage.Compression: TAplCompression;
+begin
+  Compression := FHeader.Compression;
+end;
+
+function TAplImage.CompressionLevel: TCompressionLevel;
+begin
+  CompressionLevel := FHeader.CompressionLevel;
+end;
+
+procedure TAplImage.Clear(AColor: byte);
+begin
+  Abstract;
+end;
+
+procedure TAplImage.ClearWord(AColor: word);
+begin
+  Abstract;
+end;
+
+procedure TAplImage.ClearLong(AColor: longint);
+begin
+  Abstract;
+end;
+
+function TAplImage.Width: word;
+begin
+  Width := FHeader.Width;
+end;
+
+function TAplImage.Height: word;
+begin
+  Height := FHeader.Height;
+end;
+
+function TAplImage.Bpp: byte;
+begin
+  Bpp := FHeader.Bpp;
+end;
+
+function TAplImage.Planes: byte;
+begin
+  Planes := FHeader.Planes;
+end;
+
+function TAplImage.DataSize: longint;
+begin
+  DataSize := FHeader.DataSize;
+end;
+
+function TAplImage.HasExtendedData: boolean;
+begin
+  HasExtendedData := FHeader.HasExtendedData;
+end;
+
+function TAplImage.Palette: PRgbPalette;
+begin
+  Palette := FPalette;
+end;
+
+procedure TAplImage.SetCompression(const ACompression: TAplCompression;
+  const ALevel: TCompressionLevel);
+begin
+  FHeader.Compression := ACompression;
+  FHeader.CompressionLevel := ALevel;
 end;
 
 procedure TAplImage.LoadFromFile(const AFileName: string);
 var
-  stream: PStream;
+  stream: PFileStream;
 begin
+  if HasException then
+    exit;
   stream := New(PFileStream, Create(AFileName, fmRead));
   if IsNilPtr(stream, ecNotEnoughMemory) then
     exit;
@@ -282,109 +411,420 @@ begin
   FreeAndNil(stream);
 end;
 
-procedure TAplImage.SaveToStream(const AStream: PStream);
-var
-  index: integer;
-  header: TAplImageHeader;
-  compressor: PCompressor;
-begin
-  if not Assigned(FWriter) then begin
-    compressor := AplImageCompressionManager.GetCompressor(FCompression, FCompressionLevel);
-    if IsNilPtr(compressor, ecNotEnoughMemory) then
-      exit;
-    FWriter := New(PAplImageWriter, Create(AStream, compressor));
-    if IsNilPtr(FWriter, ecNotEnoughMemory) then
-      exit;
-  end;
-
-  GetHeader(header);
-  FWriter^.WriteHeader(header);
-  if header.HasPalette then
-    FWriter^.WritePalette(FPalette);
-  for index := 0 to FBuffers^.Count - 1 do
-    FWriter^.WriteImageData(FBuffers^.Items^[index]);
-  if FWriter^.HasException then
-    Raise(FWriter^.Exception^.Code);
-end;
-
 procedure TAplImage.SaveToFile(const AFileName: string);
 var
-  stream: PStream;
+  stream: PFileStream;
 begin
+  if HasException then
+    exit;
   stream := New(PFileStream, Create(AFileName, fmWrite));
-  if stream^.HasException then
-    Raise(stream^.Exception^.Code);
+  if IsNilPtr(stream, ecNotEnoughMemory) then
+    exit;
   SaveToStream(stream);
   CheckReraise(stream);
   FreeAndNil(stream);
 end;
 
-procedure TAplImage.SetCompression(const ACompression: TAplImageCompression; const ALevel: TAplCompressionLevel);
+procedure TAplImage.SaveHeaderAndPalette(AStream: PStream; AWriter: PAplImageWriter);
 begin
-  FCompression := ACompression;
-  FCompressionLevel := ALevel;
+  FHeader.HasPalette := Assigned(FPalette);
+  if FHeader.HasPalette then
+    FHeader.PaletteSize := FPalette^.Colors^.Count;
+  AWriter^.WriteHeader(FHeader);
+  if CheckReraise(AWriter) then
+    exit;
+  if FHeader.HasPalette then begin
+    AWriter^.WritePalette(FPalette^);
+    if CheckReraise(AWriter) then
+      exit;
+  end;
 end;
 
-function TAplImage.Compression: TAplImageCompression;
+procedure TAplImage.LoadHeaderAndPalette(AStream: PStream; AReader: PAplImageReader);
 begin
-  Compression := FCompression;
+  AReader^.ReadHeader(FHeader);
+  if CheckReraise(AReader) then
+    exit;
+  FreeAndNil(FPalette);
+  FHeader.PaletteSize := 0;
+  if FHeader.HasPalette then begin
+    FPalette := AReader^.ReadPalette;
+    if CheckReraise(FPalette) then
+      exit;
+    FHeader.PaletteSize := FPalette^.Colors^.Count;
+  end;
 end;
 
-function TAplImage.CompressionLevel: TAplCompressionLevel;
+procedure TAplImage.LoadFromStream(AStream: PStream);
 begin
-  CompressionLevel := FCompressionLevel;
+  Abstract;
 end;
 
-procedure TAplImage.GetHeader(var AHeader: TAplImageHeader);
+procedure TAplImage.CreateBuffer;
 begin
-  AHeader.Identifier := AplImageIdentifier;
-  AHeader.MajorVersion := AplImageMajorVersion;
-  AHeader.MinorVersion := AplImageMinorVersion;
-  AHeader.Width := FWidth;
-  AHeader.Height := FHeight;
-  AHeader.Bpp := FBpp;
-  AHeader.Compression := FCompression;
-  AHeader.CompressionLevel := FCompressionLevel;
-  AHeader.BitPlanes := FBitPlanes;
-  AHeader.BlockSize := 0;
-  AHeader.ImageCount := FBuffers^.Count;
-  AHeader.HasPalette := Assigned(FPalette);
-  AHeader.ExtendedData := false;
+  Abstract;
 end;
 
-procedure TAplImage.SetHeader(const AHeader: TAplImageHeader);
+procedure TAplImage.SaveToStream(AStream: PStream);
 begin
-  FWidth := AHeader.Width;
-  FHeight := AHeader.Height;
-  FBpp := AHeader.Bpp;
-  FBitPlanes := AHeader.BitPlanes;
-  FSize := FWidth * FHeight * FBpp;
-  FBlockSize := AHeader.BlockSize;
-  FCompression := AHeader.Compression;
-  FCompressionLevel := AHeader.CompressionLevel;
+  Abstract;
 end;
 
-function TAplImage.Palette: PRgbPalette;
+procedure TAplImage.SetPalette(APalette: PRgbPalette; var AHeader: TAplImageHeader);
 begin
-  Palette := FPalette;
+  if HasException then
+    exit;
+  FPalette := nil;
+  AHeader.HasPalette := false;
+  AHeader.PaletteSize := 0;
+  if not Assigned(APalette) then
+    exit;
+  FPalette := APalette;
+  AHeader.PaletteSize := FPalette^.Colors^.Count;
+  AHeader.HasPalette := true;
 end;
 
-constructor TAplImageReader.Create(const AStream: PStream; ACompressor: PCompressor);
+destructor TAplImage.Free;
+begin
+  if FreePalette then
+    FreeAndNil(FPalette);
+  inherited Free;
+end;
+
+procedure TAplImage.Init;
+begin
+  inherited Init;
+  FHeader.Create;
+  FBuffer := nil;
+  FPalette := nil;
+  FreePalette := false;
+end;
+
+function TAplBufferImage.Buffer: PByte;
+begin
+  Buffer := FBuffer;
+end;
+
+procedure TAplBufferImage.Clear(AColor: byte);
+var
+  size: word;
+  buff: pointer;
+begin
+  if HasException then
+    exit;
+  if FHeader.DataSize = 0 then begin
+    Raise(ecInvalidImage);
+    exit;
+  end;
+  if FHeader.DataSize > MaxVarSize then begin
+    Raise(ecImageTooLarge);
+    exit;
+  end;
+  if not Assigned(FBuffer) then begin
+    Raise(ecInvalidImage);
+    exit;
+  end;
+  size := FHeader.DataSize;
+  buff := FBuffer;
+  asm
+    les di, buff
+    mov cx, size
+    mov al, AColor
+    cld
+    rep stosb
+  end;
+  FillChar(FBuffer^, FHeader.DataSize, AColor);
+end;
+
+procedure TAplBufferImage.ClearWord(AColor: word);
+var
+  size: word;
+  buff: pointer;
+begin
+  if HasException then
+    exit;
+  if FHeader.DataSize = 0 then begin
+    Raise(ecInvalidImage);
+    exit;
+  end;
+  if FHeader.DataSize > MaxVarSize then begin
+    Raise(ecImageTooLarge);
+    exit;
+  end;
+  if not Assigned(FBuffer) then begin
+    Raise(ecInvalidImage);
+    exit;
+  end;
+  size := FHeader.DataSize div SizeOf(word);
+  buff := FBuffer;
+  asm
+    les di, buff
+    mov cx, size
+    mov ax, AColor
+    cld
+    rep stosw
+  end;
+end;
+
+procedure TAplBufferImage.ClearLong(AColor: longint);
+var
+  index: word;
+  size: word;
+  ptr: PLong;
+begin
+  if HasException then
+    exit;
+  if FHeader.DataSize = 0 then begin
+    Raise(ecInvalidImage);
+    exit;
+  end;
+  if FHeader.DataSize > MaxVarSize then begin
+    Raise(ecImageTooLarge);
+    exit;
+  end;
+  if not Assigned(FBuffer) then begin
+    Raise(ecInvalidImage);
+    exit;
+  end;
+  size := FHeader.DataSize div SizeOf(longint);
+  ptr := FBuffer;
+  for index := 0 to size - 1 do begin
+    ptr^ := AColor;
+    Inc(ptr);
+  end;
+end;
+
+procedure TAplBufferImage.CreateBuffer;
+begin
+  if HasException then
+    exit;
+  if FHeader.DataSize = 0 then begin
+    Raise(ecInvalidImage);
+    exit;
+  end;
+  if FHeader.DataSize > MaxVarSize then begin
+    Raise(ecImageTooLarge);
+    exit;
+  end;
+  GetMem(FBuffer, FHeader.DataSize);
+  if IsNilPtr(FBuffer, ecNotEnoughMemory) then
+    exit;
+end;
+
+procedure TAplBufferImage.SaveToStream(AStream: PStream);
+var
+  writer: TAplImageBufferWriter;
+begin
+  if HasException then
+    exit;
+  if FHeader.DataSize = 0 then begin
+    Raise(ecInvalidImage);
+    exit;
+  end;
+  if not Assigned(FBuffer) then begin
+    Raise(ecInvalidImage);
+    exit;
+  end;
+  writer.Create(AStream);
+  SaveHeaderAndPalette(AStream, @writer);
+  if CheckReraise(@writer) then begin
+    writer.Free;
+    exit;
+  end;
+  writer.WriteImage(FBuffer, FHeader);
+  CheckReraise(@writer);
+  writer.Free;
+end;
+
+procedure TAplBufferImage.LoadFromStream(AStream: PStream);
+var
+  reader: TAplImageBufferReader;
+  error: word;
+begin
+  if HasException then
+    exit;
+  if Assigned(FBuffer) and (FHeader.DataSize > 0) then begin
+    FreeMem(FBuffer, FHeader.DataSize);
+    FHeader.DataSize := 0;
+    FBuffer := nil;
+    FreeAndNil(FPalette);
+  end;
+  reader.Create(AStream);
+  LoadHeaderAndPalette(AStream, @reader);
+  if CheckReraise(@reader) then
+    exit;
+  error := CheckVersion(FHeader);
+  if error <> ecNone then begin
+    Raise(error);
+    exit;
+  end;
+  FBuffer := reader.ReadImage(FHeader);
+  CheckReraise(@reader);
+  reader.Free;
+end;
+
+destructor TAplBufferImage.Free;
+begin
+  if Assigned(FBuffer) and (FHeader.DataSize > 0) then begin
+    FreeMem(FBuffer, FHeader.DataSize);
+    FHeader.DataSize := 0;
+    FBuffer := nil;
+  end;
+  inherited Free;
+end;
+
+function TAplStreamImage.Buffer: PMemoryStream;
+begin
+  Buffer := PMemoryStream(FBuffer);
+end;
+
+procedure TAplStreamImage.Clear(AColor: byte);
+begin
+  if HasException then
+    exit;
+  if FHeader.DataSize = 0 then begin
+    Raise(ecInvalidImage);
+    exit;
+  end;
+  if not Assigned(FBuffer) then begin
+    Raise(ecInvalidImage);
+    exit;
+  end;
+  PMemoryStream(FBuffer)^.Seek(0, soFromBeginning);
+  PMemoryStream(FBuffer)^.Fill(FHeader.DataSize, AColor);
+end;
+
+procedure TAplStreamImage.ClearWord(AColor: word);
+begin
+  if HasException then
+    exit;
+  if FHeader.DataSize = 0 then begin
+    Raise(ecInvalidImage);
+    exit;
+  end;
+  if not Assigned(FBuffer) then begin
+    Raise(ecInvalidImage);
+    exit;
+  end;
+  PMemoryStream(FBuffer)^.Seek(0, soFromBeginning);
+  PMemoryStream(FBuffer)^.FillWord(FHeader.DataSize, AColor);
+end;
+
+procedure TAplStreamImage.ClearLong(AColor: longint);
+begin
+  if HasException then
+    exit;
+  if FHeader.DataSize = 0 then begin
+    Raise(ecInvalidImage);
+    exit;
+  end;
+  if not Assigned(FBuffer) then begin
+    Raise(ecInvalidImage);
+    exit;
+  end;
+  PMemoryStream(FBuffer)^.Seek(0, soFromBeginning);
+  PMemoryStream(FBuffer)^.FillLong(FHeader.DataSize, AColor);
+end;
+
+procedure TAplStreamImage.CreateBuffer;
+begin
+  if HasException then
+    exit;
+  if FHeader.DataSize = 0 then begin
+    Raise(ecInvalidImage);
+    exit;
+  end;
+  FBuffer := New(PMemoryStream, Create(FHeader.DataSize));
+  if IsNilPtr(FBuffer, ecNotEnoughMemory) then
+    exit;
+  PMemoryStream(FBuffer)^.FreeBuffers := true;
+end;
+
+procedure TAplStreamImage.SaveToStream(AStream: PStream);
+var
+  writer: TAplImageStreamWriter;
+begin
+  if HasException then
+    exit;
+  if FHeader.DataSize = 0 then begin
+    Raise(ecInvalidImage);
+    exit;
+  end;
+  if not Assigned(FBuffer) then begin
+    Raise(ecInvalidImage);
+    exit;
+  end;
+  writer.Create(AStream);
+  SaveHeaderAndPalette(AStream, @writer);
+  if CheckReraise(@writer) then begin
+    writer.Free;
+    exit;
+  end;
+  writer.WriteImage(PMemoryStream(FBuffer), FHeader);
+  CheckReraise(@writer);
+  writer.Free;
+end;
+
+procedure TAplStreamImage.LoadFromStream(AStream: PStream);
+var
+  reader: TAplImageStreamReader;
+  error: word;
+begin
+  if HasException then
+    exit;
+  if Assigned(FBuffer) then begin
+    FreeAndNil(FBuffer);
+    FHeader.DataSize := 0;
+    FreeAndNil(FPalette);
+  end;
+  reader.Create(AStream);
+  LoadHeaderAndPalette(AStream, @reader);
+  if CheckReraise(@reader) then
+    exit;
+  error := CheckVersion(FHeader);
+  if error <> ecNone then begin
+    Raise(error);
+    exit;
+  end;
+  FBuffer := reader.ReadImage(FHeader);
+  CheckReraise(@reader);
+  reader.Free;
+end;
+
+destructor TAplStreamImage.Free;
+begin
+  if Assigned(FBuffer) then
+    FreeAndNil(FBuffer);
+  inherited Free;
+end;
+
+constructor TAplImageReader.Create(const AStream: PStream);
 begin
   inherited Create;
   FStream := AStream;
-  FCompressor := ACompressor;
+  FFreeStream := false;
+end;
+
+constructor TAplImageReader.CreateFile(const AFileName: string);
+begin
+  inherited Create;
+  FStream := New(PFileStream, Create(AFileName, fmRead));
+  if IsNilPtr(FStream, ecNotEnoughMemory) then
+    exit;
+  FFreeStream := true;
 end;
 
 procedure TAplImageReader.Init;
 begin
   inherited Init;
   FStream := nil;
-  FCompressor := nil;
+  FFreeStream := false;
 end;
 
 destructor TAplImageReader.Free;
 begin
+  if FFreeStream then
+    FreeAndNil(FStream);
   inherited Free;
 end;
 
@@ -392,132 +832,213 @@ procedure TAplImageReader.ReadHeader(var AHeader: TAplImageHeader);
 begin
   if HasException then
     exit;
+  AHeader.LoadFromStream(FStream);
+  CheckReraise(FStream);
+end;
+
+function TAplImageReader.GetHeader: PAplImageHeader;
+var
+  result: PAplImageHeader;
+begin
+  GetHeader := nil;
+  if HasException then
+    exit;
+  New(result);
+  if IsNilPtr(result, ecNotEnoughMemory) then
+    exit;
+  ReadHeader(result^);
+  if CheckReraise(FStream) then
+    exit;
+  GetHeader := result;
 end;
 
 function TAplImageReader.ReadPalette: PRgbPalette;
+var
+  result: PRgbPalette;
 begin
   ReadPalette := nil;
   if HasException then
     exit;
-end;
-
-procedure TAplImageReader.SetCompressionLevel(ALevel: TAplCompressionLevel);
-begin
-  FCompressor^.SetCompressionLevel(ALevel);
-end;
-
-function TAplImageReader.ReadImageData: PMemoryStream;
-var
-  size: longint;
-  result: PMemoryStream;
-begin
-  ReadImageData := nil;
-  if HasException then
-    exit;
-  if not Assigned(FCompressor) then begin
-    Raise(ecCompressorNotSpecified);
-    exit;
-  end;
-  size := FStream^.ReadLong;
-  result := New(PMemoryStream, Create(size));
+  result := New(PRgbPalette, CreateFromStream(FStream, pfApl));
   if IsNilPtr(result, ecNotEnoughMemory) then
     exit;
-  if Assigned(FCompressor) then
-    FCompressor^.DecompressStream(FStream, result, size)
-  else
-    result^.ReadFromStream(FStream, size);
-  ReadImageData := result;
+  if CheckReraise(result) then
+    exit;
+  ReadPalette := result;
+end;
+
+constructor TAplImageWriter.Create(const AStream: PStream);
+begin
+  inherited Create;
+  FStream := AStream;
+  FFreeStream := false;
+end;
+
+constructor TAplImageWriter.CreateFile(const AFileName: string);
+begin
+  inherited Create;
+  FStream := New(PFileStream, Create(AFileName, fmWrite));
+  if IsNilPtr(FStream, ecNotEnoughMemory) then
+    exit;
+  FFreeStream := true;
 end;
 
 procedure TAplImageWriter.Init;
 begin
   inherited Init;
   FStream := nil;
-  FCompressor := nil;
-end;
-
-constructor TAplImageWriter.Create(const AStream: PStream; ACompressor: PCompressor);
-begin
-  inherited Create;
-  FStream := AStream;
-  FCompressor := ACompressor;
-end;
-
-procedure TAplImageWriter.WriteHeader(const AHeader: TAplImageHeader);
-begin
-  if HasException then
-    exit;
-  FStream^.Write(@AHeader, SizeOf(AHeader));
-end;
-
-procedure TAplImageWriter.WritePalette(const APalette: PRgbPalette);
-var
-  writer: TAplPaletteWriter;
-begin
-  if HasException then
-    exit;
-  writer.Create(FStream);
-  writer.WritePalette(APalette^.Colors);
-  if writer.HasException then
-    Raise(writer.Exception^.Code);
-  writer.Free;
-end;
-
-procedure TAplImageWriter.WriteImageData(AImageData: PMemoryStream);
-var
-  index: integer;
-  size: longint;
-begin
-  if HasException then
-    exit;
-  if not Assigned(FCompressor) then begin
-    Raise(ecCompressorNotSpecified);
-    exit;
-  end;
-  if not Assigned(AImageData) then begin
-    Raise(ecInvalidImage);
-    exit;
-  end;
-  AImageData^.Seek(0, soFromBeginning);
-  size := AImageData^.Size;
-  FStream^.Write(@size, SizeOf(size));
-  if Assigned(FCompressor) then
-    size := FCompressor^.CompressStream(AImageData, FStream, AImageData^.Size)
-  else
-    AImageData^.WriteToStream(FStream, AImageData^.Size);
+  FFreeStream := false;
 end;
 
 destructor TAplImageWriter.Free;
 begin
+  if FFreeStream then
+    FreeAndNil(FStream);
   inherited Free;
 end;
 
-function TAplImageCompressionManager.GetCompressor(const ACompression: TAplImageCompression;
-  const ALevel: TAplCompressionLevel): PCompressor;
-var
-  result: PCompressor;
-  bitSize: byte;
+procedure TAplImageWriter.WriteHeader(var AHeader: TAplImageHeader);
 begin
-  case ACompression of
-    icNone:
-      result := New(PNonCompressor, Create);
-    icLzw: begin
-      bitSize := LzwCompressionBitSize[ALevel];
-      result := New(PLzw, CreateBitSize(bitSize));
-      PLzw(result)^.SetLzwCodesProc := @SetAplLzwCodes;
-      result^.AddTotalToStream := false;
-    end;
-    icGif: begin
-      result := New(PLzw, CreateBitSize(13));
-      PLzw(result)^.SetLzwCodesProc := @SetGifLzwCodes;
-      result^.AddTotalToStream := false;
-    end;
-    else
-      result := nil;
+  if HasException then
+    exit;
+  AHeader.SaveToStream(FStream);
+  CheckReraise(FStream);
+end;
+
+procedure TAplImageWriter.WritePalette(var APalette: TRgbPalette);
+begin
+  if HasException then
+    exit;
+  APalette.SaveToStreamFormat(FStream, pfApl);
+  CheckReraise(FStream);
+end;
+
+function TAplImageStreamReader.ReadImage(var AHeader: TAplImageHeader): PMemoryStream;
+var
+  result: PMemoryStream;
+  compressor: PCompressor;
+begin
+  ReadImage := nil;
+  if HasException then
+    exit;
+  if AHeader.DataSize = 0 then begin
+    Raise(ecInvalidImage);
+    exit;
   end;
-  GetCompressor := result;
+  result := New(PMemoryStream, Create(AHeader.DataSize));
+  if IsNilPtr(result, ecNotEnoughMemory) then
+    exit;
+  if AHeader.Compression = acNone then
+    result^.ReadFromStream(FStream, AHeader.DataSize)
+  else begin
+    compressor := TCompression.GetCompressor(AHeader.Compression, AHeader.CompressionLevel);
+    compressor^.DecompressStream(FStream, result, AHeader.DataSize);
+    CheckReraise(compressor);
+    FreeAndNil(compressor);
+  end;
+  CheckReraise(FStream);
+  if HasException then begin
+    result := nil;
+    FreeAndNil(result);
+  end;
+  result^.Seek(0, soFromBeginning);
+  CheckReraise(result);
+  ReadImage := result;
+end;
+
+function TAplImageBufferReader.ReadImage(var AHeader: TAplImageHeader): pointer;
+var
+  result: PByte;
+  compressor: PCompressor;
+  stream: PMemoryStream;
+begin
+  ReadImage := nil;
+  if HasException then
+    exit;
+  if AHeader.DataSize = 0 then begin
+    Raise(ecInvalidImage);
+    exit;
+  end;
+  if AHeader.DataSize > MaxVarSize then begin
+    Raise(ecImageTooLarge);
+    exit;
+  end;
+  GetMem(result, AHeader.DataSize);;
+  if IsNilPtr(result, ecNotEnoughMemory) then
+    exit;
+  stream := New(PMemoryStream, CreateBuffer(result, AHeader.DataSize));
+  if IsNilPtr(stream, ecNotEnoughMemory) then
+    exit;
+  if CheckReraise(stream) then
+    exit;
+  stream^.FreeBuffers := false;
+  if AHeader.Compression = acNone then
+    FStream^.Read(result, AHeader.DataSize)
+  else begin
+    compressor := TCompression.GetCompressor(AHeader.Compression, AHeader.CompressionLevel);
+    compressor^.DecompressStream(FStream, stream, AHeader.DataSize);
+    CheckReraise(compressor);
+    FreeAndNil(compressor);
+  end;
+  FreeAndNil(stream);
+  CheckReraise(FStream);
+  if HasException then begin
+    result := nil;
+    FreeMem(result, AHeader.DataSize);
+  end;
+  ReadImage := result;
+end;
+
+procedure TAplImageBufferWriter.WriteImage(AImageData: pointer; var AHeader: TAplImageHeader);
+var
+  compressor: PCompressor;
+  stream: PMemoryStream;
+begin
+  if HasException then
+    exit;
+  if AHeader.DataSize > MaxVarSize then begin
+    Raise(ecImageTooLarge);
+    exit;
+  end;
+  if AHeader.Compression = acNone then
+    FStream^.Write(AImageData, AHeader.DataSize)
+  else begin
+    stream := New(PMemoryStream, CreateBuffer(AImageData, AHeader.DataSize));
+    if IsNilPtr(stream, ecNotEnoughMemory) then
+      exit;
+    if CheckReraise(stream) then
+      exit;
+    stream^.FreeBuffers := false;
+    compressor := TCompression.GetCompressor(AHeader.Compression, AHeader.CompressionLevel);
+    compressor^.CompressStream(stream, FStream, AHeader.DataSize);
+    CheckReraise(compressor);
+    FreeAndNil(compressor);
+    FreeAndNil(stream);
+  end;
+  CheckReraise(FStream);
+end;
+
+procedure TAplImageStreamWriter.WriteImage(AImageData: PMemoryStream; var AHeader: TAplImageHeader);
+var
+  compressor: PCompressor;
+begin
+  if HasException then
+    exit;
+  if AHeader.DataSize = 0 then begin
+    Raise(ecInvalidImage);
+    exit;
+  end;
+  AImageData^.Seek(0, soFromBeginning);
+  if AHeader.Compression = acNone then
+    AImageData^.WriteToStream(FStream, AHeader.DataSize)
+  else begin
+    compressor := TCompression.GetCompressor(AHeader.Compression, AHeader.CompressionLevel);
+    compressor^.CompressStream(AImageData, FStream, AHeader.DataSize);
+    CheckReraise(compressor);
+    FreeAndNil(compressor);
+  end;
+  CheckReraise(FStream);
 end;
 
 begin
-  AplImageCompressionManager.Create;
 end.

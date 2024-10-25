@@ -270,15 +270,15 @@ var
 begin
   if HasException then
     exit;
-  Mode^.Bounds.GetIntersection(State.ViewPort, drawRect);
+  Mode^.Bounds.GetIntersection(State^.ViewPort, drawRect);
   if APX > drawRect.Right then
     exit;
   if APY > drawRect.Bottom then
     exit;
-  height := State.Font^.Height;
+  height := State^.Font^.Height;
   if APY + height < drawRect.Y then
     exit;
-  GetFontFormats(State.Font, format);
+  GetFontFormats(State^.Font, format);
   if ff4Bpp in format then begin
     Render4BppText(APX, APY, ALength, AText);
     exit;
@@ -286,7 +286,7 @@ begin
   sx := APX;
   for charIndex := 0 to ALength - 1 do begin
     ch := AText[charIndex];
-    width := State.Font^.TextWidth(ch);
+    width := State^.Font^.TextWidth(ch);
     if sx > drawRect.Right then
       exit;
     if sx + width < drawRect.X then begin
@@ -294,11 +294,11 @@ begin
       continue;
     end;
     sy := APY;
-    fore := State.ForeColor;
-    linePtr := State.Font^.FontData;
+    fore := State^.ForeColor;
+    linePtr := State^.Font^.FontData;
     Inc(linePtr, Ord(ch) * height);
     minX := MaxL(0, drawRect.X - sx);
-    maxX := MinL(State.Font^.TextWidth(ch) - 1, drawRect.Right - sx);
+    maxX := MinL(State^.Font^.TextWidth(ch) - 1, drawRect.Right - sx);
     sy := APY;
     for yIndex := 0 to height - 1 do begin
       currentLine := linePtr^;

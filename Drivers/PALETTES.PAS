@@ -387,7 +387,7 @@ procedure TRgbPalette.Init;
 begin
   inherited Init;
   FColors := New(PRgbColorList, Create);
-  FFormat := pfNone;
+  FFormat := pfApl;
 end;
 
 function TRgbPalette.Colors: PRgbColorList;
@@ -747,10 +747,8 @@ begin
   for index := 0 to count - 1 do begin
     color := New(PRgbColor);
     FStream^.Read(PByte(color), SizeOf(TRgbColor));
-    if FStream^.HasException then begin
-      Raise(FStream^.Exception^.Code);
+    if CheckReraise(FStream) then
       exit;
-    end;
     result^.Add(color);
   end;
 end;
@@ -771,12 +769,10 @@ begin
     exit;
   end;
   for index := 0 to APalette^.Count - 1 do begin
-    color := APalette^.GetItem(index);
+    color := APalette^.Items^[index];
     FStream^.Write(PByte(color), SizeOf(TRgbColor));
-    if FStream^.HasException then begin
-      Raise(FStream^.Exception^.Code);
+    if CheckReraise(FStream) then
       exit;
-    end;
   end;
 end;
 

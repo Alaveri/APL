@@ -86,6 +86,7 @@ const
   ecInvalidImage = 802;
   ecImageCompressionNotSupported = 803;
   ecImageVersionNotSupported = 804;
+  ecImageTooLarge = 805;
 
   { Font Errors }
   ecFontVersionNotSupported = 901;
@@ -230,6 +231,7 @@ begin
     ecInvalidPalette: ErrorMessage := 'Invalid palette';
     ecCompressionBitSizeError: ErrorMessage := 'Compression bit size too large';
     ecCompressorNotSpecified: ErrorMessage := 'Compressor not specified';
+    ecImageTooLarge: ErrorMessage := 'Image too large';
     else begin
       if AErrorCode >= ecUser then begin
         if Assigned(CustomErrorMessage) then begin
