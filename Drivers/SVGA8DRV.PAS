@@ -216,7 +216,7 @@ begin
   if HasException then
     exit;
   State^.FrameBuffer := AMode^.FrameBuffer;
-  SetStandardPalette;
+  SetVgaPalette;
   FWinSize := longint(SVgaMode^.FWinSize) * 1024 - 1;
   FWinFunc := SVgaMode^.FWinFuncPtr;
   FCurrentBank := -1;

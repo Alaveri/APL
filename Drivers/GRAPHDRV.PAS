@@ -36,6 +36,7 @@ type
   PSystemFont = ^TSystemFont;
   PMonospaceFont = ^TMonospaceFont;
   PProportionalFont = ^TProportionalFont;
+  PVectorFont = ^TVectorFont;
   PColoredFont = ^TColoredFont;
   PFontFormats = ^TFontFormats;
   PGraphicsModeListProc = ^TGraphicsModeListProc;
@@ -153,6 +154,11 @@ type
     function CharWidth(AChar: char): integer; virtual;
     function Format: word; virtual;
     destructor Free; virtual;
+  end;
+
+  TVectorFont = object(TFont)
+  private
+  public
   end;
 
   TColoredFont = object(TProportionalFont)

@@ -41,7 +41,7 @@ type
     procedure FastDrawImage(APX, APY, AWidth, AHeight: integer; AImage: PByte); virtual;
     procedure FastSetPixel(APX, APY: integer); virtual;
     procedure FillRect(ARect: TRect); virtual;
-    procedure SetRgbPaletteData(APalette: PRgbPaletteData); virtual;
+    procedure SetRgbPaletteData(APalette: PRgbColors); virtual;
     procedure WaitForVSync; virtual;
     procedure Init; virtual;
     destructor Free; virtual;
@@ -362,9 +362,9 @@ procedure TSVgaBgiDriver.GetImageStream(APX, APY, AWidth, AHeight: longint; AStr
 begin
 end;
 
-procedure TSVgaBgiDriver.SetRgbPaletteData(APalette: PRgbPaletteData);
+procedure TSVgaBgiDriver.SetRgbPaletteData(APalette: PRgbColors);
 begin
-  inherited SetRgbPaletteData(APalette);
+{  inherited SetRgbPaletteData(APalette);}
 {  FBgiInterface.SetPalette(APalette);}
 end;
 

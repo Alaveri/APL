@@ -166,7 +166,7 @@ begin
   ptr := Mode^.FrameBuffer;
   FillCharLarge(ptr^, $10000, 0);
   State^.FrameBuffer := Mode^.FrameBuffer;
-  SetStandardPalette;
+  SetVgaPalette;
   Mouse.XShift := 1;
 end;
 

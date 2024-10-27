@@ -87,7 +87,8 @@ begin
     int 10h
   end;
   State^.FrameBuffer := Mode^.FrameBuffer;
-  SetStandardPalette;
+  State^.ViewPort.SetDims(0, 0, Mode^.Width, Mode^.Height);
+  SetVgaPalette;
   Mouse.XShift := 1;
 end;
 

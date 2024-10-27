@@ -3,6 +3,14 @@ unit Math;
 
 interface
 
+uses
+  AplConst;
+
+type
+  PWordArray = ^TWordArray;
+
+  TWordArray = array[1..MaxVarSize div SizeOf(word)] of word;
+
 function Min(ANum1, ANum2: integer): integer; far;
 function MinB(ANum1, ANum2: byte): byte; far;
 function MinS(ANum1, ANum2: shortint): shortint; far;
@@ -17,6 +25,9 @@ function Clamp(AValue, AMin, AMax: integer): integer; far;
 function ClampB(AValue, AMin, AMax: byte): byte; far;
 function ClampW(AValue, AMin, AMax: word): word; far;
 function ClampL(AValue, AMin, AMax: longint): longint; far;
+function LowestW(AValues: PWordArray; ACount: word): word; far;
+function HighestW(AValues: PWordArray; ACount: word): word; far;
+function SumW(AValues: PWordArray; ACount: word): longint; far;
 
 const
   RadianConvert: real = 57.295779513082320876798154814105;
@@ -179,6 +190,50 @@ begin
     ClampL := AMin
   else if AValue > AMax then
     ClampL := AMax;
+end;
+
+function LowestW(AValues: PWordArray; ACount: word): word; assembler;
+asm
+  les di, AValues
+  mov cx, ACount
+  xor ax, ax
+  @loop:
+    mov bx, es:[di]
+    cmp ax, bx
+    jl @skip
+    mov ax, bx
+  @skip:
+    add di, 2
+  loop @loop
+end;
+
+function HighestW(AValues: PWordArray; ACount: word): word; assembler;
+asm
+  les di, AValues
+  mov cx, ACount
+  xor ax, ax
+  @loop:
+    mov bx, es:[di]
+    cmp ax, bx
+    jg @skip
+    mov ax, bx
+  @skip:
+    add di, 2
+  loop @loop
+end;
+
+function SumW(AValues: PWordArray; ACount: word): longint; assembler;
+asm
+  les di, AValues
+  mov cx, ACount
+  xor ax, ax
+  xor dx, dx
+  @loop:
+    mov bx, es:[di]
+    add ax, bx
+    adc dx, 0
+    add di, 2
+  loop @loop
 end;
 
 end.
