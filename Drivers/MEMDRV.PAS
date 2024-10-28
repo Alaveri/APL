@@ -97,6 +97,7 @@ type
     procedure CommitAllocTransaction;
     procedure RollbackAllocTransaction;
     procedure FreeReference(AReference: PReference);
+    procedure FreeReferencePreserve(AReference: PReference);
     procedure Fill(AReference: PReference; AByte: byte);
     {$IFDEF debug}
     procedure DebugFreeHandles;
@@ -556,6 +557,21 @@ begin
   Alloc := reference;
 end;
 
+procedure TMemoryDriver.FreeReferencePreserve(AReference: PReference);
+var
+  index: integer;
+begin
+  if not Assigned(AReference) then
+    exit;
+  index := FReferences^.IndexOf(AReference);
+  if AReference^.Xms then
+    MoveToConventional(AReference);
+  Dispose(AReference);
+  if index < 0 then
+    exit;
+  FReferences^.Delete(index);
+end;
+
 procedure TMemoryDriver.FreeReference(AReference: PReference);
 var
   xmsResult: word;
@@ -566,13 +582,13 @@ begin
   if not Assigned(AReference) then
     exit;
   index := FReferences^.IndexOf(AReference);
-  if index < 0 then
-    exit;
   if AReference^.Xms then
     XmsDealloc(AReference^.Handle)
   else
     FreeMem(AReference^.Ptr, AReference^.Size);
   Dispose(AReference);
+  if index < 0 then
+    exit;
   FReferences^.Delete(index);
 end;
 

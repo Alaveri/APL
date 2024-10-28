@@ -3,8 +3,7 @@ unit GrDrv8;
 
 interface
 
-uses
-  {$IFDEF DOS}
+uses  {$IFDEF DOS}
   Strings,
   {$ENDIF}
   AplTypes,
@@ -14,6 +13,7 @@ uses
   Drawing,
   Lists,
   AplConst,
+  Math,
   StrUtils,
   Streams,
 
@@ -55,15 +55,14 @@ type
   TGraphics8Driver = object(TGraphicsDriver)
   public
     MouseCursor: PMouseCursor;
-    Palette: PRgbPaletteData;
+    Palette: PRgbPalette;
     procedure Init; virtual;
     destructor Free; virtual;
     function GetColor8(AColor: TStandardColor; AIntensity: byte): longint; virtual;
     procedure GetStandardColor(AColor: longint; var AStandardColor: TStandardColor; var AIntensity: byte); virtual;
-    procedure SetStandardPalette;
     procedure SetMode(AMode: PGraphicsMode); virtual;
-    procedure SetRgbPaletteData(APalette: PRgbPaletteData); virtual;
-    procedure SetRgbPalette(APalette: PRgbPalette); virtual;
+    procedure SetVgaPaletteData(APalette: PRgbColors); virtual;
+    procedure SetVgaPalette; virtual;
     procedure SetForeColor8(AColor: TStandardColor; AIntensity: byte); virtual;
     procedure SetBackColor8(AColor: TStandardColor; AIntensity: byte); virtual;
     procedure ShowMouseCursor; virtual;
@@ -71,7 +70,7 @@ type
     procedure EraseMouseCursor(const AMouseState: TMouseState); virtual;
     procedure DrawMouseCursor(const AMouseState: TMouseState); virtual;
     procedure MoveMouseCursor(const AMouseState, AOldMouseState: TMouseState); virtual;
-    procedure ExportPalette(const AFilename: string; APalette: PRgbPaletteData; AFormat: TPaletteFormat); virtual;
+    function ClosestColor(var AColor: TRgbColor): byte; virtual;
   end;
 
   TMouseCursorList = object(TIdentifiableList)
@@ -147,7 +146,7 @@ var
   oldMode: byte;
 begin
   inherited Init;
-  Palette := nil;
+  Palette := New(PRgbPalette, CreateVgaStandard);
   MouseCursor := nil;
 end;
 
@@ -197,7 +196,7 @@ end;
 
 procedure TGraphics8Driver.ShowMouseCursor;
 begin
-  State.ViewPort.SetDims(0, 0, Mode^.Width, Mode^.Height);
+  State^.ViewPort.SetDims(0, 0, Mode^.Width, Mode^.Height);
   Mouse.ShowMouse;
   Mouse.UpdateState;
   MouseCursor^.Visible := true;
@@ -208,47 +207,72 @@ procedure TGraphics8Driver.HideMouseCursor;
 begin
   if not MouseCursor^.Visible then
     exit;
-  State.ViewPort.SetDims(0, 0, Mode^.Width, Mode^.Height);
+  State^.ViewPort.SetDims(0, 0, Mode^.Width, Mode^.Height);
   EraseMouseCursor(Mouse.State);
   MouseCursor^.Visible := false;
   Mouse.HideMouse;
 end;
 
-procedure TGraphics8Driver.SetStandardPalette;
-begin
-  Palette := GetStandardPalette;
-  SetRgbPaletteData(Palette);
-end;
-
-procedure TGraphics8Driver.ExportPalette(const AFilename: string; APalette: PRgbPaletteData; AFormat: TPaletteFormat);
+procedure TGraphics8Driver.SetVgaPalette;
 var
+  color: TRgbColor;
+  index: byte;
+  result: PRgbColors;
+begin
+  result := Palette^.GetPaletteDataVga;
+  SetVgaPaletteData(result);
+  FreeMem(result, Palette^.ColorCount * SizeOf(TRgbColor));
+  Palette^.SetFormat(pfJasc);
+  Palette^.SaveToFile('APL.PAL');
+  Palette^.SetFormat(pfGimp);
+  Palette^.SaveToFile('APL.GPL');
+  Palette^.SetFormat(pfApl);
+  color.Red := Random(256);
+  color.Green := Random(256);
+  color.Blue := Random(256);
+  index := ClosestColor(color);
+end;
+
+function TGraphics8Driver.ClosestColor(var AColor: TRgbColor): byte;
+var
+  closest: integer;
+  closestMag: longint;
   index: integer;
-  pal: PRgbPalette;
+  mag: longint;
+  function Magnitude(const AColor1, AColor2: TRgbColor): longint;
+  var
+    mg: byte;
+    mc: array[0..2] of word;
+    mt: longint;
+    ml, mh: word;
+  begin
+    mc[0] := Abs(AColor1.Red - AColor2.Red);
+    mc[1] := Abs(AColor1.Green - AColor2.Green);
+    mc[2] := Abs(AColor1.Blue - AColor2.Blue);
+    mt := SumW(@mc, 3);
+    ml := LowestW(@mc, 3);
+    mh := HighestW(@mc, 3);
+    Magnitude := (mh - ml) * mt;
+  end;
 begin
-  pal := New(PRgbPalette, Create);
-  pal^.SetPaletteData(APalette);
-  pal^.SaveToFileFormat(AFilename, AFormat);
-  FreeAndNil(pal);
+  closest := -1;
+  closestMag := MaxLongint;
+  for index := 0 to 255 do begin
+    mag := Magnitude(AColor, Palette^.Colors^[index]);
+    if mag < closestMag then begin
+      closest := index;
+      closestMag := mag;
+    end;
+  end;
+  ClosestColor := closest;
 end;
 
-procedure TGraphics8Driver.SetRgbPalette(APalette: PRgbPalette);
-begin
-  SetRgbPaletteData(APalette^.GetPaletteData);
-end;
 
-procedure TGraphics8Driver.SetRgbPaletteData(APalette: PRgbPaletteData);
+procedure TGraphics8Driver.SetVgaPaletteData(APalette: PRgbColors);
 var
   segm, offs: word;
   index: integer;
 begin
-  for index := 0 to 255 do begin
-    with APalette^[index] do begin
-      Red := Red shr 2;
-      Green := Green shr 2;
-      Blue := Blue shr 2;
-    end;
-  end;
-
   segm := Seg(APalette^);
   offs := Ofs(APalette^);
 
@@ -333,7 +357,7 @@ begin
   if not Visible then
     exit;
   Graph^.PushState;
-  Graph^.State.ViewPort.SetRect(Graph^.Mode^.Bounds);
+  Graph^.State^.ViewPort.SetRect(Graph^.Mode^.Bounds);
   Paint;
   Graph^.PopState;
 end;
@@ -346,7 +370,7 @@ begin
   Dec(AY, OffsetY);
   rect.CreateDims(AX, AY, Width, Height);
   Graph^.PushState;
-  Graph^.State.ViewPort.SetRect(Graph^.Mode^.Bounds);
+  Graph^.State^.ViewPort.SetRect(Graph^.Mode^.Bounds);
   Graph^.GetImage(AX, AY, Width, Height, FBackData);
   Graph^.PopState;
 end;

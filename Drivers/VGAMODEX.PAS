@@ -1,26 +1,49 @@
 {$I COMPILER.INC}
-unit Vga8Drv;
+unit VgaModeX;
 
 interface
 
 uses
+  AplTypes,
+  AplObj,
   GraphDrv,
   GrDrv8,
   Math,
   Common,
-  AplTypes,
+  VgaConst,
   Streams,
   Drawing;
 
 type
-  PVga8Driver = ^TVga8Driver;
+  PVgaModeXDriver = ^TVgaModeXDriver;
+  PVgaModeXMode = ^TVgaModeXMode;
+  PVgaModeXState = ^TVgaModeXState;
 
-  TVga8Driver = object(TGraphics8Driver)
+  TVgaModeXMode = object(TGraphicsMode)
+  private
+    FPages: array[0..3] of word;
+  public
+    CurrentPage: byte;
+    procedure Init; virtual;
+    procedure Assign(var ASource: TObject); virtual;
+  end;
+
+  TVgaModeXState = object(TGraphicsState)
+  private
+  public
+    CurrentPage: byte;
+    PageStart: word;
+    procedure Init; virtual;
+    procedure Assign(var ASource: TObject); virtual;
+  end;
+
+  TVgaModeXDriver = object(TGraphics8Driver)
   private
     function InitializeDrawRect(APX, APY, AWidth, AHeight: integer; var ADrawRect: TRect): boolean;
     procedure Render4BppText(APX, APY, ALength: integer; AText: PChar);
   public
     function GetScreenPointer(APX, APY: integer; var AOffset: longint): PByte; virtual;
+    function GetPixel(APX, APY: integer): byte; virtual;
     procedure GetImage(APX, APY, AWidth, AHeight: longint; ABuffer: PByte); virtual;
     procedure GetImageStream(APX, APY, AWidth, AHeight: longint; AStream: PStream); virtual;
     procedure SetMode(AMode: PGraphicsMode); virtual;
@@ -29,6 +52,7 @@ type
     procedure HLine(APX, APY, AWidth: integer); virtual;
     procedure VLine(APX, APY, AHeight: integer); virtual;
     procedure Circle(ACenterX, ACenterY, ARadius: integer); virtual;
+    procedure SetPixel(APX, APY: integer); virtual;
     procedure DrawImage(APX, APY, AWidth, AHeight: integer; AImage: PByte); virtual;
     procedure DrawImageT(APX, APY, AWidth, AHeight: integer; AImage: PByte); virtual;
     procedure DrawImageStream(APX, APY, AWidth, AHeight: integer; AStream: PStream); virtual;
@@ -38,7 +62,11 @@ type
     procedure FastDrawImage(APX, APY, AWidth, AHeight: integer; AImage: PByte); virtual;
     procedure FastGetImage(APX, APY, AWidth, AHeight: integer; ABuffer: PByte); virtual;
     procedure FastSetPixel(APX, APY: integer); virtual;
+    procedure SetCurrentPage(APage: byte);
     procedure WaitForVSync; virtual;
+    procedure PageFlip(var APage1, APage2: word); virtual;
+    procedure PushState; virtual;
+    procedure PopState; virtual;
     procedure Init; virtual;
     destructor Free; virtual;
   end;
@@ -51,16 +79,39 @@ uses
   Palettes,
   StrUtils;
 
-procedure TVga8Driver.Init;
+procedure TVgaModeXDriver.Init;
 var
-  newMode: PGraphicsMode;
+  newMode: PVgaModeXMode;
   desc: string;
+  index: integer;
+  size: word;
 begin
   inherited Init;
-  newMode := New(PGraphicsMode, Create);
+  newMode := New(PVgaModeXMode, Create);
+  FreeAndNil(State);
+  State := New(PVgaModeXState, Create);
   with newMode^ do begin
-    ModeId := $13;
-    desc := 'VGA '
+    ModeId := $01;
+    desc := 'VGA Mode X'
+      + IntToStr(320)
+      + 'x'
+      + IntToStr(240)
+      + ' 256 Color';
+    Description := TString.New(desc);
+    Width := 320;
+    Height := 240;
+    MaxX := 319;
+    MaxY := 239;
+    Bpp := 8;
+    NumPages := 3;
+    BytesPerScanLine := 320;
+    HelpText := TString.New('Requires a VGA card.');
+    FrameBuffer := Ptr($A000, $0000);
+  end;
+
+  with newMode^ do begin
+    ModeId := $02;
+    desc := 'VGA Mode Y'
       + IntToStr(320)
       + 'x'
       + IntToStr(200)
@@ -69,16 +120,23 @@ begin
     Width := 320;
     Height := 200;
     MaxX := 319;
-    MaxY := 199;
+    MaxY := 200;
     Bpp := 8;
+    NumPages := 4;
     BytesPerScanLine := 320;
     HelpText := TString.New('Requires a VGA card.');
     FrameBuffer := Ptr($A000, $0000);
   end;
+  for index := 0 to newMode^.NumPages - 1 do
+    newMode^.FPages[index] :=
+      word(newMode^.Width) * newMode^.Height div newMode^.NumPages * index;
   Modes.Add(newMode);
 end;
 
-procedure TVga8Driver.SetMode(AMode: PGraphicsMode);
+procedure TVgaModeXDriver.SetMode(AMode: PGraphicsMode);
+var
+  ptr: PBufferArray;
+  crtcAddress: word;
 begin
   inherited SetMode(AMode);
   asm
@@ -86,23 +144,72 @@ begin
     mov al, 13h
     int 10h
   end;
+
+  PortW[VgaScIndex] := VgaChain4Disable + VgaMemoryMode;
+  PortW[VgaCrtcIndex] := VgaWordDisable + VgaModeControl;
+  PortW[VgaCrtcIndex] := VgaDwordModeDisable;
+
+  if Mode^.NumPages = 3 then begin
+    PortW[VgaMiscOutput] := VgaVSyncPolarity;
+    PortW[VgaCrtcIndex]:=$2C11; { Turn off write protect }
+    PortW[VgaCrtcIndex]:=$0D06; { Vertical total }
+    PortW[VgaCrtcIndex]:=$3E07; { Overflow register }
+    PortW[VgaCrtcIndex]:=$EA10; { Vertical retrace start }
+    PortW[VgaCrtcIndex]:=$AC11; { Vertical retrace and write protect end }
+    PortW[VgaCrtcIndex]:=$DF12; { Vertical display enable end }
+    PortW[VgaCrtcIndex]:=$E715; { Start vertical blanking }
+    PortW[VgaCrtcIndex]:=$0616; { End Vertical blanking  }
+  end;
+
+  PortW[VgaScIndex] := VgaAllPlanes + VgaMapMask;
+
+  ptr := Mode^.FrameBuffer;
+  FillCharLarge(ptr^, $10000, 0);
   State^.FrameBuffer := Mode^.FrameBuffer;
-  State^.ViewPort.SetDims(0, 0, Mode^.Width, Mode^.Height);
   SetVgaPalette;
   Mouse.XShift := 1;
 end;
 
-function TVga8Driver.GetScreenPointer(APX, APY: integer; var AOffset: longint): PByte;
+procedure TVgaModeXDriver.SetCurrentPage(APage: byte);
+begin
+  if APage = PVgaModeXState(State)^.CurrentPage then
+    exit;
+  PVgaModeXState(State)^.CurrentPage := APage;
+  PVgaModeXState(State)^.PageStart := PVgaModeXMode(Mode)^.FPages[APage];
+  Port[VgaCrtcIndex] := $0C;
+  { Start Memory Video address High of upper left corner of screen }
+  Port[VgaCrtcData] := PVgaModeXState(State)^.PageStart shr 8;
+  Port[VgaCrtcIndex] := $0D;
+  { Start Memory Video address Low of upper left corner of screen }
+  Port[VgaCrtcIndex] := PVgaModeXState(State)^.PageStart and $FF;
+end;
+
+function TVgaModeXDriver.GetScreenPointer(APX, APY: integer; var AOffset: longint): PByte;
 var
   result: PByte;
 begin
-  AOffset := longint(APY) * Mode^.BytesPerScanLine + APX;
+  AOffset := PVgaModeXState(State)^.CurrentPage + (APY * Mode^.BytesPerScanLine) shr 2 + APX shr 2;
   result := Mode^.FrameBuffer;
   Inc(result, AOffset);
   GetScreenPointer := result;
 end;
 
-procedure TVga8Driver.WaitForVSync;
+procedure TVgaModeXDriver.PageFlip(var APage1, APage2: word);
+var
+  currentMode: PVgaModeXMode;
+  highAddress, lowAddress: word;
+begin
+  currentMode := PVgaModeXMode(Mode);
+  SwapWord(APage1, APage2);
+  highAddress := VgaHighAddress or (APage1 and $FF00);
+  lowAddress := VgaLowAddress or (APage1 shl 8);
+  while port[VgaInputStatus] and VgaDisplayEnable <> 0 do;
+  port[VgaCrtcIndex] := highAddress;
+  port[VgaCrtcIndex] := lowAddress;
+  while not (port[VgaInputStatus] and VgaRetrace <> 0) do;
+end;
+
+procedure TVgaModeXDriver.WaitForVSync;
 begin
   asm
     mov dx, 3DAh
@@ -113,7 +220,34 @@ begin
   end;
 end;
 
-procedure TVga8Driver.FastFillScreen(AColor: byte);
+function TVgaModeXDriver.GetPixel(APX, APY: integer): byte;
+var
+  offset: longint;
+  ptr: PByte;
+  drawRect: TRect;
+begin
+  GetPixel := 0;
+  Mode^.Bounds.GetIntersection(State^.ViewPort, drawRect);
+  if not drawRect.Contains(APX, APY) then
+    exit;
+  ptr := GetDrawPointer(APX, APY, offset);
+  GetPixel := ptr^;
+end;
+
+procedure TVgaModeXDriver.SetPixel(APX, APY: integer);
+var
+  offset: longint;
+  ptr: PByte;
+  drawRect: TRect;
+begin
+  Mode^.Bounds.GetIntersection(State^.ViewPort, drawRect);
+  if not drawRect.Contains(APX, APY) then
+    exit;
+  ptr := GetDrawPointer(APX, APY, offset);
+  ptr^ := ForeColor;
+end;
+
+procedure TVgaModeXDriver.FastFillScreen(AColor: byte);
 var
   buffer: PByte;
 begin
@@ -127,7 +261,7 @@ begin
   end;
 end;
 
-procedure TVga8Driver.FastDrawScreen(AImage: PByte);
+procedure TVgaModeXDriver.FastDrawScreen(AImage: PByte);
 var
   buffer: PByte;
 begin
@@ -142,7 +276,7 @@ begin
   end;
 end;
 
-procedure TVga8Driver.FastDrawImage(APX, APY, AWidth, AHeight: integer; AImage: PByte);
+procedure TVgaModeXDriver.FastDrawImage(APX, APY, AWidth, AHeight: integer; AImage: PByte);
 var
   screen: PByte;
   off: longint;
@@ -168,7 +302,7 @@ begin
   end;
 end;
 
-procedure TVga8Driver.FastGetImage(APX, APY, AWidth, AHeight: integer; ABuffer: PByte);
+procedure TVgaModeXDriver.FastGetImage(APX, APY, AWidth, AHeight: integer; ABuffer: PByte);
 var
   screen: PByte;
   off: longint;
@@ -195,15 +329,20 @@ begin
   end;
 end;
 
-procedure TVga8Driver.FastSetPixel(APX, APY: integer);
+procedure TVgaModeXDriver.FastSetPixel(APX, APY: integer);
 var
-  ptr: PBufferArray;
+  ptr: PByte;
+  offset: longint;
+  drawRect: TRect;
 begin
-  ptr := Mode^.FrameBuffer;
-  ptr^[APY * Mode^.BytesPerScanLine + APX] := State^.ForeColor;
+  Mode^.Bounds.GetIntersection(State^.ViewPort, drawRect);
+  if not drawRect.Contains(APX, APY) then
+    exit;
+  ptr := GetDrawPointer(APX, APY, offset);
+  ptr^ := ForeColor;
 end;
 
-function TVga8Driver.InitializeDrawRect(APX, APY, AWidth, AHeight: integer; var ADrawRect: TRect): boolean;
+function TVgaModeXDriver.InitializeDrawRect(APX, APY, AWidth, AHeight: integer; var ADrawRect: TRect): boolean;
 var
   visibleRect: TRect;
 begin
@@ -217,42 +356,41 @@ begin
     InitializeDrawRect := true;
 end;
 
-procedure TVga8Driver.Render4BppText(APX, APY, ALength: integer; AText: PChar);
+procedure TVgaModeXDriver.Render4BppText(APX, APY, ALength: integer; AText: PChar);
 begin
 end;
 
-procedure TVga8Driver.RenderText(APX, APY, ALength: integer; AText: PChar);
+procedure TVgaModeXDriver.RenderText(APX, APY, ALength: integer; AText: PChar);
 var
   drawRect: TRect;
+  charIndex, yIndex: integer;
   ch: char;
-  xIndex, maxY, sx, sy, minX, maxX: integer;
+  sx, sy: integer;
+  minX, maxX: byte;
   width: integer;
   linePtr: PWord;
-  height: word;
+  height: integer;
   screen: PByte;
-  charIndex, fore: byte;
+  fore: byte;
   offset: longint;
+  format: TFontFormats;
   count: word;
+  currentLine: word;
 begin
   if HasException then
     exit;
-  Mode^.Bounds.GetIntersection(State^.ViewPort, drawRect);
-  if drawRect.IsEmpty then
-    exit;
-  if APX > drawRect.Right then
-    exit;
-  if APY > drawRect.Bottom then
-    exit;
+  GetDrawRect(drawRect);
   height := State^.Font^.Height;
-  if APY + height < drawRect.Y then
+  if (APX > drawRect.Right) or (APY > drawRect.Bottom) or (APY + height < drawRect.Y) then
     exit;
+  GetFontFormats(State^.Font, format);
+  if ff4Bpp in format then begin
+    Render4BppText(APX, APY, ALength, AText);
+    exit;
+  end;
   sx := APX;
-  charIndex := 0;
-  maxY := Min(drawRect.Bottom, APY + height - 1);
-  fore := State^.ForeColor;
-  while charIndex < ALength  do begin
+  for charIndex := 0 to ALength - 1 do begin
     ch := AText[charIndex];
-    Inc(charIndex);
     width := State^.Font^.TextWidth(ch);
     if sx > drawRect.Right then
       exit;
@@ -260,36 +398,47 @@ begin
       Inc(sx, width);
       continue;
     end;
+    sy := APY;
+    fore := State^.ForeColor;
     linePtr := State^.Font^.FontData;
+    Inc(linePtr, Ord(ch) * height);
     minX := Max(0, drawRect.X - sx);
-    maxX := Min(width - 1, drawRect.Right - sx);
-    sy := Max(drawRect.Y, APY);
-    Inc(linePtr, Ord(ch) * height + (sy - APY));
-    count := maxX - minX + 1;
-    screen := GetDrawPointer(sx + minX, sy, offset);
-    while sy <= maxY do begin
+    maxX := Min(State^.Font^.TextWidth(ch) - 1, drawRect.Right - sx);
+    for yIndex := 0 to height - 1 do begin
+          currentLine := linePtr^;
+      if sy < drawRect.Y then begin
+        Inc(linePtr);
+        Inc(sy);
+        continue;
+      end;
+      if sy > drawRect.Bottom then
+        break;
+      screen := GetDrawPointer(sx + minX, sy, offset);
+      count := maxX - minX + 1;
       asm
         push ds
-        les di, screen
-        lds si, linePtr
-        mov ax, ds:[si]
-        mov bx, 8000h
-        mov cx, minX
-        shr bx, cl
-        mov cx, count
-        mov dh, fore
+        les di, screen { Load screen pointer into ES:DI }
+        mov cx, count { Load count into CX as the loop counter }
+        mov dl, minX { Load starting x index into DL }
+        mov dh, fore { Load foreground color into DH }
+        mov ax, currentLine { Load current character line into AX }
         @loop:
-          mov si, ax
-          and si, bx
-          jz @next
-          mov es:[di], dh
+          xchg si, cx { Move the loop counter into si }
+          mov cl, dl { Load x index into CL }
+          mov bx, 8000h { Load 32768 into BX }
+          shr bx, cl { Shift 32768 right by x index to get the mask }
+          push ax { Save the character line }
+          and ax, bx { Check if the character pixel is set }
+          jz @next { If the pixel is not set, skip to the next pixel }
+          mov [es:di], dh { Set the screen pixel to the ForeColor }
           @next:
-          shr bx, 1
-          inc di
+          pop ax { Restore the character line }
+          xchg si, cx
+          inc dl { Increment the x index }
+          inc di { Increment the screen pointer }
         loop @loop
-        pop ds
       end;
-      Inc(screen, 320);
+
       Inc(linePtr);
       Inc(sy);
     end;
@@ -297,7 +446,7 @@ begin
   end;
 end;
 
-procedure TVga8Driver.Line(AX1, AY1, AX2, AY2: integer);
+procedure TVgaModeXDriver.Line(AX1, AY1, AX2, AY2: integer);
 var
   aError, aError2, sx, sy, dlx, dly: integer;
   screenPtr: PByte;
@@ -413,7 +562,7 @@ begin
   end;}
 end;
 
-procedure TVga8Driver.HLine(APX, APY, AWidth: integer);
+procedure TVgaModeXDriver.HLine(APX, APY, AWidth: integer);
 var
   screen: PByte;
   lineWidth: integer;
@@ -441,7 +590,7 @@ begin
   end;
 end;
 
-procedure TVga8Driver.VLine(APX, APY, AHeight: integer);
+procedure TVgaModeXDriver.VLine(APX, APY, AHeight: integer);
 var
   index: integer;
   offset: longint;
@@ -479,39 +628,27 @@ begin
   end;
 end;
 
-procedure TVga8Driver.Circle(ACenterX, ACenterY, ARadius: integer);
+procedure TVgaModeXDriver.Circle(ACenterX, ACenterY, ARadius: integer);
 var
   t1, t2: integer;
   x, y: integer;
   color: byte;
-  drawRect: TRect;
-  procedure SetPix(APX, APY: integer);
-  var
-    drawPtr: PByte;
-  begin
-    if not drawRect.Contains(APX, APY) then
-      exit;
-    drawPtr := State^.FrameBuffer;
-    Inc(drawPtr, APY * Mode^.BytesPerScanline + APX);
-    drawPtr^ := ForeColor;
-  end;
 begin
-  Mode^.Bounds.GetIntersection(State^.ViewPort, drawRect);
-  t1 := ARadius shr 4;
+  t1 := ARadius div 16;
   x := ARadius;
   y := 0;
   color := State^.ForeColor;
   repeat
-    SetPix(ACenterX + x, ACenterY + y);
-    SetPix(ACenterX - x, ACenterY + y);
-    SetPix(ACenterX + x, ACenterY - y);
-    SetPix(ACenterX - x, ACenterY - y);
-    SetPix(ACenterX + y, ACenterY + x);
-    SetPix(ACenterX - y, ACenterY + x);
-    SetPix(ACenterX + y, ACenterY - x);
-    SetPix(ACenterX - y, ACenterY - x);
+    FastSetPixel(ACenterX + x, ACenterY + y);
+    FastSetPixel(ACenterX - x, ACenterY + y);
+    FastSetPixel(ACenterX + x, ACenterY - y);
+    FastSetPixel(ACenterX - x, ACenterY - y);
+    FastSetPixel(ACenterX + y, ACenterY + x);
+    FastSetPixel(ACenterX - y, ACenterY + x);
+    FastSetPixel(ACenterX + y, ACenterY - x);
+    FastSetPixel(ACenterX - y, ACenterY - x);
     Inc(y);
-    Inc(t1, y);
+    t1 := t1 + y;
     t2 := t1 - x;
     if t2 >= 0 then begin
       t1 := t2;
@@ -520,97 +657,80 @@ begin
   until x < y;
 end;
 
-procedure TVga8Driver.DrawImage(APX, APY, AWidth, AHeight: integer; AImage: PByte);
+procedure TVgaModeXDriver.DrawImage(APX, APY, AWidth, AHeight: integer; AImage: PByte);
 var
   imageRect, drawRect: TRect;
+  yIndex: word;
   screen, image: PByte;
   offset: longint;
-  screenWidth: word;
+  sy: word;
 begin
   if HasException then
     exit;
   GetImageDrawRects(APX, APY, AWidth, AHeight, imageRect, drawRect);
   if drawRect.IsEmpty then
     exit;
-  screen := GetDrawPointer(drawRect.X, drawRect.Y, offset);
-  image := AImage;
-  Inc(image, imageRect.Y * imageRect.Width + imageRect.X);
-  screenWidth := Mode^.BytesPerScanline;
-  asm
-    push ds
-    lds si, image
-    les di, screen
-    mov cx, drawRect.Height
-    mov bx, imageRect.Width
-    mov dx, drawRect.Width
-    mov ax, screenWidth
-    @yloop:
-      push cx
-      mov cx, dx
+  sy := drawRect.Y;
+  for yIndex := 0 to drawRect.Height - 1 do begin
+    screen := GetDrawPointer(drawRect.X, sy, offset);
+    image := AImage;
+    Inc(image, (yIndex + imageRect.Y) * imageRect.Width + imageRect.X);
+    asm
+      push ds
+      lds si, image
+      les di, screen
+      mov cx, drawRect.Width
       rep movsb
-      pop cx
-      add di, ax
-      sub di, dx
-      add si, bx
-      sub si, dx
-    loop @yloop
-    pop ds
+      pop ds
+    end;
+    Inc(sy);
   end;
 end;
 
-procedure TVga8Driver.DrawImageT(APX, APY, AWidth, AHeight: integer; AImage: PByte);
+procedure TVgaModeXDriver.DrawImageT(APX, APY, AWidth, AHeight: integer; AImage: PByte);
 var
   imageRect, drawRect: TRect;
-  screen, image: PByte;
+  xIndex, yIndex: word;
+  sy: longint;
   offset: longint;
-  screenWidth: word;
-  tcolor: byte;
+  screen, image: PByte;
+  width: word;
 begin
   if HasException then
     exit;
   GetImageDrawRects(APX, APY, AWidth, AHeight, imageRect, drawRect);
   if drawRect.IsEmpty then
     exit;
-  screen := GetDrawPointer(drawRect.X, drawRect.Y, offset);
-  image := AImage;
-  Inc(image, imageRect.Y * imageRect.Width + imageRect.X);
-  screenWidth := Mode^.BytesPerScanline;
-  tcolor := TransparentColor;
-  asm
-    push ds
-    lds si, image
-    les di, screen
-    mov cx, drawRect.Height
-    mov bx, imageRect.Width
-    mov dx, drawRect.Width
-    mov ax, screenWidth
-    @yloop:
-      push cx
-      push ax
-      mov cx, dx
-      mov ah, tcolor
-      @xLoop:
-        cmp ds:[si], ah
-        je @skip
+  sy := drawRect.Y;
+  width := drawRect.Width;
+  for yIndex := 0 to drawRect.Height - 1 do begin
+    screen := GetDrawPointer(drawRect.X, sy, offset);
+    image := AImage;
+    Inc(image, (yIndex + imageRect.Y) * imageRect.Width + imageRect.X);
+    asm
+      push ds
+      lds si, image
+      les di, screen
+      mov cx, width
+      mov bl, TransparentColor
+      @loop:
+        mov al, [ds:si]
+        cmp al, bl
+        je @equal
         movsb
-        jmp @next
-        @skip:
-        inc si
+        jmp @end
+        @equal:
         inc di
-        @next:
-      loop @xLoop
-      pop ax
-      pop cx
-      add di, ax
-      sub di, dx
-      add si, bx
-      sub si, dx
-    loop @yloop
-    pop ds
+        inc si
+        @end:
+      loop @loop
+      pop ds
+    end;
+    Inc(sy);
   end;
 end;
 
-procedure TVga8Driver.DrawImageStream(APX, APY, AWidth, AHeight: integer; AStream: PStream);
+procedure TVgaModeXDriver.DrawImageStream(APX, APY, AWidth, AHeight: integer; AStream: PStream);
 var
   imageRect, drawRect: TRect;
   yIndex: word;
@@ -632,13 +752,12 @@ begin
     screen := GetDrawPointer(drawRect.X, sy, offset);
     AStream^.Seek((yIndex + imageRect.Y) * imageRect.Width + imageRect.X, soFromBeginning);
     AStream^.Read(screen, lineWidth);
-    Inc(sy);
   end;
   if AStream^.HasException then
     Raise(AStream^.Exception^.Code);
 end;
 
-procedure TVga8Driver.DrawImageStreamT(APX, APY, AWidth, AHeight: integer; AStream: PStream);
+procedure TVgaModeXDriver.DrawImageStreamT(APX, APY, AWidth, AHeight: integer; AStream: PStream);
 var
   imageRect, drawRect: TRect;
   xIndex, yIndex: word;
@@ -648,7 +767,6 @@ var
   streamStart: longint;
   sy: integer;
   lineWidth: integer;
-  tcolor: byte;
 begin
   if AStream^.HasException or HasException then
     exit;
@@ -664,7 +782,6 @@ begin
   streamStart := AStream^.Position;
   sy := drawRect.Y;
   AStream^.Seek((yIndex + imageRect.Y) * AWidth + imageRect.X, soFromPosition);
-  tcolor := TransparentColor;
   for yIndex := 0 to drawRect.Height - 1 do begin
     screen := GetDrawPointer(drawRect.X, drawRect.Y + yIndex, offset);
     AStream^.Seek(yIndex * imageRect.Width + imageRect.X, soFromBeginning);
@@ -674,7 +791,7 @@ begin
       lds si, imageLine
       les di, screen
       mov cx, lineWidth
-      mov bl, tcolor
+      mov bl, TransparentColor
       @loop:
         mov al, [ds:si]
         cmp al, bl
@@ -695,7 +812,7 @@ begin
   FreeMem(imageLine, lineWidth);
 end;
 
-procedure TVga8Driver.GetImage(APX, APY, AWidth, AHeight: longint; ABuffer: PByte);
+procedure TVgaModeXDriver.GetImage(APX, APY, AWidth, AHeight: longint; ABuffer: PByte);
 var
   imageRect, drawRect: TRect;
   yIndex: word;
@@ -728,7 +845,7 @@ begin
   end;
 end;
 
-procedure TVga8Driver.GetImageStream(APX, APY, AWidth, AHeight: longint; AStream: PStream);
+procedure TVgaModeXDriver.GetImageStream(APX, APY, AWidth, AHeight: longint; AStream: PStream);
 var
   imageRect, drawRect: TRect;
   yIndex: word;
@@ -756,9 +873,61 @@ begin
     Raise(AStream^.Exception^.Code);
 end;
 
-destructor TVga8Driver.Free;
+procedure TVgaModeXDriver.PushState;
+var
+  newState: PVgaModeXState;
+begin
+  newState := New(PVgaModeXState, Create);
+  newState^.Assign(State^);
+  StateStack.Push(newState);
+end;
+
+procedure TVgaModeXDriver.PopState;
+var
+  oldState: PVgaModeXState;
+begin
+  oldState := PVgaModeXState(StateStack.Pop);
+  if not Assigned(oldState) then
+    exit;
+  State^.Assign(oldState^);
+  FreeAndNil(oldState);
+end;
+
+destructor TVgaModeXDriver.Free;
 begin
   inherited Free;
+end;
+
+procedure TVgaModeXMode.Init;
+begin
+  inherited Init;
+  FillChar(FPages, SizeOf(FPages), 0);
+end;
+
+procedure TVgaModeXMode.Assign(var ASource: TObject);
+var
+  source: PVgaModeXMode;
+begin
+  inherited Assign(ASource);
+  source := PVgaModeXMode(@ASource);
+  FPages := source^.FPages;
+end;
+
+procedure TVgaModeXState.Init;
+begin
+  inherited Init;
+  CurrentPage := 0;
+  PageStart := 0;
+end;
+
+procedure TVgaModeXState.Assign(var ASource: TObject);
+var
+  source: PVgaModeXState;
+begin
+  inherited Assign(ASource);
+  source := PVgaModeXState(@ASource);
+  CurrentPage := source^.CurrentPage;
+  PageStart := source^.PageStart;
 end;
 
 end.

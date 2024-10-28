@@ -80,10 +80,10 @@ type
   private
     FReferences: PReferenceList;
   public
+    FreeBuffers: boolean;
     constructor Create(ASize: longint);
     constructor CreateBuffer(ABuffer: pointer; ASize: word);
     destructor Free; virtual;
-    destructor FreePreserveBuffers; virtual;
     function Read(ABuffer: pointer; ACount: longint): longint; virtual;
     function Write(ABuffer: pointer; ACount: longint): longint; virtual;
     function WriteToStream(AStream: PStream; ACount: longint): longint; virtual;
@@ -92,6 +92,10 @@ type
     function CanWrite: boolean; virtual;
     function CanSeek: boolean; virtual;
     function Fill(ACount: longint; AByte: byte): longint; virtual;
+    function FillWord(ACount: longint; AWord: word): longint; virtual;
+    function FillLong(ACount: longint; ALong: longint): longint; virtual;
+    procedure DeallocateReferences;
+    procedure SetSize(ASize: longint);
     procedure Init; virtual;
   end;
 
@@ -411,12 +415,33 @@ begin
 end;
 
 constructor TMemoryStream.Create(ASize: longint);
+begin
+  inherited Create;
+  SetSize(ASize);
+end;
+
+constructor TMemoryStream.CreateBuffer(ABuffer: pointer; ASize: word);
+var
+  reference: PReference;
+begin
+  inherited Create;
+  reference := Memory.GetReference(ABuffer, ASize);
+  Size :=  ASize;
+  if not Assigned(reference) then begin
+    Raise(Memory.Exception^.Code);
+    exit;
+  end;
+  FReferences^.Add(reference);
+  Size := ASize;
+end;
+
+procedure TMemoryStream.SetSize(ASize: longint);
 var
   reference: PReference;
   remaining: longint;
   refSize: longint;
 begin
-  inherited Create;
+  DeallocateReferences;
   Memory.BeginAllocTransaction;
   remaining := ASize;
   while remaining > 0 do begin
@@ -436,44 +461,26 @@ begin
   Memory.CommitAllocTransaction;
 end;
 
-constructor TMemoryStream.CreateBuffer(ABuffer: pointer; ASize: word);
+procedure TMemoryStream.DeallocateReferences;
 var
+  index: integer;
   reference: PReference;
 begin
-  inherited Create;
-  reference := Memory.GetReference(ABuffer, ASize);
-  if not Assigned(reference) then begin
-    Raise(Memory.Exception^.Code);
-    exit;
+  for index := FReferences^.Count - 1 downto 0 do begin
+    reference := FReferences^.GetItem(index);
+    if FreeBuffers then
+      Memory.DeAlloc(reference)
+    else begin
+      Memory.FreeReferencePreserve(reference);
+    end;
   end;
-  Size := ASize;
+  Size := 0;
+  Position := 0;
 end;
 
 destructor TMemoryStream.Free;
-var
-  index: integer;
-  reference: PReference;
 begin
-  for index := FReferences^.Count - 1 downto 0 do begin
-    reference := FReferences^.GetItem(index);
-    Memory.DeAlloc(reference);
-  end;
-  FreeAndNil(FReferences);
-  inherited Free;
-end;
-
-destructor TMemoryStream.FreePreserveBuffers;
-var
-  index: integer;
-  reference: PReference;
-begin
-  for index := FReferences^.Count - 1 downto 0 do begin
-    reference := FReferences^.GetItem(index);
-    if not Assigned(reference) then
-      continue;
-    Dispose(reference);
-    FReferences^.Delete(index);
-  end;
+  DeallocateReferences;
   FreeAndNil(FReferences);
   inherited Free;
 end;
@@ -519,7 +526,7 @@ var
   reference: PReference;
   offset: longint;
   writeSize: word;
-  ptr: PByte;
+  aptr: PByte;
 begin
   if HasException then
     exit;
@@ -532,15 +539,96 @@ begin
     offset := Position mod MaxVarSize;
     reference := FReferences^.GetItem(index);
     writeSize := MinL(reference^.Size - offset, ACount - written);
-    if writeSize <= 0 then
-      exit;
-    ptr := Memory.ReferencePointer(reference);
-    Inc(ptr, offset);
-    System.FillChar(ptr^, writeSize, AByte);
+    if writeSize < SizeOf(byte) then
+      break;
+    aptr := Memory.ReferencePointer(reference);
+    Inc(aptr, offset);
+    asm
+      les di, aptr
+      mov al, AByte
+      mov cx, writeSize
+      cld
+      rep stosb
+    end;
     Inc(written, writeSize);
     Inc(Position, writeSize);
   end;
   Fill := written;
+end;
+
+function TMemoryStream.FillWord(ACount: longint; AWord: word): longint;
+var
+  index: integer;
+  written: longint;
+  reference: PReference;
+  offset: longint;
+  writeSize: word;
+  aptr: PWord;
+  count: word;
+begin
+  if HasException then
+    exit;
+  FillWord := 0;
+  written := 0;
+  while written < ACount do begin
+    index := Position div MaxVarSize;
+    if index > FReferences^.Count - 1 then
+      break;
+    offset := Position mod MaxVarSize;
+    reference := FReferences^.GetItem(index);
+    writeSize := MinL(reference^.Size - offset, ACount - written);
+    if writeSize < SizeOf(word) then
+      break;
+    count := writeSize div SizeOf(word);
+    aptr := Memory.ReferencePointer(reference);
+    Inc(aptr, offset);
+    asm
+      les di, aptr
+      mov ax, AWord
+      mov cx, count
+      cld
+      rep stosw
+    end;
+    Inc(written, writeSize);
+    Inc(Position, writeSize);
+  end;
+  FillWord := written;
+end;
+
+function TMemoryStream.FillLong(ACount: longint; ALong: longint): longint;
+var
+  index: word;
+  written: longint;
+  reference: PReference;
+  offset: longint;
+  writeSize: word;
+  aptr: PLong;
+  count: word;
+begin
+  if HasException then
+    exit;
+  FillLong := 0;
+  written := 0;
+  while written < ACount do begin
+    index := Position div MaxVarSize;
+    if index > FReferences^.Count - 1 then
+      break;
+    offset := Position mod MaxVarSize;
+    reference := FReferences^.GetItem(index);
+    writeSize := MinL(reference^.Size - offset, ACount - written);
+    if writeSize < SizeOf(longint) then
+      break;
+    count := writeSize div SizeOf(longint);
+    aptr := Memory.ReferencePointer(reference);
+    Inc(aptr, offset);
+    for index := 0 to count - 1 do begin
+      aptr^ := ALong;
+      Inc(aptr);
+    end;
+    Inc(written, writeSize);
+    Inc(Position, writeSize);
+  end;
+  FillLong := written;
 end;
 
 function TMemoryStream.Write(ABuffer: pointer; ACount: longint): longint;
@@ -620,6 +708,7 @@ procedure TMemoryStream.Init;
 begin
   inherited Init;
   FReferences := New(PReferenceList, Create);
+  FreeBuffers := true;
 end;
 
 function TMemoryStream.CanRead: boolean;

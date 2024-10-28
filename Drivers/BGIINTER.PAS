@@ -25,7 +25,7 @@ type
     procedure Init; virtual;
     procedure SetMode(AModeIndex: integer);
     procedure FillRect(ARect: TRect);
-    procedure SetPalette(APalette: PRgbPaletteData);
+    procedure SetPalette(APalette: PRgbColors);
     procedure PutPixel(APX, APY: integer; AColor: word);
   end;
 
@@ -57,8 +57,8 @@ end;
 
 procedure TBgiInterface.FillRect(ARect: TRect);
 begin
-  ARect.Intersect(Graph8^.State.ViewPort);
-  SetFillStyle(SolidFill, Graph8^.State.BackColor);
+  ARect.Intersect(Graph8^.State^.ViewPort);
+  SetFillStyle(SolidFill, Graph8^.State^.BackColor);
   Bar(ARect.X, ARect.Y, ARect.Right, ARect.Bottom);
 end;
 
@@ -99,10 +99,10 @@ begin
     if GraphResult <> grOk then
       Raise(ecGraphicsDriverError);
   end;
-  Graph8^.SetStandardPalette;
+  Graph8^.SetVgaPalette;
 end;
 
-procedure TBgiInterface.SetPalette(APalette: PRgbPaletteData);
+procedure TBgiInterface.SetPalette(APalette: PRgbColors);
 var
   index: integer;
   color: TRgbColor;

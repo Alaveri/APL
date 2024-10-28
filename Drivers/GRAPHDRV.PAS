@@ -18,12 +18,13 @@ uses
   Lists,
   AplConst,
   StrUtils,
+  Compress,
   Palettes,
   MemDrv;
 
 const
   FontMajorVersion = 1;
-  FontMinorVersion = 0;
+  FontMinorVersion = 1;
 
 type
   PGraphicsMode = ^TGraphicsMode;
@@ -35,13 +36,13 @@ type
   PSystemFont = ^TSystemFont;
   PMonospaceFont = ^TMonospaceFont;
   PProportionalFont = ^TProportionalFont;
+  PVectorFont = ^TVectorFont;
   PColoredFont = ^TColoredFont;
   PFontFormats = ^TFontFormats;
   PGraphicsModeListProc = ^TGraphicsModeListProc;
   PFontListProc = ^TFontListProc;
 
   TFontWidthArray = array[byte] of word;
-  TFontCompression = (fcNone, fcLzw);
   TFontFormat = (ffProportional, ffMonospace, ffSystem, ffColored, ff1Bpp, ff2Bpp, ff4Bpp, ff8Bpp);
   TFontFormats = set of TFontFormat;
   TGraphicsModeListProc = procedure(ASender: PGraphicsModeList; AMode: PGraphicsMode);
@@ -85,10 +86,11 @@ type
     DataSize: longint;
     MaxWidth: byte;
     Height: byte;
-    Compression: TFontCompression;
+    Compression: TAplCompression;
     Spacing: byte;
     Format: word;
-    Reserved: array[0..252] of byte;
+    CompressionLevel: TCompressionLevel;
+    Reserved: array[0..251] of byte;
   end;
 
   TFont = object(TStatusObject)
@@ -154,6 +156,11 @@ type
     destructor Free; virtual;
   end;
 
+  TVectorFont = object(TFont)
+  private
+  public
+  end;
+
   TColoredFont = object(TProportionalFont)
   private
   public
@@ -195,7 +202,7 @@ type
   private
     FOldMode: byte;
   public
-    State: TGraphicsState;
+    State: PGraphicsState;
     StateStack: TObjectStack;
     Modes: TGraphicsModeList;
     Mode: PGraphicsMode;
@@ -215,6 +222,7 @@ type
     procedure SetForeColor(AColor: longint); virtual;
     procedure SetBackColor(AColor: longint); virtual;
     procedure SetMode(AMode: PGraphicsMode); virtual;
+    procedure SetViewport(ARect: TRect); virtual;
     procedure SetPixel(APX, APY: integer); virtual;
     procedure FastSetPixel(APX, APY: integer); virtual;
     procedure MoveTo(APX, APY: integer); virtual;
@@ -276,7 +284,6 @@ var
 implementation
 
 uses
-  Compress,
   Lzw;
 var
   PreviousExitProc: PProc;
@@ -294,7 +301,7 @@ begin
   FOldMode := oldMode;
   Modes.Create;
   Mode := nil;
-  State.Create;
+  State := New(PGraphicsState, Create);
   StateStack.Create;
   MoveTo(0, 0);
 end;
@@ -319,19 +326,24 @@ procedure TGraphicsDriver.FastSetPixel(APX, APY: integer);
 begin
 end;
 
+procedure TGraphicsDriver.SetViewport(ARect: TRect);
+begin
+  State^.ViewPort.Assign(ARect);
+end;
+
 function TGraphicsDriver.GetBufferPointer(APX, APY: integer; var AOffset: longint): PByte;
 var
   screen: PByte;
 begin
-  screen := State.FrameBuffer;
-  AOffset := longint(APY) * State.ViewPort.Width + APX;
+  screen := State^.FrameBuffer;
+  AOffset := longint(APY) * State^.ViewPort.Width + APX;
   Inc(screen, AOffset);
   GetBufferPointer := screen;
 end;
 
 function TGraphicsDriver.GetDrawPointer(APX, APY: integer; var AOffset: longint): PByte;
 begin
-  if State.BufferMode then
+  if State^.BufferMode then
     GetDrawPointer := GetBufferPointer(APX, APY, AOffset)
   else
     GetDrawPointer := GetScreenPointer(APX, APY, AOffset);
@@ -339,32 +351,32 @@ end;
 
 function TGraphicsDriver.ForeColor: longint;
 begin
-  ForeColor := State.ForeColor;
+  ForeColor := State^.ForeColor;
 end;
 
 function TGraphicsDriver.BackColor: longint;
 begin
-  BackColor := State.BackColor;
+  BackColor := State^.BackColor;
 end;
 
 function TGraphicsDriver.XPos: byte;
 begin
-  XPos := State.XPos;
+  XPos := State^.XPos;
 end;
 
 function TGraphicsDriver.YPos: byte;
 begin
-  YPos := State.YPos;
+  YPos := State^.YPos;
 end;
 
 procedure TGraphicsDriver.SetForeColor(AColor: longint);
 begin
-  State.ForeColor := AColor;
+  State^.ForeColor := AColor;
 end;
 
 procedure TGraphicsDriver.SetBackColor(AColor: longint);
 begin
-  State.BackColor := AColor;
+  State^.BackColor := AColor;
 end;
 
 procedure TGraphicsDriver.ResetMode;
@@ -383,13 +395,13 @@ procedure TGraphicsDriver.GetFontFormats(AFont: PFont; var AFormats: TFontFormat
 var
   formatByte: byte;
 begin
-  formatByte := State.Font^.Format;
+  formatByte := State^.Font^.Format;
   AFormats := PFontFormats(@formatByte)^;
 end;
 
 procedure TGraphicsDriver.GetDrawRect(var ARect: TRect);
 begin
-  Mode^.Bounds.GetIntersection(State.ViewPort, ARect);
+  Mode^.Bounds.GetIntersection(State^.ViewPort, ARect);
 end;
 
 function TGraphicsDriver.GetPixel(APX, APY: integer): byte;
@@ -399,7 +411,7 @@ var
   drawRect: TRect;
 begin
   GetPixel := 0;
-  Mode^.Bounds.GetIntersection(State.ViewPort, drawRect);
+  Mode^.Bounds.GetIntersection(State^.ViewPort, drawRect);
   if not drawRect.Contains(APX, APY) then
     exit;
   ptr := GetDrawPointer(APX, APY, offset);
@@ -408,35 +420,35 @@ end;
 
 procedure TGraphicsDriver.SetPixel(APX, APY: integer);
 var
-  offset: longint;
-  ptr: PByte;
+  drawPtr: PByte;
   drawRect: TRect;
 begin
-  Mode^.Bounds.GetIntersection(State.ViewPort, drawRect);
+  Mode^.Bounds.GetIntersection(State^.ViewPort, drawRect);
   if not drawRect.Contains(APX, APY) then
     exit;
-  ptr := GetDrawPointer(APX, APY, offset);
-  ptr^ := ForeColor;
+  drawPtr := State^.FrameBuffer;
+  Inc(drawPtr, APY * Mode^.BytesPerScanline + APX);
+  drawPtr^ := ForeColor;
 end;
 
 procedure TGraphicsDriver.SetMode(AMode: PGraphicsMode);
 begin
   Mode := AMode;
-  State.ViewPort.SetDims(0, 0, Mode^.Width, Mode^.Height);
-  Mode^.Bounds.SetRect(State.ViewPort);
+  State^.ViewPort.SetDims(0, 0, Mode^.Width, Mode^.Height);
+  Mode^.Bounds.SetRect(State^.ViewPort);
 end;
 
 procedure TGraphicsDriver.MoveTo(APX, APY: integer);
 begin
-  State.XPos := APX;
-  State.YPos := APY;
+  State^.XPos := APX;
+  State^.YPos := APY;
 end;
 
 procedure TGraphicsDriver.LineTo(APX, APY: integer);
 begin
-  Line(State.XPos, State.YPos, APX, APY);
-  State.XPos := APX;
-  State.YPos := APY;
+  Line(State^.XPos, State^.YPos, APX, APY);
+  State^.XPos := APX;
+  State^.YPos := APY;
 end;
 
 procedure TGraphicsDriver.Line(AX1, AY1, AX2, AY2: integer);
@@ -465,14 +477,14 @@ var
   tempColor: longint;
   rect: PRect;
 begin
-  tempColor := State.ForeColor;
-  State.ForeColor := State.BackColor;
+  tempColor := State^.ForeColor;
+  State^.ForeColor := State^.BackColor;
   if ARect.IsEmpty then
     exit;
-  ARect.Intersect(State.ViewPort);
+  ARect.Intersect(State^.ViewPort);
   for index := ARect.Y to ARect.Bottom do
     HLine(ARect.X, index, ARect.Width);
-  State.ForeColor := tempColor;
+  State^.ForeColor := tempColor;
 end;
 
 procedure TGraphicsDriver.BezierQuad(AP1: TPoint; AP2: TPoint; AControl: TPoint; AResolution: integer);
@@ -626,7 +638,7 @@ procedure TGraphicsDriver.DrawText(APX, APY: integer; AText: string);
 var
   ptr: PChar;
 begin
-  if not Assigned(State.Font) then
+  if not Assigned(State^.Font) then
     exit;
   if Length(AText) = 0 then
     exit;
@@ -638,7 +650,7 @@ procedure TGraphicsDriver.DrawTextLarge(APX, APY: integer; AText: PChar);
 var
   len: word;
 begin
-  if not Assigned(State.Font) then
+  if not Assigned(State^.Font) then
     exit;
   if not Assigned(AText) then
     exit;
@@ -714,7 +726,7 @@ procedure TGraphicsDriver.GetImageDrawRects(APX, APY, AWidth, AHeight: longint;
   var AImageRect, ADrawRect: TRect);
 begin
   AImageRect.CreateDims(APX, APY, AWidth, AHeight);
-  Mode^.Bounds.GetIntersection(State.ViewPort, ADrawRect);
+  Mode^.Bounds.GetIntersection(State^.ViewPort, ADrawRect);
   ADrawRect.Intersect(AImageRect);
   AImageRect.X := ADrawRect.X - AImageRect.X;
   AImageRect.Y := ADrawRect.Y - AImageRect.Y;
@@ -725,7 +737,7 @@ var
   newState: PGraphicsState;
 begin
   newState := New(PGraphicsState, Create);
-  newState^.Assign(State);
+  newState^.Assign(State^);
   StateStack.Push(newState);
 end;
 
@@ -740,15 +752,15 @@ begin
     exit;
   end;
   ABounds.TranslateToOrigin;
-  State.FrameBuffer := ABuffer;
-  State.ViewPort.Assign(ABounds);
-  State.BufferMode := true;
+  State^.FrameBuffer := ABuffer;
+  State^.ViewPort.Assign(ABounds);
+  State^.BufferMode := true;
 end;
 
 procedure TGraphicsDriver.EndDrawBuffer;
 begin
-  State.BufferMode := false;
-  State.FrameBuffer := Mode^.FrameBuffer;
+  State^.BufferMode := false;
+  State^.FrameBuffer := Mode^.FrameBuffer;
 end;
 
 procedure TGraphicsDriver.PopState;
@@ -758,7 +770,7 @@ begin
   oldState := PGraphicsState(StateStack.Pop);
   if not Assigned(oldState) then
     exit;
-  State.Assign(oldState^);
+  State^.Assign(oldState^);
   FreeAndNil(oldState);
 end;
 
@@ -766,7 +778,7 @@ destructor TGraphicsDriver.Free;
 begin
   ResetMode;
   Modes.Free;
-  State.Free;
+  FreeAndNil(State);
   StateStack.DisposeObjects := true;
   StateStack.Free;
   inherited Free;
@@ -1160,7 +1172,6 @@ var
   lzw: TLzw;
   stream: TMemoryStream;
 begin
-  lzw.CreateBitSize(13);
   FillChar(header, SizeOf(header), 0);
   header.MajorVersion := FontMajorVersion;
   header.MinorVersion := FontMinorVersion;
@@ -1168,12 +1179,11 @@ begin
   header.DataSize := FFontDataSize;
   header.MaxWidth := MaxWidth;
   header.Height := Height;
-  header.Compression := fcLzw;
+  header.Compression := acLzw;
+  header.CompressionLevel := clHigh;
   header.Spacing := Spacing;
   header.Format := Format;
-
   SetCharWidths;
-
   stream.Create(FFontDataSize);
   stream.Write(PByte(FFontData), FFontDataSize);
   stream.Seek(0, soFromBeginning);
@@ -1184,10 +1194,11 @@ begin
     if AStream^.HasException then
       Raise(AStream^.Exception^.Code)
     else begin
+      lzw.CreateBitSize(LzwCompressionBitSize[header.CompressionLevel]);
       lzw.CompressStream(@stream, AStream, FFontDataSize);
       if lzw.HasException then
         Raise(lzw.Exception^.Code);
-      lzw.Free;
+      FreeAndNil(lzw);
     end;
   end;
   stream.Free;
@@ -1238,10 +1249,13 @@ begin
   end
   else begin
     case header.Compression of
-      fcNone: begin
+      acNone: begin
       end;
-      fcLzw: begin
-        lzw.CreateBitSize(13);
+      acLzw: begin
+        if (header.MajorVersion = 1) and (header.MinorVersion < 1) then
+          lzw.CreateBitSize(13)
+        else
+          lzw.CreateBitSize(LzwCompressionBitSize[header.CompressionLevel]);
         lzw.DecompressStream(AStream, @stream, header.DataSize);
         CheckReraise(@lzw);
         lzw.Free;

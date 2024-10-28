@@ -15,12 +15,17 @@ type
   PNonCompressor = ^TNonCompressor;
   PCompressProgressProc = ^TCompressProgressProc;
 
-  TAplCompressionLevel = (
+  TAplCompression = (
+    acNone,
+    acLzw,
+    acGif
+  );
+
+  TCompressionLevel = (
     clLow,
     clMedium,
     clHigh
   );
-
 
   TCompressProgressProc = procedure(ASender: PCompressor; AMax, ACurrent: longint);
 
@@ -37,7 +42,7 @@ type
     FWriteBitBuffer: longint;
     FReadBuffer, FWriteBuffer: PByte;
     FReadPtr, FWritePtr: PByte;
-    FProgressCounter: word;
+    FProgressCounter: longint;
     procedure SetBufferSize(AReadBufferSize, AWriteBufferSize: word);
   public
     OnProgress: PCompressProgressProc;
@@ -59,7 +64,7 @@ type
     procedure Init; virtual;
     procedure InitCompression; virtual;
     procedure UpdateProgress(const AMax, ACurrent: longint);
-    procedure SetCompressionLevel(ALevel: TAplCompressionLevel); virtual;
+    procedure SetCompressionLevel(ALevel: TCompressionLevel); virtual;
     destructor Free; virtual;
   end;
 
@@ -69,7 +74,20 @@ type
     procedure DecompressStream(ASource, ADest: PStream; AOriginalSize: longint); virtual;
   end;
 
+  TCompressionManager = object(TStatusObject)
+  private
+  public
+    function GetCompressor(const ACompression: TAplCompression;
+      const ALevel: TCompressionLevel): PCompressor;
+  end;
+
+var
+  TCompression: TCompressionManager;
+
 implementation
+
+uses
+  Lzw;
 
 const
   DefaultProgressIncrement = 4096;
@@ -129,7 +147,7 @@ var
   written: longint;
 begin
   if FWritePos >= FWriteSize then begin
-    written := Dest^.Write(FWriteBuffer, FWriteSize);
+    written := Dest^.Write(FWriteBuffer, FWritePos);
     if written = 0 then begin
       Raise(ecWritePastStreamEnd);
       exit;
@@ -297,7 +315,7 @@ begin
   InitCompression;
 end;
 
-procedure TCompressor.SetCompressionLevel(ALevel: TAplCompressionLevel);
+procedure TCompressor.SetCompressionLevel(ALevel: TCompressionLevel);
 begin
 end;
 
@@ -317,4 +335,32 @@ begin
   ASource^.WriteToStream(ADest, AOriginalSize);
 end;
 
+function TCompressionManager.GetCompressor(const ACompression: TAplCompression;
+  const ALevel: TCompressionLevel): PCompressor;
+var
+  result: PCompressor;
+  bitSize: byte;
+begin
+  case ACompression of
+    acNone:
+      result := New(PNonCompressor, Create);
+    acLzw: begin
+      bitSize := LzwCompressionBitSize[ALevel];
+      result := New(PLzw, CreateBitSize(bitSize));
+      PLzw(result)^.SetLzwCodesProc := @SetAplLzwCodes;
+      result^.AddTotalToStream := false;
+    end;
+    acGif: begin
+      result := New(PLzw, CreateBitSize(13));
+      PLzw(result)^.SetLzwCodesProc := @SetGifLzwCodes;
+      result^.AddTotalToStream := false;
+    end;
+    else
+      result := nil;
+  end;
+  GetCompressor := result;
+end;
+
+begin
+  TCompression.Create;
 end.

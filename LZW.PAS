@@ -17,7 +17,7 @@ type
   PLzwCodes = ^TLzwCodes;
   PSetLzwCodesProc = ^TSetLzwCodesProc;
 
-  TLzwCompressionLevels = array[TAplCompressionLevel] of byte;
+  TLzwCompressionLevels = array[TCompressionLevel] of byte;
 
   TDictEntry = record
     Code: word;
@@ -64,7 +64,6 @@ type
   public
     BitSize: byte;
     SetLzwCodesProc: PSetLzwCodesProc;
-    DeferredClear: boolean;
     constructor CreateBitSize(ABitSize: byte);
     constructor CreateCodes(ASetCodesProc: PSetLzwCodesProc);
     constructor CreateAll(ABitSize: byte; ASetCodesProc: PSetLzwCodesProc);
@@ -73,7 +72,7 @@ type
     function GetOriginalSize(ASource: PStream): longint; virtual;
     procedure Init; virtual;
     procedure DecompressStream(ASource, ADest: PStream; AOriginalSize: longint); virtual;
-    procedure SetCompressionLevel(ALevel: TAplCompressionLevel); virtual;
+    procedure SetCompressionLevel(ALevel: TCompressionLevel); virtual;
   end;
 
 procedure SetAplLzwCodes(var ACodes: TLzwCodes; ABitSize: byte); far;
@@ -143,7 +142,6 @@ begin
   FNextCode := 0;
   FCurrentBitSize := BitSize;
   SetLzwCodesProc := nil;
-  DeferredClear := false;
   AddTotalToStream := true;
 end;
 
@@ -240,7 +238,7 @@ begin
   SetLzwCodesProc := ASetCodesProc;
 end;
 
-procedure TLzw.SetCompressionLevel(ALevel: TAplCompressionLevel);
+procedure TLzw.SetCompressionLevel(ALevel: TCompressionLevel);
 begin
   BitSize := LzwCompressionBitSize[ALevel];
 end;
@@ -307,7 +305,7 @@ var
   code: word;
   index: word;
   entry: PDictEntry;
-  endPos, startPos: longint;
+  endPos: longint;
   written: longint;
   destStart: longint;
 begin
@@ -320,7 +318,6 @@ begin
     exit;
 
   ADest^.WriteByte(BitSize);
-  startPos := ADest^.Position;
   code := ReadByte;
   if ASource^.HasException then begin
     Raise(ADest^.Exception^.Code);
