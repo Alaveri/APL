@@ -484,22 +484,34 @@ var
   t1, t2: integer;
   x, y: integer;
   color: byte;
+  drawRect: TRect;
+  procedure SetPix(APX, APY: integer);
+  var
+    drawPtr: PByte;
+  begin
+    if not drawRect.Contains(APX, APY) then
+      exit;
+    drawPtr := State^.FrameBuffer;
+    Inc(drawPtr, APY * Mode^.BytesPerScanline + APX);
+    drawPtr^ := ForeColor;
+  end;
 begin
-  t1 := ARadius div 16;
+  Mode^.Bounds.GetIntersection(State^.ViewPort, drawRect);
+  t1 := ARadius shr 4;
   x := ARadius;
   y := 0;
   color := State^.ForeColor;
   repeat
-    SetPixel(ACenterX + x, ACenterY + y);
-    SetPixel(ACenterX - x, ACenterY + y);
-    SetPixel(ACenterX + x, ACenterY - y);
-    SetPixel(ACenterX - x, ACenterY - y);
-    SetPixel(ACenterX + y, ACenterY + x);
-    SetPixel(ACenterX - y, ACenterY + x);
-    SetPixel(ACenterX + y, ACenterY - x);
-    SetPixel(ACenterX - y, ACenterY - x);
+    SetPix(ACenterX + x, ACenterY + y);
+    SetPix(ACenterX - x, ACenterY + y);
+    SetPix(ACenterX + x, ACenterY - y);
+    SetPix(ACenterX - x, ACenterY - y);
+    SetPix(ACenterX + y, ACenterY + x);
+    SetPix(ACenterX - y, ACenterY + x);
+    SetPix(ACenterX + y, ACenterY - x);
+    SetPix(ACenterX - y, ACenterY - x);
     Inc(y);
-    t1 := t1 + y;
+    Inc(t1, y);
     t2 := t1 - x;
     if t2 >= 0 then begin
       t1 := t2;

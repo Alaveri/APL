@@ -420,15 +420,15 @@ end;
 
 procedure TGraphicsDriver.SetPixel(APX, APY: integer);
 var
-  offset: longint;
-  ptr: PByte;
+  drawPtr: PByte;
   drawRect: TRect;
 begin
   Mode^.Bounds.GetIntersection(State^.ViewPort, drawRect);
   if not drawRect.Contains(APX, APY) then
     exit;
-  ptr := GetDrawPointer(APX, APY, offset);
-  ptr^ := ForeColor;
+  drawPtr := State^.FrameBuffer;
+  Inc(drawPtr, APY * Mode^.BytesPerScanline + APX);
+  drawPtr^ := ForeColor;
 end;
 
 procedure TGraphicsDriver.SetMode(AMode: PGraphicsMode);
