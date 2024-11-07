@@ -7,11 +7,10 @@ uses
   AplTypes,
   AplConst,
   AplObj,
-  Compress,
-  Palettes,
-  Common,
-  Streams,
-  Errors;
+  AplCompr,
+  AplPal,
+  AplUtils,
+  AplStrms;
 
 const
   AplImageIdentifier: string[6] = 'APLIMG';
@@ -185,7 +184,7 @@ type
 implementation
 
 uses
-  Lzw;
+  AplLzw;
 
 procedure TAplImageHeader.Init;
 begin
@@ -352,17 +351,14 @@ end;
 
 procedure TAplImage.Clear(AColor: byte);
 begin
-  Abstract;
 end;
 
 procedure TAplImage.ClearWord(AColor: word);
 begin
-  Abstract;
 end;
 
 procedure TAplImage.ClearLong(AColor: longint);
 begin
-  Abstract;
 end;
 
 function TAplImage.Width: word;
@@ -414,7 +410,7 @@ begin
   if HasException then
     exit;
   stream := New(PFileStream, Create(AFileName, fmRead));
-  if IsNilPtr(stream, ecNotEnoughMemory) then
+  if NilPtr(stream, ecNotEnoughMemory) then
     exit;
   LoadFromStream(stream);
   CheckReraise(stream);
@@ -429,7 +425,7 @@ begin
   if HasException then
     exit;
   stream := New(PFileStream, Create(AFileName, fmWrite));
-  if IsNilPtr(stream, ecNotEnoughMemory) then
+  if NilPtr(stream, ecNotEnoughMemory) then
     exit;
   SaveToStream(stream, ACompression, ACompressionLevel);
   CheckReraise(stream);
@@ -468,18 +464,15 @@ end;
 
 procedure TAplImage.LoadFromStream(AStream: PStream);
 begin
-  Abstract;
 end;
 
 procedure TAplImage.CreateBuffer;
 begin
-  Abstract;
 end;
 
 procedure TAplImage.SaveToStream(AStream: PStream; ACompression: TAplCompression;
   ACompressionLevel: TCompressionLevel);
 begin
-  Abstract;
 end;
 
 procedure TAplImage.SetPalette(APalette: PRgbPalette; var AHeader: TAplImageHeader);
@@ -545,7 +538,6 @@ begin
     cld
     rep stosb
   end;
-  FillChar(FBuffer^, FHeader.DataSize, AColor);
 end;
 
 procedure TAplBufferImage.ClearWord(AColor: word);
@@ -619,7 +611,7 @@ begin
     exit;
   end;
   GetMem(FBuffer, FHeader.DataSize);
-  if IsNilPtr(FBuffer, ecNotEnoughMemory) then
+  if NilPtr(FBuffer, ecNotEnoughMemory) then
     exit;
 end;
 
@@ -748,7 +740,7 @@ begin
     exit;
   end;
   FBuffer := New(PMemoryStream, Create(FHeader.DataSize));
-  if IsNilPtr(FBuffer, ecNotEnoughMemory) then
+  if NilPtr(FBuffer, ecNotEnoughMemory) then
     exit;
   PMemoryStream(FBuffer)^.FreeBuffers := true;
 end;
@@ -825,7 +817,7 @@ constructor TAplImageReader.CreateFile(const AFileName: string);
 begin
   inherited Create;
   FStream := New(PFileStream, Create(AFileName, fmRead));
-  if IsNilPtr(FStream, ecNotEnoughMemory) then
+  if NilPtr(FStream, ecNotEnoughMemory) then
     exit;
   FFreeStream := true;
 end;
@@ -859,10 +851,9 @@ begin
   GetHeader := nil;
   if HasException then
     exit;
-  New(result);
-  if IsNilPtr(result, ecNotEnoughMemory) then
+  result := New(PAplImageHeader, CreateFromStream(FStream));
+  if NilPtr(result, ecNotEnoughMemory) then
     exit;
-  ReadHeader(result^);
   if CheckReraise(FStream) then
     exit;
   GetHeader := result;
@@ -876,7 +867,7 @@ begin
   if HasException then
     exit;
   result := New(PRgbPalette, CreateFromStream(FStream, pfApl));
-  if IsNilPtr(result, ecNotEnoughMemory) then
+  if NilPtr(result, ecNotEnoughMemory) then
     exit;
   if CheckReraise(result) then
     exit;
@@ -897,7 +888,7 @@ constructor TAplImageWriter.CreateFile(const AFileName: string);
 begin
   inherited Create;
   FStream := New(PFileStream, Create(AFileName, fmWrite));
-  if IsNilPtr(FStream, ecNotEnoughMemory) then
+  if NilPtr(FStream, ecNotEnoughMemory) then
     exit;
   FFreeStream := true;
 end;
@@ -947,13 +938,13 @@ begin
     exit;
   end;
   result := New(PMemoryStream, Create(AHeader.DataSize));
-  if IsNilPtr(result, ecNotEnoughMemory) then
+  if NilPtr(result, ecNotEnoughMemory) then
     exit;
   if AHeader.Compression = acNone then
     result^.ReadFromStream(FStream, AHeader.DataSize)
   else begin
     compressor := TCompression.GetCompressor(AHeader.Compression, AHeader.CompressionLevel);
-    if IsNilPtr(compressor, ecNotEnoughMemory) then begin
+    if NilPtr(compressor, ecNotEnoughMemory) then begin
       FreeAndNil(result);
       exit;
     end;
@@ -989,10 +980,10 @@ begin
     exit;
   end;
   GetMem(result, AHeader.DataSize);;
-  if IsNilPtr(result, ecNotEnoughMemory) then
+  if NilPtr(result, ecNotEnoughMemory) then
     exit;
   stream := New(PMemoryStream, CreateBuffer(result, AHeader.DataSize));
-  if IsNilPtr(stream, ecNotEnoughMemory) then
+  if NilPtr(stream, ecNotEnoughMemory) then
     exit;
   if CheckReraise(stream) then
     exit;
@@ -1029,7 +1020,7 @@ begin
     FStream^.Write(AImageData, AHeader.DataSize)
   else begin
     stream := New(PMemoryStream, CreateBuffer(AImageData, AHeader.DataSize));
-    if IsNilPtr(stream, ecNotEnoughMemory) then
+    if NilPtr(stream, ecNotEnoughMemory) then
       exit;
     if CheckReraise(stream) then
       exit;

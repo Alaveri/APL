@@ -4,17 +4,15 @@ unit AplApps;
 interface
 
 uses
-  {$IFDEF DOS}
-  Dos,
-  {$ENDIF}
-  MemDrv,
-  Lists,
-  AplTypes,
   AplObj,
-  Common,
-  StrUtils,
-  KeyDrv,
-  MouseDrv;
+  AplConst,
+  AplMem,
+  AplLists,
+  AplTypes,
+  AplUtils,
+  AplKeys,
+  AplMouse,
+  AplStr;
 
 const
   mUser = 10000;
@@ -73,12 +71,13 @@ type
     function Deq: PMessage;
   end;
 
-  TApplication = object(TObject)
+  TApplication = object(TStatusObject)
   private
   public
     Closed: boolean;
     OnError: PApplicationErrorProc;
     MessageQueue: TMessageQueue;
+    destructor Free; virtual;
     procedure Init; virtual;
     procedure Run; virtual;
     procedure Close; virtual;
@@ -90,9 +89,6 @@ type
   end;
 
 implementation
-
-uses
-  Errors;
 
 var
   Application: PApplication;
@@ -142,9 +138,15 @@ begin
   MessageQueue.Enq(message);
 end;
 
+destructor TApplication.Free;
+begin
+  MessageQueue.DisposeObjects := true;
+  MessageQueue.Free;
+  inherited Free;
+end;
+
 procedure TApplication.ProcessMessages;
 begin
-  Abstract;
 end;
 
 procedure TApplication.ProcessEvents;

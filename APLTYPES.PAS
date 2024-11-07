@@ -8,63 +8,17 @@ uses
   AplConst;
 
 type
-
-  PWord = ^word;
+  PProc = ^TProc;
   PPointer = ^pointer;
   PBoolean = ^boolean;
-  PProc = ^TProc;
   PByte = ^byte;
+  PShort = ^shortint;
+  PInt = ^integer;
+  PUInt = ^word;
+  PWord = ^word;
   PLong = ^longint;
   PByteArray = ^TByteArray;
-  PInteger = ^integer;
-  PLongint = ^longint;
   PBufferArray = ^TBufferArray;
-
-  Int64 = comp;
-
-  TProc = procedure;
-  TBit = (bit0, bit1, bit2, bit3, bit4, bit5, bit6, bit7);
-  TBits = set of TBit;
-  TBit16 = (
-    wbit0,
-    wbit1,
-    wbit2,
-    wbit3,
-    wbit4,
-    wbit5,
-    wbit6,
-    wbit7,
-    wbit8,
-    wbit9,
-    wbit10,
-    wbit11,
-    wbit12,
-    wbit13,
-    wbit14,
-    wbit15
-  );
-  TBits16 = set of TBit16;
-  THexString = string[9];
-  TByteArray = array[byte] of byte;
-  TBufferArray = array[0..MaxVarSize] of byte;
-  TCharSet = set of char;
-
-  TLongLowHigh = record
-    Low: word;
-    High: word;
-  end;
-
-  TModalResult =
-  (
-    mrNone,
-    mrYes,
-    mrNo,
-    mrOk,
-    mrCancel,
-    mrHelp
-  );
-
-type
   PEvent = ^TEvent;
   PKeyEvent = ^TKeyEvent;
   PMouseEvent = ^TMouseEvent;
@@ -72,6 +26,17 @@ type
   PMouseEventProc = ^TMouseEventProc;
   PKeyEventProc = ^TKeyEventProc;
   PMouseState = ^TMouseState;
+
+  short = shortint;
+  long = longint;
+  uint = word;
+  int = integer;
+
+  TProc = procedure;
+  THexString = string[9];
+  TByteArray = array[byte] of byte;
+  TBufferArray = array[0..MaxVarSize] of byte;
+  TCharSet = set of char;
 
   TButtonState =
   (
@@ -86,6 +51,8 @@ type
   public
     X: integer;
     Y: integer;
+    RawX: integer;
+    RawY: integer;
     ButtonState: TButtonStates;
     Visible: boolean;
     WheelCounter: shortint;
@@ -126,9 +93,23 @@ type
     procedure Clear; virtual;
   end;
 
+  TModalResult =
+  (
+    mrNone,
+    mrYes,
+    mrNo,
+    mrOk,
+    mrCancel,
+    mrHelp
+  );
+
   TEventProc = procedure(ASender: PObject; var AEvent: TEvent);
   TMouseEventProc = procedure(ASender: PObject; var AEvent: TMouseEvent);
   TKeyEventProc = procedure(ASender: PObject; var AEvent: TKeyEvent);
+
+var
+  NumberSeparator: char;
+  WhiteSpaceChars: TCharSet;
 
 implementation
 
@@ -216,6 +197,8 @@ begin
   source := PMouseState(@ASource);
   X := source^.X;
   Y := source^.Y;
+  RawX := source^.RawX;
+  RawY := source^.RawY;
   ButtonState := source^.ButtonState;
   WheelCounter := source^.WheelCounter;
   Visible := source^.Visible;
@@ -225,6 +208,8 @@ procedure TMouseState.Clear;
 begin
   X := 0;
   Y := 0;
+  RawX := 0;
+  RawY := 0;
   ButtonState := [];
   WheelCounter := 0;
   Visible := false;
@@ -243,6 +228,5 @@ function TMouseState.Moved(const AState: TMouseState): boolean;
 begin
   Moved := (X <> AState.X) or (Y <> AState.Y);
 end;
-
 
 end.
