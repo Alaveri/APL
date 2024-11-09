@@ -1,5 +1,5 @@
 {$I COMPILER.INC}
-unit Graphics;
+unit GraphApp;
 
 interface
 
@@ -7,8 +7,8 @@ uses
   AplObj,
   Lists,
   AplApps,
-  GrDrv8,
   Graphics,
+  GrDrv8,
   GraphIni;
 
 type

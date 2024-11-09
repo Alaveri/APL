@@ -64,7 +64,6 @@ type
     function Find(const AFilename: string): PFile;
     function Add(AItem: PFile): integer;
     function IndexOf(AItem: PFile): integer;
-    procedure ForEach(AProc: PFileListProc);
     procedure SetItem(AIndex: integer; AItem: PFile);
     procedure Insert(AIndex: integer; AItem: PFile);
   end;
@@ -376,11 +375,6 @@ end;
 function TFileList.IndexOf(AItem: PFile): integer;
 begin
   IndexOf := inherited IndexOf(AItem);
-end;
-
-procedure TFileList.ForEach(AProc: PFileListProc);
-begin
-  TList.ForEach(PListProc(AProc));
 end;
 
 procedure TFileList.SetItem(AIndex: integer; AItem: PFile);
