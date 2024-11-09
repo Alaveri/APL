@@ -69,7 +69,6 @@ type
     function GetModeById(AModeID: integer): PGraphicsMode;
     function Add(AItem: PGraphicsMode): integer;
     function IndexOf(AItem: PGraphicsMode): integer;
-    procedure ForEach(AProc: PGraphicsModeListProc);
     procedure SetItem(AIndex: integer; AItem: PGraphicsMode);
     procedure Insert(AIndex: integer; AItem: PGraphicsMode);
   end;
@@ -272,7 +271,6 @@ type
     function GetItem(AIndex: integer): PFont;
     function Add(AItem: PFont): integer;
     function IndexOf(AItem: PFont): integer;
-    procedure ForEach(AProc: PFontListProc);
     procedure SetItem(AIndex: integer; AItem: PFont);
     procedure Insert(AIndex: integer; AItem: PFont);
   end;
@@ -774,7 +772,7 @@ begin
   ResetMode;
   Modes.Free;
   FreeAndNil(State);
-  StateStack.DisposeAplObj := true;
+  StateStack.DisposeObjects := true;
   StateStack.Free;
   inherited Free;
 end;
@@ -864,11 +862,6 @@ end;
 function TGraphicsModeList.IndexOf(AItem: PGraphicsMode): integer;
 begin
   IndexOf := inherited IndexOf(AItem);
-end;
-
-procedure TGraphicsModeList.ForEach(AProc: PGraphicsModeListProc);
-begin
-  TList.ForEach(PListProc(AProc));
 end;
 
 procedure TGraphicsModeList.SetItem(AIndex: integer; AItem: PGraphicsMode);
@@ -1478,11 +1471,6 @@ end;
 function TFontList.IndexOf(AItem: PFont): integer;
 begin
   IndexOf := inherited IndexOf(AItem);
-end;
-
-procedure TFontList.ForEach(AProc: PFontListProc);
-begin
-  TList.ForEach(PListProc(AProc));
 end;
 
 procedure TFontList.SetItem(AIndex: integer; AItem: PFont);

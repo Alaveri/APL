@@ -5,7 +5,7 @@ interface
 
 uses
   Graphics,
-  AplSVga8,
+  SVga8Drv,
   Vga8Drv;
 
 type

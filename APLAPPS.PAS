@@ -140,7 +140,7 @@ end;
 
 destructor TApplication.Free;
 begin
-  MessageQueue.DisposeAplObj := true;
+  MessageQueue.DisposeObjects := true;
   MessageQueue.Free;
   inherited Free;
 end;

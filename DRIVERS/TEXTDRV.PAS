@@ -1,5 +1,5 @@
 {$I COMPILER.INC}
-unit AplText;
+unit TextDrv;
 
 interface
 
@@ -32,7 +32,6 @@ type
     function GetModeById(AModeId: TTextModes): PTextMode;
     function IndexOf(AItem: PTextMode): integer;
     function Add(AItem: PTextMode): integer;
-    procedure ForEach(AProc: PTextModeListProc); virtual;
     procedure Insert(AIndex: integer; AItem: PTextMode);
   end;
 
@@ -123,11 +122,6 @@ begin
       break;
     end;
   end;
-end;
-
-procedure TTextModeList.ForEach(AProc: PTextModeListProc);
-begin
-  TList.ForEach(PListProc(AProc));
 end;
 
 function TTextModeList.IndexOf(AItem: PTextMode): integer;
@@ -351,7 +345,7 @@ destructor TTextDriver.Free;
 begin
   Modes.Free;
   FreeAndNil(State);
-  StateStack.DisposeAplObj := true;
+  StateStack.DisposeObjects := true;
   StateStack.Free;
   inherited Free;
 end;

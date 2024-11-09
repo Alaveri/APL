@@ -139,7 +139,6 @@ type
     procedure SetItem(AIndex: integer; AItem: PStream);
     procedure Insert(AIndex: integer; AItem: PStream);
     procedure Delete(AIndex: integer); virtual;
-    procedure ForEach(AProc: TStreamListProc);
   end;
 
   TMemoryStreamList = object(TStreamList)
@@ -152,7 +151,6 @@ type
     procedure SetItem(AIndex: integer; AItem: PMemoryStream);
     procedure Insert(AIndex: integer; AItem: PMemoryStream);
     procedure Delete(AIndex: integer); virtual;
-    procedure ForEach(AProc: TMemoryStreamListProc);
   end;
 
 implementation
@@ -976,11 +974,6 @@ begin
   inherited Delete(AIndex);
 end;
 
-procedure TStreamList.ForEach(AProc: TStreamListProc);
-begin
-  TList.ForEach(@AProc);
-end;
-
 procedure TMemoryStreamList.Init;
 begin
   inherited Init;
@@ -1014,11 +1007,6 @@ end;
 procedure TMemoryStreamList.Delete(AIndex: integer);
 begin
   inherited Delete(AIndex);
-end;
-
-procedure TMemoryStreamList.ForEach(AProc: TMemoryStreamListProc);
-begin
-  TList.ForEach(@AProc);
 end;
 
 begin

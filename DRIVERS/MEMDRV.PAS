@@ -30,7 +30,6 @@ type
     function GetItem(AIndex: integer): PReference;
     function Add(AItem: PReference): integer;
     function IndexOf(AItem: PReference): integer;
-    procedure ForEach(AProc: PReferenceListProc);
     procedure SetItem(AIndex: integer; AItem: PReference);
     procedure Insert(AIndex: integer; AItem: PReference);
   end;
@@ -676,11 +675,6 @@ end;
 function TReferenceList.IndexOf(AItem: PReference): integer;
 begin
   IndexOf := Inherited IndexOf(AItem);
-end;
-
-procedure TReferenceList.ForEach(AProc: PReferenceListProc);
-begin
-  TList.ForEach(PListProc(AProc));
 end;
 
 procedure TReferenceList.SetItem(AIndex: integer; AItem: PReference);

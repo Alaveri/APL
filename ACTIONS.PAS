@@ -51,7 +51,6 @@ type
     function GetItem(AIndex: integer): PAction;
     function GetActionById(AActionId: integer): PAction;
     function Add(AItem: pointer): integer; virtual;
-    procedure ForEach(AProc: PActionListProc);
     procedure Init; virtual;
     destructor Free; virtual;
   end;
@@ -144,11 +143,6 @@ begin
       exit;
     end;
   end;
-end;
-
-procedure TActionList.ForEach(AProc: PActionListProc);
-begin
-  TList.ForEach(PListProc(AProc));
 end;
 
 procedure TActionList.Init;

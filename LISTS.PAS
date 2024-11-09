@@ -57,24 +57,31 @@ type
     constructor CreateSortedCapacity(AComparer: TComparer; ACapacity: integer);
     destructor Free; virtual;
     procedure Init; virtual;
+    function AddPtr(AItem: pointer): integer; virtual;
     function Add(AItem: pointer): integer;
     function Sorted: boolean;
+    function GetPtr(AIndex: integer): pointer; virtual;
     function GetItem(AIndex: integer): pointer;
+    function IndexOfPtr(AItem: pointer): integer; virtual;
     function IndexOf(AItem: pointer): integer;
-    function BinarySearchUsing(AComparer: TComparer; var AValue): integer;
-    function BinarySearch(var AValue): integer;
+    function BinarySearchUsing(AComparer: TComparer; var AValue): integer; virtual;
+    function BinarySearch(var AValue): integer; virtual;
     function Capacity: integer;
     procedure Grow; virtual;
     procedure GrowUsing(AGrowFunc: TListGrowFunc);
-    procedure ForEach(AProc: PListProc);
+    procedure ForEach(AProc: PListProc); virtual;
     procedure SetComparer(AComparer: TComparer); virtual;
     procedure Swap(AIndex1, AIndex2: integer); virtual;
+    procedure SetPtr(AIndex: integer; AItem: pointer); virtual;
     procedure SetItem(AIndex: integer; AItem: pointer);
     procedure Sort; virtual;
     procedure SetCapacity(ACapacity: integer); virtual;
     procedure CustomSort(AComparer: TComparer; ASortFunc: TSortFunc); virtual;
+    procedure InsertPtr(AIndex: integer; AItem: pointer); virtual;
     procedure Insert(AIndex: integer; AItem: pointer);
     procedure Delete(AIndex: integer); virtual;
+    procedure DeletePtr(AItem: pointer); virtual;
+    procedure DeleteItem(AItem: pointer);
     procedure Clear; virtual;
   end;
 
@@ -110,22 +117,24 @@ type
   TObjectList = object(TList)
   private
   public
-    DisposeAplObj: boolean;
+    DisposeObjects: boolean;
     procedure Init; virtual;
     function Add(AItem: PObject): integer;
     function GetItem(AIndex: integer): PObject;
     function IndexOf(AItem: PObject): integer;
     procedure SetItem(AIndex: integer; AItem: PObject);
     procedure Insert(AIndex: integer; AItem: PObject);
+    procedure Remove(AIndex: integer); virtual;
+    procedure RemovePtr(AItem: pointer); virtual;
+    procedure RemoveItem(AItem: PObject);
     procedure Delete(AIndex: integer); virtual;
-    procedure ForEach(AProc: TObjectListProc);
     procedure Clear; virtual;
     destructor Free; virtual;
   end;
 
   TLinkedObjectList = object(TLinkedList)
   public
-    DisposeAplObj: boolean;
+    DisposeObjects: boolean;
     procedure Init; virtual;
     function Add(AItem: PObject): PListNode;
     function GetItem(AIndex: longint): PObject;
@@ -177,7 +186,6 @@ type
     function GetString(AIndex: integer): string;
     procedure Clear; virtual;
     procedure Delete(AIndex: integer); virtual;
-    procedure ForEach(AProc: PStringListProc);
     procedure Init; virtual;
   end;
 
@@ -189,7 +197,6 @@ type
     function IndexOfId(const AId: string): integer; virtual;
     function Add(AItem: PIdentifiable): integer;
     function IndexOf(AItem: PIdentifiable): integer;
-    procedure ForEach(AProc: PIdentifiableListProc);
     procedure SetItem(AIndex: integer; AItem: PIdentifiable);
     procedure Insert(AIndex: integer; AItem: PIdentifiable);
   end;
@@ -322,6 +329,11 @@ begin
 end;
 
 function TList.Add(AItem: pointer): integer;
+begin
+  Add := AddPtr(AItem);
+end;
+
+function TList.AddPtr(AItem: pointer): integer;
 var
   ptr: PPointer;
   index: integer;
@@ -340,7 +352,7 @@ begin
   end
   else
     Insert(index, AItem);
-  Add := index;
+  AddPtr := index;
 end;
 
 procedure TList.Clear;
@@ -452,15 +464,20 @@ end;
 
 function TList.GetItem(AIndex: integer): pointer;
 begin
-  GetItem := nil;
+  GetItem := GetPtr(AIndex);
+end;
+
+function TList.GetPtr(AIndex: integer): pointer;
+begin
+  GetPtr := nil;
   if (AIndex < 0) or (AIndex > Count - 1) then begin
     Raise(ecIndexOutOfBounds);
     exit;
   end;
-  GetItem := Items^[AIndex];
+  GetPtr := Items^[AIndex];
 end;
 
-procedure TList.SetItem(AIndex: integer; AItem: pointer);
+procedure TList.SetPtr(AIndex: integer; AItem: pointer);
 begin
   if (AIndex < 0) or (AIndex > Count - 1) then begin
     Raise(ecIndexOutOfBounds);
@@ -469,19 +486,64 @@ begin
   Items^[AIndex] := AItem;
 end;
 
+procedure TList.SetItem(AIndex: integer; AItem: pointer);
+begin
+  SetPtr(AIndex, AItem);
+end;
+
+procedure TList.InsertPtr(AIndex: integer; AItem: pointer);
+begin
+  Insert(AIndex, AItem);
+end;
+
+procedure TList.Delete(AIndex: integer);
+var
+  ptr, next: PPointer;
+begin
+  if (AIndex < 0) or (AIndex > Count - 1) then begin
+    Raise(ecIndexOutOfBounds);
+    exit;
+  end;
+  ptr := pointer(Items);
+  Inc(ptr, AIndex);
+  next := ptr;
+  Inc(next);
+  Move(next^, ptr^, (Count - AIndex - 1) * PointerSize);
+  Dec(Count);
+end;
+
+procedure TList.DeleteItem(AItem: pointer);
+begin
+  DeletePtr(AItem);
+end;
+
+procedure TList.DeletePtr(AItem: pointer);
+var
+  index: integer;
+begin
+  index := IndexOfPtr(AItem);
+  if index >= 0 then
+    Delete(index);
+end;
+
 function TList.IndexOf(AItem: pointer): integer;
+begin
+  IndexOf := IndexOfPtr(AItem);
+end;
+
+function TList.IndexOfPtr(AItem: pointer): integer;
 var
   index: integer;
   current: pointer;
 begin
-  IndexOf := -1;
+  IndexOfPtr := -1;
   if Count = 0 then
     exit;
   index := 0;
   repeat
-    current := GetItem(index);
+    current := GetPtr(index);
     if AItem = current then begin
-      IndexOf := index;
+      IndexOfPtr := index;
       break;
     end;
     Inc(index);
@@ -537,22 +599,6 @@ begin
   Inc(Count);
 end;
 
-procedure TList.Delete(AIndex: integer);
-var
-  ptr, next: PPointer;
-begin
-  if (AIndex < 0) or (AIndex > Count - 1) then begin
-    Raise(ecIndexOutOfBounds);
-    exit;
-  end;
-  ptr := pointer(Items);
-  Inc(ptr, AIndex);
-  next := ptr;
-  Inc(next);
-  Move(next^, ptr^, (Count - AIndex - 1) * PointerSize);
-  Dec(Count);
-end;
-
 procedure TList.ForEach(AProc: PListProc);
 var
   index: integer;
@@ -593,7 +639,7 @@ end;
 procedure TObjectList.Init;
 begin
   inherited Init;
-  DisposeAplObj := true;
+  DisposeObjects := true;
 end;
 
 function TObjectList.Add(AItem: PObject): integer;
@@ -625,9 +671,28 @@ begin
     exit;
   end;
   obj := GetItem(AIndex);
-  if DisposeAplObj then
+  if DisposeObjects then
     FreeAndNil(obj);
   inherited Delete(AIndex);
+end;
+
+procedure TObjectList.Remove(AIndex: integer);
+begin
+  inherited Delete(AIndex);
+end;
+
+procedure TObjectList.RemovePtr(AItem: pointer);
+var
+  index: integer;
+begin
+  index := IndexOf(AItem);
+  if index >= 0 then
+    inherited Delete(index);
+end;
+
+procedure TObjectList.RemoveItem(AItem: PObject);
+begin
+  RemovePtr(AItem);
 end;
 
 destructor TObjectList.Free;
@@ -638,7 +703,7 @@ end;
 
 procedure TObjectList.Clear;
 begin
-  if DisposeAplObj then begin
+  if DisposeObjects then begin
     while Count > 0 do
       Delete(0);
   end;
@@ -648,11 +713,6 @@ end;
 function TObjectList.GetItem(AIndex: integer): PObject;
 begin
   GetItem := inherited GetItem(AIndex);
-end;
-
-procedure TObjectList.ForEach(AProc: TObjectListProc);
-begin
-  TList.ForEach(@AProc);
 end;
 
 procedure TQueue.Init;
@@ -677,7 +737,7 @@ end;
 procedure TObjectQueue.Init;
 begin
   inherited Init;
-  DisposeAplObj := false;
+  DisposeObjects := false;
 end;
 
 function TObjectQueue.Enq(AObject: PObject): integer;
@@ -697,7 +757,7 @@ end;
 procedure TObjectStack.Init;
 begin
   inherited Init;
-  DisposeAplObj := false;
+  DisposeObjects := false;
 end;
 
 function TObjectStack.Push(AObject: PObject): integer;
@@ -758,11 +818,6 @@ begin
   inherited Init;
   FComparer := TStringCompare.CaseInsensitive^;
   DisposeStrings := true;
-end;
-
-procedure TStringList.ForEach(AProc: PStringListProc);
-begin
-  TList.ForEach(PListProc(AProc));
 end;
 
 function TStringList.GetString(AIndex: integer): string;
@@ -844,11 +899,6 @@ end;
 function TIdentifiableList.IndexOf(AItem: PIdentifiable): integer;
 begin
   IndexOf := inherited IndexOf(AItem);
-end;
-
-procedure TIdentifiableList.ForEach(AProc: PIdentifiableListProc);
-begin
-  TList.ForEach(PListProc(AProc));
 end;
 
 procedure TIdentifiableList.SetItem(AIndex: integer; AItem: PIdentifiable);
@@ -1086,7 +1136,7 @@ end;
 procedure TLinkedObjectList.Init;
 begin
   inherited Init;
-  DisposeAplObj := true;
+  DisposeObjects := true;
 end;
 
 function TLinkedObjectList.Add(AItem: PObject): PListNode;
@@ -1116,7 +1166,7 @@ end;
 
 procedure TLinkedObjectList.FreeNode(ANode: PListNode);
 begin
-  if DisposeAplObj then
+  if DisposeObjects then
     FreeAndNil(ANode^.Item);
   inherited FreeNode(ANode);
 end;

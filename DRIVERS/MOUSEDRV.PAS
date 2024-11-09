@@ -44,7 +44,7 @@ destructor TMouseDriver.Free;
 var
   index: integer;
 begin
-  StateStack.DisposeAplObj := true;
+  StateStack.DisposeObjects := true;
   StateStack.Free;
   State.Free;
   inherited Free;
