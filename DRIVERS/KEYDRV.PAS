@@ -1,5 +1,5 @@
 {$I COMPILER.INC}
-unit AplKeys;
+unit KeyDrv;
 
 interface
 
@@ -7,7 +7,7 @@ uses
   AplObj,
   AplTypes,
   AplUtils,
-  AplDates;
+  DateTime;
 
 const
   ExtKeyFlag = word($100);
@@ -443,7 +443,6 @@ end;
 
 function TKeyboardDriver.KeyPressed: boolean;
 var
-  available: byte;
   result: boolean;
 begin
   result := false;
@@ -463,7 +462,7 @@ begin
     mov   AH, 3
     mov   BX, 0
     int   10h
-    and   CH, 255-20h
+    and   CH, 255 - 20h
     mov   AH, 1
     mov   BX, 0
     int   10h

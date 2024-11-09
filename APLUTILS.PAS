@@ -60,7 +60,7 @@ function ChangeDirectory(const ADirectory: string): boolean;
 function StringsEqualInsensitive(const AString1, AString2: string): boolean;
 function HasWildcard(const AFilename: string): boolean;
 function IsDirectory(const AFilename: string): boolean;
-
+procedure FreeAndNilMem(var APtr; ASize: word);
 
 var
   WhiteSpaceChars: set of char;
@@ -70,7 +70,7 @@ implementation
 uses
   AplConst,
   AplMath,
-  AplFiles;
+  Files;
 
 var
   PreviousExitProc: PProc;
@@ -464,9 +464,9 @@ begin
   FormatLong := result;
 end;
 
-procedure FreeMemAndNil(var APtr; ASize: word);
+procedure FreeAndNilMem(var APtr; ASize: word);
 var
-  ptr: PObject;
+  ptr: pointer;
   pointerPtr: PPointer;
 begin
   ptr := pointer(APtr);

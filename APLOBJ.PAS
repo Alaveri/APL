@@ -95,10 +95,13 @@ var
 
 implementation
 
+uses
+  AplTypes;
+
 procedure FreeAndNil(var AObject);
 var
   obj: PObject;
-  ptr: ^Pointer;
+  ptr: PPointer;
 begin
   obj := PObject(AObject);
   if Assigned(obj) then

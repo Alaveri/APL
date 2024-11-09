@@ -1,15 +1,15 @@
 {$I COMPILER.INC}
-unit AplGrApp;
+unit Graphics;
 
 interface
 
 uses
   AplObj,
-  AplLists,
+  Lists,
   AplApps,
-  AplGrap8,
-  AplGraph,
-  AplGrIni;
+  GrDrv8,
+  Graphics,
+  GraphIni;
 
 type
   PGraphApp = ^TGraphApp;
@@ -36,7 +36,7 @@ end;
 
 procedure TGraphApp.InitGraphics(ADriverId: TGraphDrivers);
 begin
-  AplGrIni.InitGraphicsDriver(ADriverId);
+  GraphIni.InitGraphicsDriver(ADriverId);
   Graph8 := PGraphics8Driver(Graph);
 end;
 

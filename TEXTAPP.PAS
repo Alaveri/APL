@@ -1,5 +1,5 @@
 {$I COMPILER.INC}
-unit AplTxtAp;
+unit TextApp;
 
 interface
 
@@ -7,13 +7,13 @@ uses
   AplObj,
   AplTypes,
   AplConst,
-  AplLists,
+  Lists,
   AplApps,
-  AplKeys,
+  KeyDrv,
   AplUtils,
-  AplTxtTp,
+  TextType,
   AplText,
-  AplTxIni;
+  TextIni;
 
 type
   PTextApplication = ^TTextApplication;
@@ -40,7 +40,7 @@ end;
 
 procedure TTextApplication.InitText(ADriver: TTextDrivers);
 begin
-  AplTxIni.InitTextDriver(ADriver);
+  TextIni.InitTextDriver(ADriver);
   if NilPtr(Text, ecNotEnoughMemory) then
     exit;
   CheckReraise(Text);

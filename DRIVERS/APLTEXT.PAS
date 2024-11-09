@@ -6,15 +6,15 @@ interface
 uses
   AplObj,
   AplTypes,
-  AplStrms,
-  AplLists,
+  Streams,
+  Lists,
   AplConst,
-  AplKeys,
+  KeyDrv,
   AplUtils,
   AplMath,
-  AplDraw,
-  AplTxtTp,
-  AplMouse,
+  Drawing,
+  TextType,
+  MouseDrv,
   Strings,
   Dos;
 
@@ -351,7 +351,7 @@ destructor TTextDriver.Free;
 begin
   Modes.Free;
   FreeAndNil(State);
-  StateStack.DisposeObjects := true;
+  StateStack.DisposeAplObj := true;
   StateStack.Free;
   inherited Free;
 end;

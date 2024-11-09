@@ -1,17 +1,17 @@
 {$I COMPILER.INC}
-unit AplVga8;
+unit Vga8Drv;
 
 interface
 
 uses
-  AplGraph,
-  AplGrap8,
+  Graphics,
+  GrDrv8,
   AplMath,
   AplConst,
   AplUtils,
   AplTypes,
-  AplStrms,
-  AplDraw;
+  Streams,
+  Drawing;
 
 type
   PVga8Driver = ^TVga8Driver;
@@ -44,8 +44,8 @@ type
 implementation
 
 uses
-  AplMouse,
-  AplPal,
+  MouseDrv,
+  Palettes,
   AplStr;
 
 procedure TVga8Driver.Init;

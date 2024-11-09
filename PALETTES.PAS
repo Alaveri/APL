@@ -1,5 +1,5 @@
 {$I COMPILER.INC}
-unit AplPal;
+unit Palettes;
 
 interface
 
@@ -7,10 +7,10 @@ uses
   AplObj,
   AplTypes,
   AplUtils,
-  AplCompr,
-  AplStrms,
+  Compress,
+  Streams,
   AplConst,
-  AplLists;
+  Lists;
 
 type
   PRgbPalette = ^TRgbPalette;
@@ -62,10 +62,10 @@ type
     FFormat: TPaletteFormat;
     FCompression: TAplCompression;
     FCompressionLevel: TCompressionLevel;
-    procedure LoadAplPalette(AStream: PStream);
+    procedure LoadPalettesette(AStream: PStream);
     procedure LoadJascPalette(AStream: PStream);
     procedure LoadGimpPalette(AStream: PStream);
-    procedure SaveAplPalette(AStream: PStream);
+    procedure SavePalettesette(AStream: PStream);
     procedure SaveJascPalette(AStream: PStream);
     procedure SaveGimpPalette(AStream: PStream);
     function ReadLine(AStream: PStream): string;
@@ -425,7 +425,7 @@ begin
   end;
 end;
 
-procedure TRgbPalette.LoadAplPalette(AStream: PStream);
+procedure TRgbPalette.LoadPalettesette(AStream: PStream);
 var
   count: word;
   compressor: PCompressor;
@@ -456,7 +456,7 @@ begin
   end;
 end;
 
-procedure TRgbPalette.SaveAplPalette(AStream: PStream);
+procedure TRgbPalette.SavePalettesette(AStream: PStream);
 var
   compressor: PCompressor;
   source: PMemoryStream;
@@ -524,7 +524,7 @@ begin
   FColorCount := 0;
   FColors := nil;
   case FFormat of
-    pfApl: LoadAplPalette(AStream);
+    pfApl: LoadPalettesette(AStream);
     pfJasc: LoadJascPalette(AStream);
     pfGimp: LoadGimpPalette(AStream);
   end;
@@ -563,7 +563,7 @@ end;
 procedure TRgbPalette.SaveToStream(AStream: PStream);
 begin
   case FFormat of
-    pfApl: SaveAplPalette(AStream);
+    pfApl: SavePalettesette(AStream);
     pfJasc: SaveJascPalette(AStream);
     pfGimp: SaveGimpPalette(AStream);
   end;

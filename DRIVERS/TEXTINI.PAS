@@ -1,13 +1,13 @@
 {$I COMPILER.INC}
-unit AplTxIni;
+unit TextIni;
 
 interface
 
 uses
   AplObj,
   AplTypes,
-  AplTxtTp,
-  AplDirTx;
+  TextType,
+  DrTxtDrv;
 
 procedure InitTextDriver(ADriverId: TTextDrivers);
 
