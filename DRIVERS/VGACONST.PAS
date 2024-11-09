@@ -1,5 +1,5 @@
 {$I COMPILER.INC}
-unit AplVgaCo;
+unit VgaConst;
 
 interface
 

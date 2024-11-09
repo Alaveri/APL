@@ -1,5 +1,5 @@
 {$I COMPILER.INC}
-unit AplLists;
+unit Lists;
 
 interface
 
@@ -110,7 +110,7 @@ type
   TObjectList = object(TList)
   private
   public
-    DisposeObjects: boolean;
+    DisposeAplObj: boolean;
     procedure Init; virtual;
     function Add(AItem: PObject): integer;
     function GetItem(AIndex: integer): PObject;
@@ -125,7 +125,7 @@ type
 
   TLinkedObjectList = object(TLinkedList)
   public
-    DisposeObjects: boolean;
+    DisposeAplObj: boolean;
     procedure Init; virtual;
     function Add(AItem: PObject): PListNode;
     function GetItem(AIndex: longint): PObject;
@@ -593,7 +593,7 @@ end;
 procedure TObjectList.Init;
 begin
   inherited Init;
-  DisposeObjects := true;
+  DisposeAplObj := true;
 end;
 
 function TObjectList.Add(AItem: PObject): integer;
@@ -625,7 +625,7 @@ begin
     exit;
   end;
   obj := GetItem(AIndex);
-  if DisposeObjects then
+  if DisposeAplObj then
     FreeAndNil(obj);
   inherited Delete(AIndex);
 end;
@@ -638,7 +638,7 @@ end;
 
 procedure TObjectList.Clear;
 begin
-  if DisposeObjects then begin
+  if DisposeAplObj then begin
     while Count > 0 do
       Delete(0);
   end;
@@ -677,7 +677,7 @@ end;
 procedure TObjectQueue.Init;
 begin
   inherited Init;
-  DisposeObjects := false;
+  DisposeAplObj := false;
 end;
 
 function TObjectQueue.Enq(AObject: PObject): integer;
@@ -697,7 +697,7 @@ end;
 procedure TObjectStack.Init;
 begin
   inherited Init;
-  DisposeObjects := false;
+  DisposeAplObj := false;
 end;
 
 function TObjectStack.Push(AObject: PObject): integer;
@@ -1086,7 +1086,7 @@ end;
 procedure TLinkedObjectList.Init;
 begin
   inherited Init;
-  DisposeObjects := true;
+  DisposeAplObj := true;
 end;
 
 function TLinkedObjectList.Add(AItem: PObject): PListNode;
@@ -1116,7 +1116,7 @@ end;
 
 procedure TLinkedObjectList.FreeNode(ANode: PListNode);
 begin
-  if DisposeObjects then
+  if DisposeAplObj then
     FreeAndNil(ANode^.Item);
   inherited FreeNode(ANode);
 end;

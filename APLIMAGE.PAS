@@ -7,10 +7,10 @@ uses
   AplTypes,
   AplConst,
   AplObj,
-  AplCompr,
-  AplPal,
+  Compress,
+  Palettes,
   AplUtils,
-  AplStrms;
+  Streams;
 
 const
   AplImageIdentifier: string[6] = 'APLIMG';
@@ -184,7 +184,7 @@ type
 implementation
 
 uses
-  AplLzw;
+  Lzw;
 
 procedure TAplImageHeader.Init;
 begin

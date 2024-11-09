@@ -6,12 +6,12 @@ interface
 uses
   AplObj,
   AplConst,
-  AplMem,
-  AplLists,
+  MemDrv,
+  Lists,
   AplTypes,
   AplUtils,
-  AplKeys,
-  AplMouse,
+  KeyDrv,
+  MouseDrv,
   AplStr;
 
 const
@@ -140,7 +140,7 @@ end;
 
 destructor TApplication.Free;
 begin
-  MessageQueue.DisposeObjects := true;
+  MessageQueue.DisposeAplObj := true;
   MessageQueue.Free;
   inherited Free;
 end;

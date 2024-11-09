@@ -1,5 +1,5 @@
 {$I COMPILER.INC}
-unit AplSvga8;
+unit SVga8Drv;
 
 interface
 
@@ -7,16 +7,16 @@ uses
   AplTypes,
   AplConst,
   AplObj,
-  AplDraw,
+  Drawing,
   AplUtils,
   AplStr,
   AplMath,
-  AplStrms,
-  AplGraph,
-  AplGrap8,
-  AplMem,
-  AplPal,
-  AplVbe,
+  Streams,
+  Graphics,
+  GrDrv8,
+  MemDrv,
+  Palettes,
+  VbeTypes,
   Strings;
 
 type
@@ -65,7 +65,7 @@ type
 implementation
 
 uses
-  AplMouse;
+  MouseDrv;
 
 procedure TSVga8Mode.Init;
 begin

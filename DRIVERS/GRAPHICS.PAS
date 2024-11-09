@@ -1,5 +1,5 @@
 {$I COMPILER.INC}
-unit AplGraph;
+unit Graphics;
 
 interface
 
@@ -8,14 +8,14 @@ uses
   AplTypes,
   AplMath,
   AplUtils,
-  AplStrms,
-  AplDraw,
-  AplLists,
+  Streams,
+  Drawing,
+  Lists,
   AplConst,
   AplStr,
-  AplCompr,
-  AplPal,
-  AplMem,
+  Compress,
+  Palettes,
+  MemDrv,
   Strings;
 
 const
@@ -284,7 +284,7 @@ implementation
 
 uses
   Dos,
-  AplLzw;
+  Lzw;
 
 var
   PreviousExitProc: PProc;
@@ -774,7 +774,7 @@ begin
   ResetMode;
   Modes.Free;
   FreeAndNil(State);
-  StateStack.DisposeObjects := true;
+  StateStack.DisposeAplObj := true;
   StateStack.Free;
   inherited Free;
 end;

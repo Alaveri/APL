@@ -1,5 +1,5 @@
 {$I COMPILER.INC}
-unit AplCompr;
+unit Compress;
 
 interface
 
@@ -7,7 +7,7 @@ uses
   AplObj,
   AplTypes,
   AplConst,
-  AplStrms,
+  Streams,
   AplUtils;
 
 type
@@ -87,7 +87,7 @@ var
 implementation
 
 uses
-  AplLzw;
+  Lzw;
 
 const
   DefaultProgressIncrement = 4096;
@@ -347,7 +347,7 @@ begin
     acLzw: begin
       bitSize := LzwCompressionBitSize[ALevel];
       result := New(PLzw, CreateBitSize(bitSize));
-      PLzw(result)^.SetLzwCodesProc := @SetAplLzwCodes;
+      PLzw(result)^.SetLzwCodesProc := @SetLzwCodes;
       result^.AddTotalToStream := false;
     end;
     acGif: begin

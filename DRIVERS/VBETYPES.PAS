@@ -1,4 +1,4 @@
-unit AplVbe;
+unit VbeTypes;
 
 interface
 

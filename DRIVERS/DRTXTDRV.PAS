@@ -1,5 +1,5 @@
 {$I COMPILER.INC}
-unit AplDirTx;
+unit DrTxtDrv;
 
 interface
 
@@ -7,12 +7,12 @@ uses
   AplObj,
   AplTypes,
   AplMath,
-  AplLists,
+  Lists,
   AplUtils,
-  AplStrms,
-  AplDraw,
+  Streams,
+  Drawing,
   AplStr,
-  AplTxtTp,
+  TextType,
   AplText,
   Dos,
   Strings;
@@ -46,9 +46,6 @@ type
   end;
 
 implementation
-
-uses
- Crt;
 
 const
   ColorScreen: PByte = Ptr($B800, $0000);

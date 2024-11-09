@@ -1,5 +1,5 @@
 {$I COMPILER.INC}
-unit AplGrap8;
+unit GrDrv8;
 
 interface
 
@@ -7,15 +7,15 @@ uses
   AplTypes,
   AplObj,
   AplUtils,
-  AplDraw,
-  AplLists,
+  Drawing,
+  Lists,
   AplConst,
   AplMath,
   AplStr,
-  AplMouse,
-  AplGraph,
-  AplMem,
-  AplPal,
+  MouseDrv,
+  Graphics,
+  MemDrv,
+  Palettes,
   Strings;
 
 type

@@ -1,11 +1,11 @@
 {$I COMPILER.INC}
-unit AplDraw;
+unit Drawing;
 
 interface
 
 uses
   AplObj,
-  AplLists,
+  Lists,
   AplMath,
   AplUtils;
 

@@ -1,5 +1,5 @@
 {$I COMPILER.INC}
-unit AplAct;
+unit Actions;
 
 interface
 
@@ -7,10 +7,10 @@ uses
   AplObj,
   AplTypes,
   AplStr,
-  AplMouse,
+  MouseDrv,
   AplMath,
   AplUtils,
-  AplLists;
+  Lists;
 
 type
   PAction = ^TAction;

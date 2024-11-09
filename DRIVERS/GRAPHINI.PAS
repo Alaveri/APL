@@ -1,12 +1,12 @@
 {$I COMPILER.INC}
-unit AplGrIni;
+unit GraphIni;
 
 interface
 
 uses
-  AplGraph,
+  Graphics,
   AplSVga8,
-  AplVga8;
+  Vga8Drv;
 
 type
   TGraphDrivers =

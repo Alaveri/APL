@@ -1,12 +1,12 @@
 {$I COMPILER.INC}
-unit AplMouse;
+unit MouseDrv;
 
 interface
 
 uses
   AplObj,
   AplTypes,
-  AplLists;
+  Lists;
 
 type
   PMouseDriver = ^TMouseDriver;
@@ -44,7 +44,7 @@ destructor TMouseDriver.Free;
 var
   index: integer;
 begin
-  StateStack.DisposeObjects := true;
+  StateStack.DisposeAplObj := true;
   StateStack.Free;
   State.Free;
   inherited Free;
@@ -74,6 +74,8 @@ end;
 
 procedure TMouseDriver.ShowMouse;
 begin;
+  if State.Visible then
+    exit;
   State.Visible := true;
   if not UseSystemCursor then
     exit;
@@ -85,6 +87,8 @@ end;
 
 procedure TMouseDriver.HideMouse;
 begin;
+  if not State.Visible then
+    exit;
   State.Visible := false;
   if not UseSystemCursor then
     exit;
