@@ -1,11 +1,11 @@
 {$I COMPILER.INC}
-unit AplUndo;
+unit Undo;
 
 interface
 
 uses
   AplObj,
-  AplLists;
+  Lists;
 
 type
   PUndoStack = ^TUndoStack;

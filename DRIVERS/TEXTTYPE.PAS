@@ -1,12 +1,12 @@
 {$I COMPILER.INC}
-unit AplTxtTp;
+unit TextType;
 
 interface
 
 uses
   AplObj,
   AplConst,
-  AplDraw;
+  Drawing;
 
 type
   PTextState = ^TTextState;
@@ -239,8 +239,8 @@ const
   StandardBorderChars: TBorderChars =
   (
     (#32, #32, #32, #32, #32, #32, #32, #32),
-    (#218, #191, #192, #217, #186, #205, #186, #205),
-    (#201, #187, #200, #188, #179, #196, #179, #196)
+    (#218, #191, #192, #217, #179, #196, #179, #196),
+    (#201, #187, #200, #188, #186, #205, #186, #205)
   );
 
   EnhancedBorderChars: TBorderChars =

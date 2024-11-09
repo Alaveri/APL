@@ -1,5 +1,5 @@
 {$I COMPILER.INC}
-unit AplStrms;
+unit Streams;
 
 interface
 
@@ -8,11 +8,11 @@ uses
   AplObj,
   AplTypes,
   AplConst,
-  AplDates,
+  DateTime,
   AplMath,
   AplUtils,
-  AplLists,
-  AplMem;
+  Lists,
+  MemDrv;
 
 type
   PStream = ^TStream;

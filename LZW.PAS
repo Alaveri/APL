@@ -1,14 +1,14 @@
 {$I COMPILER.INC}
-unit AplLzw;
+unit Lzw;
 
 interface
 
 uses
   AplTypes,
   AplObj,
-  AplCompr,
+  Compress,
   AplConst,
-  AplStrms,
+  Streams,
   AplUtils;
 
 type
@@ -75,7 +75,7 @@ type
     procedure SetCompressionLevel(ALevel: TCompressionLevel); virtual;
   end;
 
-procedure SetAplLzwCodes(var ACodes: TLzwCodes; ABitSize: byte); far;
+procedure SetLzwCodes(var ACodes: TLzwCodes; ABitSize: byte); far;
 procedure SetGifLzwCodes(var ACodes: TLzwCodes; ABitSize: byte); far;
 
 const
@@ -83,7 +83,7 @@ const
 
 implementation
 
-procedure SetAplLzwCodes(var ACodes: TLzwCodes; ABitSize: byte);
+procedure SetLzwCodes(var ACodes: TLzwCodes; ABitSize: byte);
 begin
   ACodes.EndOfStream := 256;
   ACodes.IncreaseCodeSize := 257;
@@ -249,7 +249,7 @@ begin
   if Assigned(SetLzwCodesProc) then
     TSetLzwCodesProc(SetLzwCodesProc)(FCodes, BitSize)
   else
-    SetAplLzwCodes(FCodes, BitSize);
+    SetLzwCodes(FCodes, BitSize);
 
   if BitSize = 12 then
     FDictEntries := 5021

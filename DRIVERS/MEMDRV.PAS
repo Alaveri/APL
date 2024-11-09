@@ -1,5 +1,5 @@
 {$I COMPILER.INC}
-unit AplMem;
+unit MemDrv;
 
 interface
 
@@ -9,7 +9,7 @@ uses
   AplConst,
   AplUtils,
   AplMath,
-  AplLists;
+  Lists;
 
 type
   PReferenceList = ^TReferenceList;
