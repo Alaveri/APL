@@ -60,7 +60,6 @@ function ChangeDirectory(const ADirectory: string): boolean;
 function StringsEqualInsensitive(const AString1, AString2: string): boolean;
 function HasWildcard(const AFilename: string): boolean;
 function IsDirectory(const AFilename: string): boolean;
-procedure FreeAndNilMem(var APtr; ASize: word);
 
 var
   WhiteSpaceChars: set of char;
@@ -462,18 +461,6 @@ begin
     aLong := aLong div 1000;
   end;
   FormatLong := result;
-end;
-
-procedure FreeAndNilMem(var APtr; ASize: word);
-var
-  ptr: pointer;
-  pointerPtr: PPointer;
-begin
-  ptr := pointer(APtr);
-  if Assigned(ptr) then
-     FreeMem(ptr, ASize);
-  pointerPtr := @Ptr;
-  pointerPtr^ := nil;
 end;
 
 function FileExists(const AFilename: string): boolean;

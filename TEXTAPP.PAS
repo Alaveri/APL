@@ -12,7 +12,7 @@ uses
   KeyDrv,
   AplUtils,
   TextType,
-  AplText,
+  TextDrv,
   TextIni;
 
 type

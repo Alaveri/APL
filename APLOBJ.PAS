@@ -13,6 +13,7 @@ type
   PException = ^TException;
   PIdentifiable = ^TIdentifiable;
   PStatusObject = ^TStatusObject;
+  PStringBuilder = ^TStringBuilder;
 
   TComparer = function(AItem1, AItem2: pointer): integer;
   TPredicate = function(AItem: pointer; var AValue): boolean;
@@ -86,6 +87,32 @@ type
     function NilPtrSeverity(APtr: pointer; ACode: TExceptionCode;
       ASeverity: TExceptionSeverity): boolean;
     destructor Free; virtual;
+  end;
+
+  TStringBuilder = object(TStatusObject)
+  private
+    FBuffer: PChar;
+    FLength: word;
+    FCapacity: word;
+    procedure SetCapacity(ACapacity: word);
+    function Grow(AMin: word): word;
+  public
+    constructor Create;
+    constructor CreateCapacity(ACapacity: word);
+    destructor Free; virtual;
+    procedure Init; virtual;
+    function Append(AString: PChar): PStringBuilder;
+    function AppendString(const AString: string): PStringBuilder;
+    function AppendBuilder(const AStringBuilder: TStringBuilder): PStringBuilder;
+    function AppendChar(AChar: char): PStringBuilder;
+    function AppendLine(AString: PChar): PStringBuilder;
+    function AppendLineString(const AString: string): PStringBuilder;
+    function Clear: PStringBuilder;
+    function ToPChar: PChar;
+    function ToString: string;
+    function AsPChar: PChar;
+    function Length: word;
+    function Capacity: word;
   end;
 
 procedure FreeAndNil(var AObject); far;
@@ -354,6 +381,179 @@ begin
   inherited Init;
   Exception := nil;
   Status := sOk;
+end;
+
+constructor TStringBuilder.Create;
+begin
+  inherited Create;
+end;
+
+constructor TStringBuilder.CreateCapacity(ACapacity: word);
+begin
+  inherited Create;
+  SetCapacity(ACapacity);
+end;
+
+procedure TStringBuilder.Init;
+begin
+  FBuffer := nil;
+  FLength := 0;
+  FCapacity := 0;
+end;
+
+destructor TStringBuilder.Free;
+begin
+  if Assigned(FBuffer) then
+    FreeMem(FBuffer, FCapacity);
+  inherited Free;
+end;
+
+procedure TStringBuilder.SetCapacity(ACapacity: word);
+var
+  newBuffer: PChar;
+begin
+  if ACapacity = FCapacity then
+    exit;
+  if ACapacity = 0 then begin
+    if Assigned(FBuffer) then
+      FreeMem(FBuffer, FCapacity);
+    FBuffer := nil;
+    FCapacity := 0;
+    exit;
+  end;
+  if not Assigned(FBuffer) then begin
+    GetMem(FBuffer, ACapacity);
+    if not NilPtr(FBuffer, ecNotEnoughMemory) then
+      FCapacity := ACapacity;
+    exit;
+  end;
+  GetMem(newBuffer, ACapacity);
+  FillChar(newBuffer^, ACapacity, 0);
+  if NilPtr(newBuffer, ecNotEnoughMemory) then
+    exit;
+  if ACapacity < FCapacity then
+    Move(FBuffer^, newBuffer^, ACapacity)
+  else
+    Move(FBuffer^, newBuffer^, FCapacity);
+  FCapacity := ACapacity;
+end;
+
+function TStringBuilder.Grow(AMin: word): word;
+var
+  newCapacity: integer;
+begin
+  newCapacity := 0;
+  while newCapacity < AMin do begin
+    if newCapacity > 64 then
+      newCapacity := (newCapacity * 3) div 2
+    else if newCapacity >= 8 then
+      Inc(newCapacity, 16)
+    else
+      Inc(newCapacity, 4);
+  end;
+  SetCapacity(newCapacity);
+  Grow := newCapacity;
+end;
+
+function TStringBuilder.Append(AString: PChar): PStringBuilder;
+var
+  len: word;
+  cap: word;
+begin
+  if not Assigned(AString) then
+    exit;
+  len := StrLen(AString);
+  if len = 0 then
+    exit;
+  cap := FLength + len;
+  if cap > FCapacity then
+    Grow(cap);
+  Move(AString^, FBuffer[FLength], len);
+  Inc(FLength, len);
+  Append := @Self;
+end;
+
+function TStringBuilder.AppendString(const AString: string): PStringBuilder;
+var
+  len: word;
+  cap: word;
+  str: PChar;
+begin
+  len := System.Length(AString);
+  if System.Length(AString) = 0 then
+    exit;
+  cap := FLength + len;
+  if cap > FCapacity then
+    Grow(cap);
+  str := @AString[1];
+  Move(str^, FBuffer[FLength], len);
+  Inc(FLength, len);
+  AppendString := @Self;
+end;
+
+function TStringBuilder.AppendBuilder(const AStringBuilder: TStringBuilder): PStringBuilder;
+begin
+  AppendBuilder := Append(AStringBuilder.FBuffer);
+end;
+
+function TStringBuilder.AppendChar(AChar: char): PStringBuilder;
+begin
+  AppendChar := Append(@AChar);
+end;
+
+function TStringBuilder.AppendLine(AString: PChar): PStringBuilder;
+var
+  str: array[0..1] of char;
+begin
+  str := #13#10;
+  AppendLine := Append(AString);
+  Append(@str);
+end;
+
+function TStringBuilder.AppendLineString(const AString: string): PStringBuilder;
+begin
+  AppendLineString := AppendString(AString);
+  AppendChar(#13);
+  AppendChar(#10);
+end;
+
+function TStringBuilder.Clear: PStringBuilder;
+begin
+  SetCapacity(0);
+  FLength := 0;
+  Clear := @Self;
+end;
+
+function TStringBuilder.ToPChar: PChar;
+var
+  str: PChar;
+begin
+  GetMem(str, FLength + 1);
+  FillChar(str^, FLength + 1, 0);
+  if NilPtr(str, ecNotEnoughMemory) then
+    exit;
+  StrLCopy(str, FBuffer, FLength);
+  ToPChar := FBuffer;
+end;
+
+function TStringBuilder.ToString: string;
+begin
+  ToString := StrPas(ToPChar);
+end;
+
+function TStringBuilder.AsPChar: PChar;
+begin
+  AsPChar := FBuffer;
+end;
+
+function TStringBuilder.Length: word;
+begin
+  Length := FLength;
+end;
+
+function TStringBuilder.Capacity: word;
+begin
+  Capacity := FCapacity;
 end;
 
 var

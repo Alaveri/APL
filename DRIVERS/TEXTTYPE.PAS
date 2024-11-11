@@ -11,6 +11,7 @@ uses
 type
   PTextState = ^TTextState;
   PTextMode = ^TTextMode;
+  PTextChar = ^TTextChar;
 
   TTextDrivers =
   (
@@ -67,9 +68,9 @@ type
   public
     ForeColor, BackColor: byte;
     Blink: boolean;
-    Attributes: byte;
     IsCursorOn: boolean;
     ViewPort: TRect;
+    function Attributes: byte;
     procedure Init; virtual;
     procedure Assign(var ASource: TObject); virtual;
   end;
@@ -265,7 +266,6 @@ begin
   ForeColor := 0;
   BackColor := 0;
   Blink := false;
-  Attributes := 0;
   IsCursorOn := true;
   ViewPort.Create;
 end;
@@ -279,9 +279,13 @@ begin
   ForeColor := state^.ForeColor;
   BackColor := state^.BackColor;
   Blink := state^.Blink;
-  Attributes := state^.Attributes;
   IsCursorOn := state^.IsCursorOn;
   ViewPort.SetRect(state^.ViewPort);
+end;
+
+function TTextState.Attributes: byte;
+begin
+  Attributes := (ForeColor and $0F) or ((BackColor and $0F) shl 4) or (byte(Blink) shl 7);
 end;
 
 procedure TTextMode.Init;

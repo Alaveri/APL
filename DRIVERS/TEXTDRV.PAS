@@ -66,7 +66,6 @@ type
     procedure GetImageStreamRect(var ARect: TRect; AStream: PStream); virtual;
     procedure SetForeColor(AColor: byte); virtual;
     procedure SetBackColor(AColor: byte); virtual;
-    procedure SetBlink(ABlink: boolean); virtual;
     procedure SetXY(AXPos, AYPos: byte); virtual;
     procedure ScrollText; virtual;
     procedure CursorOn; virtual;
@@ -85,12 +84,24 @@ type
     procedure ClrScr; virtual;
     procedure ShowMouseCursor; virtual;
     procedure HideMouseCursor; virtual;
-    procedure SetAttribute(AXPos, AYPos: byte; AAttribute: byte); virtual;
     procedure ClearLine; virtual;
+    procedure SetScreenForeColor(APX, APY: byte; AColor: byte); virtual;
+    procedure SetScreenBackColor(APX, APY: byte; AColor: byte); virtual;
+    procedure SetBlink(ABlink: boolean); virtual;
+    procedure SetScreenAttributes(APX, APY: byte; AAttributes: byte); virtual;
+    procedure GetTextChar(APX, APY: byte; var AChar: TTextChar); virtual;
+    procedure SetTextChar(APX, APY: byte; AChar: TTextChar); virtual;
+    procedure SetChar(APX, APY: byte; AChar: char); virtual;
+    procedure SetScreenBlink(AXPos, AYPos: byte; ABlink: boolean);
+    function GetScreenBackColor(APX, APY: byte): byte; virtual;
+    function GetScreenForeColor(APX, APY: byte): byte; virtual;
     function ForeColor: byte; virtual;
     function BackColor: byte; virtual;
     function CheckBounds(AXPos, AYPos, ALength: byte; var ADrawRect: TRect): boolean;
-    function GetTextAttributes(AForeColor, ABackColor: byte; ABlink: boolean): byte; virtual;
+    function GetAttributes(AForeColor, ABackColor: byte; ABlink: boolean): byte; virtual;
+    function GetScreenAttributes(AXPos, AYPos: byte): byte; virtual;
+    function GetChar(APX, APY: byte): char; virtual;
+    function GetScreenBlink(APX, APY: byte): boolean; virtual;
   end;
 
 var
@@ -222,7 +233,7 @@ begin
   if YPos > Mode^.Bounds.Bottom then
     ScrollText;
   SetXY(XPos, YPos);
-  SetAttribute(XPos, YPos, GetTextAttributes(State^.ForeColor, State^.BackColor, State^.Blink));
+  SetScreenAttributes(XPos, YPos, GetAttributes(State^.ForeColor, State^.BackColor, State^.Blink));
 end;
 
 procedure TTextDriver.WriteText(AXPos, AYPos: byte; AText: PChar; ALength: word);
@@ -236,7 +247,7 @@ begin
   Inc(YPos);
   if YPos > Mode^.Bounds.Bottom then
     ScrollText;
-  SetAttribute(XPos, YPos, GetTextAttributes(State^.ForeColor, State^.BackColor, State^.Blink));
+  SetScreenAttributes(XPos, YPos, GetAttributes(State^.ForeColor, State^.BackColor, State^.Blink));
 end;
 
 procedure TTextDriver.DrawImage(AXPos, AYPos, AWidth, AHeight: byte; AImage: PByte);
@@ -287,9 +298,45 @@ procedure TTextDriver.GetImageStreamRect(var ARect: TRect; AStream: PStream);
 begin
 end;
 
-function TTextDriver.GetTextAttributes(AForeColor, ABackColor: byte; ABlink: boolean): byte;
+procedure TTextDriver.SetTextChar(APX, APY: byte; AChar: TTextChar);
 begin
-  GetTextAttributes := (AForeColor and $0F) or ((ABackColor and $0F) shl 4) or (byte(ABlink) shl 7);
+end;
+
+procedure TTextDriver.GetTextChar(APX, APY: byte; var AChar: TTextChar);
+begin
+end;
+
+function TTextDriver.GetChar(APX, APY: byte): char;
+begin
+end;
+
+procedure TTextDriver.SetChar(APX, APY: byte; AChar: char);
+begin
+end;
+
+function TTextDriver.GetScreenBackColor(APX, APY: byte): byte;
+begin
+  GetScreenBackColor := 0;
+end;
+
+function TTextDriver.GetScreenForeColor(APX, APY: byte): byte;
+begin
+end;
+
+procedure TTextDriver.SetScreenForeColor(APX, APY: byte; AColor: byte);
+begin
+end;
+
+procedure TTextDriver.SetScreenBackColor(APX, APY: byte; AColor: byte);
+begin
+end;
+
+procedure TTextDriver.SetBlink(ABlink: boolean);
+begin
+end;
+
+procedure TTextDriver.SetScreenBlink(AXPos, AYPos: byte; ABlink: boolean);
+begin
 end;
 
 procedure TTextDriver.SetForeColor(AColor: byte);
@@ -297,14 +344,28 @@ begin
   State^.ForeColor := AColor;
 end;
 
-procedure TTextDriver.SetBlink(ABlink: boolean);
-begin
-  State^.Blink := ABlink;
-end;
-
 procedure TTextDriver.SetBackColor(AColor: byte);
 begin
   State^.BackColor := AColor;
+end;
+
+function TTextDriver.GetScreenAttributes(AXPos, AYPos: byte): byte;
+begin
+  GetScreenAttributes := 0;
+end;
+
+function TTextDriver.GetAttributes(AForeColor, ABackColor: byte; ABlink: boolean): byte;
+begin
+  GetAttributes := (AForeColor and $0F) or ((ABackColor and $0F) shl 4) or (byte(ABlink) shl 7);
+end;
+
+procedure TTextDriver.SetScreenAttributes(APX, APY: byte; AAttributes: byte);
+begin
+end;
+
+function TTextDriver.GetScreenBlink(APX, APY: byte): boolean;
+begin
+  GetScreenBlink := false;
 end;
 
 procedure TTextDriver.CursorOn;
@@ -424,10 +485,6 @@ procedure TTextDriver.ClrScr;
 begin
   XPos := 0;
   YPos := 0;
-end;
-
-procedure TTextDriver.SetAttribute(AXPos, AYPos: byte; AAttribute: byte);
-begin
 end;
 
 procedure TTextDriver.FillRect(ARect: TRect; AChar: char);
