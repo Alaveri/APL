@@ -35,12 +35,12 @@ type
     Enabled: boolean;
     OnExecute: PActionExecuteProc;
     ModalResult: TModalResult;
-    Owner: PObject;
     OnUpdate: PActionUpdateProc;
     constructor Create(AActionId: integer; AText: string; AShortcut: word);
     constructor CreateEmpty;
     procedure SetHelpText(AHelpText: string); virtual;
     procedure SetText(AText: string); virtual;
+    procedure Execute(ASender: PObject); virtual;
     destructor Free; virtual;
     procedure Init; virtual;
   end;
@@ -86,7 +86,6 @@ begin
   Enabled := true;
   OnExecute := nil;
   ModalResult := mrNone;
-  Owner := nil;
 end;
 
 destructor TAction.Free;
@@ -105,6 +104,13 @@ end;
 procedure TAction.SetText(AText: string);
 begin
   TString.AssignString(Text, AText);
+end;
+
+procedure TAction.Execute(ASender: PObject);
+begin
+  if Assigned(OnExecute) then begin
+    TActionExecuteProc(OnExecute)(ASender, @Self);
+  end;
 end;
 
 function TActionList.NewAction(AActionId: integer; AText: string;
