@@ -125,6 +125,8 @@ type
     procedure SetDims(AX, AY, AWidth, AHeight: integer);
     procedure SetCoords(AX, AY, ARight, ABottom: integer);
     procedure SetRect(ARect: TRect);
+    procedure SetSize(AWidth, AHeight: integer);
+    procedure SetXY(AX, AY: integer);
     procedure Assign(var ASource: TObject); virtual;
     procedure SetRight(ARight: integer);
     procedure SetBottom(ABottom: integer);
@@ -321,6 +323,18 @@ begin
   Y := AY;
   Width := ARight - AX + 1;
   Height := ABottom - AY + 1;
+end;
+
+procedure TRect.SetSize(AWidth, AHeight: integer);
+begin
+  Width := AWidth;
+  Height := AHeight;
+end;
+
+procedure TRect.SetXY(AX, AY: integer);
+begin
+  X := AX;
+  Y := AY;
 end;
 
 procedure TRect.Grow(ADW, ADH: integer);

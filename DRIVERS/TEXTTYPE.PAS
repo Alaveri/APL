@@ -251,7 +251,6 @@ const
     (#201, #187, #200, #188, #179, #196, #179, #196)
   );
 
-
 var
   BorderChars: TBorderChars;
 

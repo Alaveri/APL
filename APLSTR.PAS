@@ -19,8 +19,8 @@ type
     function New(ASource: string): PChar;
     function CompareLength(AStr1, AStr2: PChar; AMaxLength: word; ACompareOptions: TStringCompareOptions): integer;
     function Compare(AStr1, AStr2: PChar; ACompareOptions: TStringCompareOptions): integer;
-    function CompareShort(AStr1: string; AStr2: PChar; ACompareOptions: TStringCompareOptions): integer;
-    function AppendShort(AStr1: PChar; const AStr2: string): PChar;
+    function CompareString(AStr1: string; AStr2: PChar; ACompareOptions: TStringCompareOptions): integer;
+    function AppendString(AStr1: PChar; const AStr2: string): PChar;
     function Append(var AStr1: PChar; AStr2: PChar): PChar;
     function Copy(ASource: PChar): PChar;
     function CopyLength(ASource: PChar; AMaxLength: word): PChar;
@@ -65,12 +65,12 @@ begin
   New := dest;
 end;
 
-function TStringUtil.AppendShort(AStr1: PChar; const AStr2: string): PChar;
+function TStringUtil.AppendString(AStr1: PChar; const AStr2: string): PChar;
 var
   str: PChar;
   short: string;
 begin
-  AppendShort := nil;
+  AppendString := nil;
   if not Assigned(AStr1) or (System.Length(AStr2) = 0) then
     exit;
   GetMem(str, StrLen(AStr1) + System.Length(AStr2) + 1);
@@ -78,7 +78,7 @@ begin
     exit;
   short := AStr2 + #0;
   str := StrCat(AStr1, @short[1]);
-  AppendShort := str;
+  AppendString := str;
 end;
 
 function TStringUtil.Append(var AStr1: PChar; AStr2: PChar): PChar;
@@ -171,14 +171,14 @@ begin
     Compare := StrComp(AStr1, AStr2);
 end;
 
-function TStringUtil.CompareShort(AStr1: string; AStr2: PChar;
+function TStringUtil.CompareString(AStr1: string; AStr2: PChar;
   ACompareOptions: TStringCompareOptions): integer;
 var
   str: PChar;
 begin
   AStr1 := AStr1 + #0;
   str := @AStr1[1];
-  CompareShort := Compare(str, AStr2, ACompareOptions);
+  CompareString := Compare(str, AStr2, ACompareOptions);
 end;
 
 procedure TStringUtil.AssignString(var ADest: PChar; ASource: string);
