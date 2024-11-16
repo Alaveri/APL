@@ -34,6 +34,7 @@ type
     procedure AssignString(var ADest: PChar; ASource: string);
   end;
 
+
 var
   TString: TStringUtil;
 

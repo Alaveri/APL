@@ -149,7 +149,6 @@ begin
     if AXPos > right then
       break;
   end;
-  SetXY(AXPos, AYPos);
 end;
 
 procedure TDirectTextDriver.WriteText(AXPos, AYPos: byte; AText: PChar; ALength: word);
@@ -160,10 +159,10 @@ var
   ch, attr: char;
   x1, x2: byte;
 begin
-  XPos := Clamp(AXPos, Mode^.Bounds.X, Mode^.Bounds.Right);
-  YPos := Clamp(AYPos, Mode^.Bounds.Y, Mode^.Bounds.Bottom);
+  State^.CursorX := Clamp(AXPos, Mode^.Bounds.X, Mode^.Bounds.Right);
+  State^.CursorY := Clamp(AYPos, Mode^.Bounds.Y, Mode^.Bounds.Bottom);
   screenPtr := PChar(CurrentScreen);
-  Inc(screenPtr, 2 * (YPos * Mode^.Width + XPos));
+  Inc(screenPtr, 2 * (State^.CursorY * Mode^.Width + State^.CursorX));
   attr := Chr(State^.Attributes);
   index := 0;
   while index < ALength do begin
@@ -173,19 +172,20 @@ begin
     Inc(screenPtr);
     screenPtr^ := attr;
     Inc(screenPtr);
-    Inc(XPos);
-    if XPos > Mode^.Bounds.Right then begin
-      XPos := Mode^.Bounds.X;
-      Inc(YPos);
-      if YPos > Mode^.Bounds.Bottom then begin
+    Inc(State^.CursorX);
+    if State^.CursorX > Mode^.Bounds.Right then begin
+      State^.CursorX := Mode^.Bounds.X;
+      Inc(State^.CursorY);
+      if State^.CursorY > Mode^.Bounds.Bottom then begin
         ScrollText;
-        YPos := Mode^.Bounds.Bottom;
+        State^.CursorY := Mode^.Bounds.Bottom;
       end;
       screenPtr := PChar(CurrentScreen);
-      Inc(screenPtr, 2 * (YPos * Mode^.Width + XPos));
+      Inc(screenPtr, 2 * (State^.CursorY * Mode^.Width + State^.CursorX));
     end;
   end;
-  SetScreenAttributes(XPos, YPos, GetAttributes(State^.ForeColor, State^.BackColor, State^.Blink));
+  SetScreenAttributes(State^.CursorX, State^.CursorY,
+    GetAttributes(State^.ForeColor, State^.BackColor, State^.Blink));
 end;
 
 procedure TDirectTextDriver.ClearLine;
@@ -194,7 +194,7 @@ var
   index: integer;
 begin
   screenPtr := CurrentScreen;
-  Inc(screenPtr, 2 * (YPos * Mode^.Width + Mode^.Bounds.X));
+  Inc(screenPtr, 2 * (State^.CursorY * Mode^.Width + Mode^.Bounds.X));
   for index := Mode^.Bounds.X to Mode^.Bounds.Right do begin
     screenPtr^ := 32;
     Inc(screenPtr, 2);

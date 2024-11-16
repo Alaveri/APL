@@ -128,6 +128,7 @@ const
   { System errors }
   ecNullParameter = 1101;
   ecInvalidOperation = 1102;
+  ecInvalidArgument = 1103;
 
   { User defined errors }
   ecUser = 5000;
@@ -202,6 +203,7 @@ begin
     ecFileInvalidVersion: ErrorMessage := 'Unsupported file version';
     ecNullParameter: ErrorMessage := 'Null parameter';
     ecInvalidOperation: ErrorMessage := 'Invalid operation';
+    ecInvalidArgument: ErrorMessage := 'Invalid argument';
     ecUnsupportedPaletteFormat: ErrorMessage := 'Unsupported palette format';
     ecInvalidPalette: ErrorMessage := 'Invalid palette';
     ecCompressionBitSizeError: ErrorMessage := 'Compression bit size too large';

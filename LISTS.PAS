@@ -125,7 +125,6 @@ type
     procedure SetItem(AIndex: integer; AItem: PObject);
     procedure Insert(AIndex: integer; AItem: PObject);
     procedure Remove(AIndex: integer); virtual;
-    procedure RemovePtr(AItem: pointer); virtual;
     procedure RemoveItem(AItem: PObject);
     procedure Delete(AIndex: integer); virtual;
     procedure Clear; virtual;
@@ -681,18 +680,13 @@ begin
   inherited Delete(AIndex);
 end;
 
-procedure TObjectList.RemovePtr(AItem: pointer);
+procedure TObjectList.RemoveItem(AItem: PObject);
 var
   index: integer;
 begin
   index := IndexOf(AItem);
   if index >= 0 then
-    inherited Delete(index);
-end;
-
-procedure TObjectList.RemoveItem(AItem: PObject);
-begin
-  RemovePtr(AItem);
+    Remove(index);
 end;
 
 destructor TObjectList.Free;

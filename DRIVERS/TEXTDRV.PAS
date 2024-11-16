@@ -44,7 +44,6 @@ type
     StateStack: TObjectStack;
     BppMode: byte;
     StartMode: integer;
-    XPos, YPos: byte;
     destructor Free; virtual;
     procedure PushState; virtual;
     procedure PopState; virtual;
@@ -168,7 +167,7 @@ begin
     exit;
   State^.Assign(oldState^);
   FreeAndNil(oldState);
-  SetXY(XPos, YPos);
+  SetXY(State^.CursorX, State^.CursorY);
   if State^.IsCursorOn then
     CursorOn
   else
@@ -177,8 +176,10 @@ end;
 
 procedure TTextDriver.SetXY(AXPos, AYPos: byte);
 begin
-  XPos := AXPos;
-  YPos := AYPos;
+  if (State^.CursorX = AXPos) and (State^.CursorY = AYPos) then
+    exit;
+  State^.CursorX := AXPos;
+  State^.CursorY := AYPos;
 end;
 
 function TTextDriver.CheckBounds(AXPos, AYPos, ALength: byte; var ADrawRect: TRect): boolean;
@@ -217,23 +218,24 @@ end;
 
 procedure TTextDriver.Write(const AText: string);
 begin
-  WriteText(XPos, YPos, @AText[1], Length(AText));
+  WriteText(State^.CursorX, State^.CursorY, @AText[1], Length(AText));
 end;
 
 procedure TTextDriver.WriteLarge(AText: PChar);
 begin
-  WriteText(XPos, YPos, AText, StrLen(AText));
+  WriteText(State^.CursorX, State^.CursorY, AText, StrLen(AText));
 end;
 
 procedure TTextDriver.WriteLn(const AText: string);
 begin
-  WriteText(XPos, YPos, @AText[1], Length(AText));
-  XPos := 0;
-  Inc(YPos);
-  if YPos > Mode^.Bounds.Bottom then
+  WriteText(State^.CursorX, State^.CursorY, @AText[1], Length(AText));
+  State^.CursorX := 0;
+  Inc(State^.CursorY);
+  if State^.CursorY > Mode^.Bounds.Bottom then
     ScrollText;
-  SetXY(XPos, YPos);
-  SetScreenAttributes(XPos, YPos, GetAttributes(State^.ForeColor, State^.BackColor, State^.Blink));
+  SetXY(State^.CursorX, State^.CursorY);
+  SetScreenAttributes(State^.CursorX, State^.CursorY,
+    GetAttributes(State^.ForeColor, State^.BackColor, State^.Blink));
 end;
 
 procedure TTextDriver.WriteText(AXPos, AYPos: byte; AText: PChar; ALength: word);
@@ -242,12 +244,13 @@ end;
 
 procedure TTextDriver.WriteLnLarge(AText: PChar);
 begin
-  WriteText(XPos, YPos, AText, StrLen(AText));
-  XPos := 0;
-  Inc(YPos);
-  if YPos > Mode^.Bounds.Bottom then
+  WriteText(State^.CursorX, State^.CursorY, AText, StrLen(AText));
+  State^.CursorX := 0;
+  Inc(State^.CursorY);
+  if State^.CursorY > Mode^.Bounds.Bottom then
     ScrollText;
-  SetScreenAttributes(XPos, YPos, GetAttributes(State^.ForeColor, State^.BackColor, State^.Blink));
+  SetScreenAttributes(State^.CursorX, State^.CursorY,
+    GetAttributes(State^.ForeColor, State^.BackColor, State^.Blink));
 end;
 
 procedure TTextDriver.DrawImage(AXPos, AYPos, AWidth, AHeight: byte; AImage: PByte);
@@ -386,8 +389,6 @@ begin
   StateStack.Create;
   Mode := nil;
   BppMode := 4;
-  XPos := 0;
-  YPos := 0;
 end;
 
 procedure TTextDriver.Rectangle(ARect: TRect; ABorderStyle: TBorderStyle);
@@ -483,8 +484,8 @@ end;
 
 procedure TTextDriver.ClrScr;
 begin
-  XPos := 0;
-  YPos := 0;
+  State^.CursorX := 0;
+  State^.CursorY := 0;
 end;
 
 procedure TTextDriver.FillRect(ARect: TRect; AChar: char);

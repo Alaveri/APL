@@ -70,6 +70,7 @@ type
     Blink: boolean;
     IsCursorOn: boolean;
     ViewPort: TRect;
+    CursorX, CursorY: integer;
     function Attributes: byte;
     procedure Init; virtual;
     procedure Assign(var ASource: TObject); virtual;
@@ -264,6 +265,8 @@ procedure TTextState.Init;
 begin
   ForeColor := 0;
   BackColor := 0;
+  CursorX := 0;
+  CursorY := 0;
   Blink := false;
   IsCursorOn := true;
   ViewPort.Create;
@@ -278,6 +281,8 @@ begin
   ForeColor := state^.ForeColor;
   BackColor := state^.BackColor;
   Blink := state^.Blink;
+  CursorX := state^.CursorX;
+  CursorY := state^.CursorY;
   IsCursorOn := state^.IsCursorOn;
   ViewPort.SetRect(state^.ViewPort);
 end;

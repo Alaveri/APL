@@ -76,6 +76,7 @@ type
   TMemoryStream = object(TStream)
   private
     FReferences: PReferenceList;
+    procedure DeallocateReferences;
   public
     FreeBuffers: boolean;
     constructor Create(ASize: longint);
@@ -84,14 +85,12 @@ type
     function Read(ABuffer: pointer; ACount: longint): longint; virtual;
     function Write(ABuffer: pointer; ACount: longint): longint; virtual;
     function WriteToStream(AStream: PStream; ACount: longint): longint; virtual;
-    function ReadFromStream(AStream: PStream; ACount: longint): longint; virtual;
     function CanRead: boolean; virtual;
     function CanWrite: boolean; virtual;
     function CanSeek: boolean; virtual;
     function Fill(ACount: longint; AByte: byte): longint; virtual;
     function FillWord(ACount: longint; AWord: word): longint; virtual;
     function FillLong(ACount: longint; ALong: longint): longint; virtual;
-    procedure DeallocateReferences;
     procedure SetSize(ASize: longint);
     procedure Init; virtual;
   end;
@@ -119,7 +118,6 @@ type
     function Read(ABuffer: pointer; ACount: longint): longint; virtual;
     function Write(ABuffer: pointer; ACount: longint): longint; virtual;
     function WriteToStream(AStream: PStream; ACount: longint): longint; virtual;
-    function ReadFromStream(AStream: PStream; ACount: longint): longint; virtual;
     function CanRead: boolean; virtual;
     function CanWrite: boolean; virtual;
     function CanSeek: boolean; virtual;
@@ -287,6 +285,7 @@ end;
 
 function TStream.ReadFromStream(AStream: PStream; ACount: longint): longint;
 begin
+  AStream^.WriteToStream(@self, ACount);
 end;
 
 procedure TStream.Init;
@@ -694,11 +693,6 @@ begin
   WriteToStream := total;
 end;
 
-function TMemoryStream.ReadFromStream(AStream: PStream; ACount: longint): longint;
-begin
-  ReadFromStream := AStream^.WriteToStream(@self, ACount);
-end;
-
 procedure TMemoryStream.Init;
 begin
   inherited Init;
@@ -842,11 +836,6 @@ begin
   end;
   FreeMem(buffer, BufferSize);
   WriteToStream := total;
-end;
-
-function TFileStream.ReadFromStream(AStream: PStream; ACount: longint): longint;
-begin
-  ReadFromStream := AStream^.WriteToStream(@self, ACount);
 end;
 
 function TFileStream.CanRead: boolean;
