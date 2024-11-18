@@ -5,47 +5,148 @@ interface
 
 uses
   AplObj,
+  AplTypes,
   Lists,
   AplApps,
   Graphics,
   GrDrv8,
+  Drawing,
+  MouseDrv,
   GraphIni;
 
 type
   PGraphApp = ^TGraphApp;
+  PMouseCursor = ^TMouseCursor;
+  PMouseCursorList = ^TMouseCursorList;
+  PMouseCursorListProc = ^TMouseCursorListProc;
+  PAppState = ^TAppState;
+
+  TLargeMouseCursorImage = array[0..14, 0..7] of byte;
+  TSmallMouseCursorImage = array[0..8, 0..7] of byte;
+  TMouseCursorListProc = procedure(ASender: PMouseCursorList; AMouseCursor: PMouseCursor);
+
+  TAppState = object(TObject)
+  private
+  public
+    MouseCursor: PMouseCursor;
+    procedure Init; virtual;
+    procedure Assign(var ASource: TObject); virtual;
+  end;
+
+  TMouseCursor = object(TIdentifiable)
+  private
+    FBackData: PByte;
+    FBackBuffer: PByte;
+  public
+    Visible: boolean;
+    X, Y: integer;
+    OffsetX, OffsetY: integer;
+    Image: PByte;
+    Width, Height: word;
+    constructor Create(AId: string; AWidth, AHeight: integer; AImage: PByte);
+    destructor Free; virtual;
+    function BackBuffer: PByte;
+    function BackData: PByte;
+    procedure GetBounds(var ARect: TRect);
+    procedure Draw;
+    procedure Paint;
+    procedure Init; virtual;
+    procedure StoreBackground(AX, AY: integer);
+  end;
+
+  TMouseCursorList = object(TIdentifiableList)
+  private
+  public
+    function GetItem(AIndex: integer): PMouseCursor;
+    function GetItemById(const AId: string): PMouseCursor;
+    function Add(AItem: PMouseCursor): integer;
+    function IndexOf(AItem: PMouseCursor): integer;
+    procedure SetItem(AIndex: integer; AItem: PMouseCursor);
+    procedure Insert(AIndex: integer; AItem: PMouseCursor);
+    procedure Init; virtual;
+  end;
 
   TGraphApp = object(TApplication)
   private
+    FDriverId: TGraphDrivers;
   public
-    constructor Create;
+    AppState: PAppState;
+    MouseCursors: PMouseCursorList;
+    constructor Create(ADriverId: TGraphDrivers);
+    destructor Free; virtual;
+    function GetGraphicsModeId(AWidth, AHeight, ABpp: integer): integer;
+    function SetMode(AModeId: integer): boolean; virtual;
+    function CreateAppState: PAppState; virtual;
     procedure Init; virtual;
-    procedure InitGraphics(ADriverId: TGraphDrivers);
-    function SetMode(AModeId: integer): boolean;
-    function GetGraphicsModeId(AWidth: integer; AHeight: integer; ABpp: integer): integer;
+    procedure InitMouseCursors;
+    procedure ShowMouseCursor; virtual;
+    procedure HideMouseCursor; virtual;
+    procedure EraseMouseCursor(const AMouseState: TMouseState); virtual;
+    procedure DrawMouseCursor(const AMouseState: TMouseState); virtual;
+    procedure MoveMouseCursor(const AMouseState, AOldMouseState: TMouseState); virtual;
+    procedure RedrawMouseCursor(var AViewPort: TRect; const AMouseState: TMouseState);
   end;
+
+const
+  DefaultMouseCursor: TLargeMouseCursorImage =
+  (
+    ($0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($0F, $0F, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($0F, $00, $0F, $FF, $FF, $FF, $FF, $FF),
+    ($0F, $00, $00, $0F, $FF, $FF, $FF, $FF),
+    ($0F, $00, $00, $00, $0F, $FF, $FF, $FF),
+    ($0F, $00, $00, $00, $00, $0F, $FF, $FF),
+    ($0F, $00, $00, $00, $00, $00, $0F, $FF),
+    ($0F, $00, $00, $00, $00, $00, $00, $0F),
+    ($0F, $00, $00, $00, $00, $00, $00, $0F),
+    ($0F, $00, $00, $00, $0F, $0F, $0F, $FF),
+    ($0F, $00, $00, $0F, $FF, $FF, $FF, $FF),
+    ($FF, $0F, $0F, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF)
+  );
+
+  DefaultBeamMouseCursor: TLargeMouseCursorImage =
+  (
+    ($0F, $0F, $0F, $FF, $0F, $0F, $0F, $FF),
+    ($0F, $00, $00, $0F, $00, $00, $0F, $FF),
+    ($0F, $0F, $0F, $00, $0F, $0F, $0F, $FF),
+    ($FF, $FF, $0F, $00, $0F, $FF, $FF, $FF),
+    ($FF, $FF, $0F, $00, $0F, $FF, $FF, $FF),
+    ($FF, $FF, $0F, $00, $0F, $FF, $FF, $FF),
+    ($FF, $FF, $0F, $00, $0F, $FF, $FF, $FF),
+    ($FF, $FF, $0F, $00, $0F, $FF, $FF, $FF),
+    ($FF, $FF, $0F, $00, $0F, $FF, $FF, $FF),
+    ($FF, $FF, $0F, $00, $0F, $FF, $FF, $FF),
+    ($FF, $FF, $0F, $00, $0F, $FF, $FF, $FF),
+    ($FF, $FF, $0F, $00, $0F, $FF, $FF, $FF),
+    ($0F, $0F, $0F, $00, $0F, $0F, $0F, $FF),
+    ($0F, $00, $00, $0F, $00, $00, $0F, $FF),
+    ($0F, $0F, $0F, $FF, $0F, $0F, $0F, $FF)
+  );
 
 var
   Graph8: PGraphics8Driver;
 
 implementation
 
-constructor TGraphApp.Create;
+constructor TGraphApp.Create(ADriverId: TGraphDrivers);
 begin
   inherited Create;
-end;
-
-procedure TGraphApp.InitGraphics(ADriverId: TGraphDrivers);
-begin
+  FDriverId := ADriverId;
   GraphIni.InitGraphicsDriver(ADriverId);
   Graph8 := PGraphics8Driver(Graph);
 end;
 
-function TGraphApp.GetGraphicsModeId(AWidth: integer; AHeight: integer; ABpp: integer): integer;
+function TGraphApp.GetGraphicsModeId(AWidth, AHeight, ABpp: integer): integer;
 var
   mode: PGraphicsMode;
   index: integer;
 begin
   GetGraphicsModeId := -1;
+  if HasException then
+    exit;
   for index := 0 to Graph^.Modes.Count - 1 do begin
     mode := Graph^.Modes.GetItem(index);
     if (mode^.Width = AWidth) and (mode^.Height = AHeight) and (mode^.Bpp = ABpp) then begin
@@ -66,13 +167,238 @@ begin
     exit;
   end;
   Graph^.SetMode(mode);
-  if Graph^.HasException then
-    SetMode := false;
+  CheckReraise(Graph);
 end;
 
 procedure TGraphApp.Init;
 begin
   inherited Init;
+  AppState := CreateAppState;
+  InitMouseCursors;
+end;
+
+procedure TGraphApp.InitMouseCursors;
+var
+  cursor: PMouseCursor;
+  sens: integer;
+begin
+  MouseCursors := New(PMouseCursorList, Create);
+  cursor := New(PMouseCursor, Create('Default', 8, 15, @DefaultMouseCursor));
+  MouseCursors^.Add(cursor);
+  cursor := New(PMouseCursor, Create('Beam', 8, 15, @DefaultBeamMouseCursor));
+  cursor^.OffsetX := 4;
+  cursor^.OffsetY := 7;
+  MouseCursors^.Add(cursor);
+  AppState^.MouseCursor := MouseCursors^.GetItemById('Default');
+end;
+
+destructor TGraphApp.Free;
+begin
+  inherited Free;
+end;
+
+procedure TGraphApp.RedrawMouseCursor(var AViewPort: TRect;
+  const AMouseState: TMouseState);
+var
+  oldViewPort: TRect;
+  drawRect: TRect;
+begin
+  if not AppState^.MouseCursor^.Visible then
+    exit;
+  drawRect.CreateDims(AMouseState.X, AMouseState.Y,
+    AppState^.MouseCursor^.Width, AppState^.MouseCursor^.Height);
+  drawRect.Translate(-AppState^.MouseCursor^.OffsetX, -AppState^.MouseCursor^.OffsetY);
+  drawRect.Intersect(AViewPort);
+  if drawRect.IsEmpty then
+    exit;
+  Graph^.WaitForVSync;
+  AppState^.MouseCursor^.Draw;
+end;
+
+procedure TGraphApp.MoveMouseCursor(const AMouseState, AOldMouseState: TMouseState);
+var
+  oldRect, newRect: TRect;
+begin
+  if (not AppState^.MouseCursor^.Visible) or not (AMouseState.Visible) then
+    exit;
+  Graph^.WaitForVSync;
+  if Assigned(AppState^.MouseCursor^.FBackData) then
+    EraseMouseCursor(AOldMouseState);
+  DrawMouseCursor(AMouseState);
+end;
+
+procedure TGraphApp.EraseMouseCursor(const AMouseState: TMouseState);
+begin
+  if (not AppState^.MouseCursor^.Visible) or not (AMouseState.Visible) then
+    exit;
+  if Assigned(AppState^.MouseCursor^.FBackData) then begin
+    Graph^.DrawImage(
+      AMouseState.X - AppState^.MouseCursor^.OffsetX,
+      AMouseState.Y - AppState^.MouseCursor^.OffsetY,
+      AppState^.MouseCursor^.Width,
+      AppState^.MouseCursor^.Height,
+      AppState^.MouseCursor^.FBackData
+    );
+  end;
+end;
+
+procedure TGraphApp.DrawMouseCursor(const AMouseState: TMouseState);
+begin
+  if (not AppState^.MouseCursor^.Visible) or (not AMouseState.Visible) then
+    exit;
+  AppState^.MouseCursor^.StoreBackground(AMouseState.X, AMouseState.Y);
+  AppState^.MouseCursor^.X := AMouseState.X;
+  AppState^.MouseCursor^.Y := AMouseState.Y;
+  AppState^.MouseCursor^.Draw;
+end;
+
+procedure TGraphApp.ShowMouseCursor;
+begin
+  Graph^.State^.ViewPort.SetDims(0, 0, Graph^.Mode^.Width, Graph^.Mode^.Height);
+  Mouse.ShowMouse;
+  Mouse.UpdateState;
+  AppState^.MouseCursor^.Visible := true;
+  DrawMouseCursor(Mouse.State);
+end;
+
+procedure TGraphApp.HideMouseCursor;
+begin
+  if not AppState^.MouseCursor^.Visible then
+    exit;
+  Graph^.State^.ViewPort.SetDims(0, 0, Graph^.Mode^.Width, Graph^.Mode^.Height);
+  EraseMouseCursor(Mouse.State);
+  AppState^.MouseCursor^.Visible := false;
+  Mouse.HideMouse;
+end;
+
+function TGraphApp.CreateAppState: PAppState;
+begin
+  CreateAppState := New(PAppState, Create);
+end;
+
+constructor TMouseCursor.Create(AId: string; AWidth, AHeight: integer; AImage: PByte);
+begin
+  inherited CreateId(AId);
+  Width := AWidth;
+  Height := AHeight;
+  Image := AImage;
+  GetMem(FBackData, Width * Height);
+end;
+
+procedure TMouseCursor.Init;
+begin
+  inherited Init;
+  Width := 0;
+  Height := 0;
+  Visible := true;
+  Y := 0;
+  X := 0;
+  OffsetX := 0;
+  OffsetY := 0;
+  FBackData := nil;
+  FBackBuffer := nil;
+end;
+
+procedure TMouseCursor.Paint;
+begin
+  Graph^.DrawImageT(X - OffsetX, Y - OffsetY, Width, Height, Image);
+end;
+
+procedure TMouseCursor.Draw;
+begin
+  if not Visible then
+    exit;
+  Graph^.PushState;
+  Graph^.State^.ViewPort.SetRect(Graph^.State^.Bounds);
+  Paint;
+  Graph^.PopState;
+end;
+
+procedure TMouseCursor.GetBounds(var ARect: TRect);
+begin
+  ARect.CreateDims(X - OffsetX, Y - OffsetY, Width, Height);
+end;
+
+procedure TMouseCursor.StoreBackground(AX, AY: integer);
+var
+  rect: TRect;
+begin
+  Dec(AX, OffsetX);
+  Dec(AY, OffsetY);
+  rect.CreateDims(AX, AY, Width, Height);
+  Graph^.PushState;
+  Graph^.State^.ViewPort.SetRect(Graph^.State^.Bounds);
+  Graph^.GetImage(AX, AY, Width, Height, FBackData);
+  Graph^.PopState;
+end;
+
+destructor TMouseCursor.Free;
+begin
+  if Assigned(FBackData) then
+    FreeMem(FBackData, Width * Height);
+  if Assigned(FBackBuffer) then
+    FreeMem(FBackBuffer, Width * Height * 2);
+  inherited Free;
+end;
+
+function TMouseCursor.BackBuffer: PByte;
+begin
+  BackBuffer := FBackBuffer;
+end;
+
+function TMouseCursor.BackData: PByte;
+begin
+  BackData := FBackData;
+end;
+
+function TMouseCursorList.GetItem(AIndex: integer): PMouseCursor;
+begin
+  GetItem := PMouseCursor(inherited GetItem(AIndex));
+end;
+
+procedure TMouseCursorList.Init;
+begin
+  inherited Init;
+end;
+
+function TMouseCursorList.GetItemById(const AId: string): PMouseCursor;
+begin
+  GetItemById := PMouseCursor(inherited GetItemById(AId));
+end;
+
+function TMouseCursorList.Add(AItem: PMouseCursor): integer;
+begin
+  Add := inherited Add(AItem);
+end;
+
+function TMouseCursorList.IndexOf(AItem: PMouseCursor): integer;
+begin
+  IndexOf := inherited IndexOf(AItem);
+end;
+
+procedure TMouseCursorList.SetItem(AIndex: integer; AItem: PMouseCursor);
+begin
+  inherited SetItem(AIndex, AItem);
+end;
+
+procedure TMouseCursorList.Insert(AIndex: integer; AItem: PMouseCursor);
+begin
+  inherited Insert(AIndex, AItem);
+end;
+
+procedure TAppState.Init;
+begin
+  inherited Init;
+  MouseCursor := nil;
+end;
+
+procedure TAppState.Assign(var ASource: TObject);
+var
+  source: PAppState;
+begin
+  inherited Assign(ASource);
+  source := PAppState(@ASource);
+  MouseCursor := source^.MouseCursor;
 end;
 
 end.
