@@ -5,7 +5,7 @@ interface
 
 uses
   Graphics,
-  GrDrv8,
+  Gr8Drv,
   AplMath,
   AplConst,
   AplUtils,
@@ -168,11 +168,8 @@ var
   visibleRect: TRect;
 begin
   InitializeDrawRect := false;
-  if HasException then
-    exit;
-  State^.Bounds.GetIntersection(State^.ViewPort, visibleRect);
-  ADrawRect.CreateDims(APX, APY, AWidth, AHeight);
-  ADrawRect.Intersect(visibleRect);
+  State^.Bounds.GetIntersection(State^.ViewPort, ADrawRect);
+  ADrawRect.Intersect(Mode^.Bounds);
   if not ADrawRect.IsEmpty then
     InitializeDrawRect := true;
 end;
@@ -192,6 +189,7 @@ begin
   if HasException then
     exit;
   State^.Bounds.GetIntersection(State^.ViewPort, drawRect);
+  drawRect.Intersect(Mode^.Bounds);
   if drawRect.IsEmpty then
     exit;
   if APX > drawRect.Right then
@@ -342,30 +340,7 @@ begin
       mov AY1, ax
       jmp @loop
     @endLoop:
-   end;
-
-{  while true do begin
-    if State.ViewPort.Contains(AX1, AY1) then begin
-      screenPtr := State.FrameBuffer;
-      Inc(screenPtr, longint(AY1) * Mode^.Width + AX1);
-      screenPtr^ := State.ForeColor;
-    end;
-    if (AX1 = AX2) and (AY1 = AY2) then
-      break;
-    aError2 := 2 * aError;
-    if aError2 >= dly then begin
-      if AX1 = AX2 then
-        break;
-      Inc(aError, dly);
-      Inc(AX1, sx);
-    end;
-    if aError2 <= dlx then begin
-      if AY1 = AY2 then
-        break;
-      Inc(aError, dlx);
-      Inc(AY1, sy);
-    end;
-  end;}
+  end;
 end;
 
 procedure TVga8Driver.HLine(APX, APY, AWidth: integer);
@@ -449,6 +424,7 @@ var
   end;
 begin
   State^.Bounds.GetIntersection(State^.ViewPort, drawRect);
+  drawRect.Intersect(Mode^.Bounds);
   t1 := ARadius shr 4;
   x := ARadius;
   y := 0;

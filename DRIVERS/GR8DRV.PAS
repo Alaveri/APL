@@ -12,6 +12,7 @@ uses
   AplConst,
   AplMath,
   AplStr,
+  MouseDrv,
   Graphics,
   MemDrv,
   Palettes,
@@ -32,8 +33,33 @@ type
     procedure SetVgaPalette; virtual;
     procedure SetForeColor8(AColor: TStandardColor; AIntensity: byte); virtual;
     procedure SetBackColor8(AColor: TStandardColor; AIntensity: byte); virtual;
-    function ClosestColor(var AColor: TRgbColor): byte; virtual;
+    procedure InverseHLine(APX, APY, AWidth: integer); virtual;
+    procedure InverseVLine(APX, APY, AHeight: integer); virtual;
+    procedure InverseRectangle(ARect: TRect); virtual;
   end;
+
+const
+  CheckerFillPattern: array[0..15] of word =
+  (
+    $AAAA,
+    $5555,
+    $AAAA,
+    $5555,
+    $AAAA,
+    $5555,
+    $AAAA,
+    $5555,
+    $AAAA,
+    $5555,
+    $AAAA,
+    $5555,
+    $AAAA,
+    $5555,
+    $AAAA,
+    $5555
+  );
+
+  CheckerLinePattern: word = $AAAA;
 
 implementation
 
@@ -53,48 +79,20 @@ end;
 procedure TGraphics8Driver.SetVgaPalette;
 var
   color: TRgbColor;
-  index: byte;
   result: PRgbColors;
 begin
   result := Palette^.GetPaletteDataVga;
   SetVgaPaletteData(result);
   FreeMem(result, Palette^.ColorCount * SizeOf(TRgbColor));
+  Palette^.SetFormat(pfJasc);
+  Palette^.SaveToFile('APL.PAL');
+  Palette^.SetFormat(pfGimp);
+  Palette^.SaveToFile('APL.GPL');
+  Palette^.SetFormat(pfApl);
+  color.Red := Random(256);
+  color.Green := Random(256);
+  color.Blue := Random(256);
 end;
-
-function TGraphics8Driver.ClosestColor(var AColor: TRgbColor): byte;
-var
-  closest: integer;
-  closestMag: longint;
-  index: integer;
-  mag: longint;
-  function Magnitude(const AColor1, AColor2: TRgbColor): longint;
-  var
-    mg: byte;
-    mc: array[0..2] of word;
-    mt: longint;
-    ml, mh: word;
-  begin
-    mc[0] := Abs(AColor1.Red - AColor2.Red);
-    mc[1] := Abs(AColor1.Green - AColor2.Green);
-    mc[2] := Abs(AColor1.Blue - AColor2.Blue);
-    mt := SumW(@mc, 3);
-    ml := LowestW(@mc, 3);
-    mh := HighestW(@mc, 3);
-    Magnitude := (mh - ml) * mt;
-  end;
-begin
-  closest := -1;
-  closestMag := MaxLongint;
-  for index := 0 to 255 do begin
-    mag := Magnitude(AColor, Palette^.Colors^[index]);
-    if mag < closestMag then begin
-      closest := index;
-      closestMag := mag;
-    end;
-  end;
-  ClosestColor := closest;
-end;
-
 
 procedure TGraphics8Driver.SetVgaPaletteData(APalette: PRgbColors);
 var
@@ -150,6 +148,22 @@ end;
 procedure TGraphics8Driver.SetBackColor8(AColor: TStandardColor; AIntensity: byte);
 begin
   SetBackColor(GetColor8(AColor, AIntensity));
+end;
+
+procedure TGraphics8Driver.InverseHLine(APX, APY, AWidth: integer);
+begin
+end;
+
+procedure TGraphics8Driver.InverseVLine(APX, APY, AHeight: integer);
+begin
+end;
+
+procedure TGraphics8Driver.InverseRectangle(ARect: TRect);
+begin
+  InverseHLine(ARect.X, ARect.Y, ARect.Width);
+  InverseHLine(ARect.X, ARect.Bottom, ARect.Width);
+  InverseVLine(ARect.X, ARect.Y, ARect.Height);
+  InverseVLine(ARect.Right, ARect.Y, ARect.Height);
 end;
 
 end.

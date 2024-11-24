@@ -36,12 +36,14 @@ type
   PColoredFont = ^TColoredFont;
   PGraphicsModeListProc = ^TGraphicsModeListProc;
   PFontListProc = ^TFontListProc;
+  PFillPattern = ^TFillPattern;
 
   TFontWidthArray = array[byte] of word;
   TGraphicsModeListProc = procedure(ASender: PGraphicsModeList; AMode: PGraphicsMode);
   TFontListProc = procedure(ASender: PFontList; AFont: PFont);
 
   TFontFormat = (ffNone, ffMonoSpace, ffProportional, ffSystem, ffColored, ffVector);
+  TFillPattern = array[0..15] of word;
 
   TGraphicsMode = object(TIdentifiable)
   private
@@ -194,6 +196,7 @@ type
     FontColor: TStandardColor;
     FontShade: byte;
     Bounds: TRect;
+    FillPattern: PFillPattern;
     procedure Init; virtual;
     procedure Assign(var ASource: TObject); virtual;
   end;
@@ -220,6 +223,7 @@ type
     procedure GetImageStreamRect(ARect: TRect; AStream: PStream); virtual;
     procedure SetForeColor(AColor: longint); virtual;
     procedure SetBackColor(AColor: longint); virtual;
+    procedure SetFillPattern(APattern: PFillPattern); virtual;
     procedure SetMode(AMode: PGraphicsMode); virtual;
     procedure SetViewport(ARect: TRect); virtual;
     procedure SetPixel(APX, APY: integer); virtual;
@@ -232,9 +236,11 @@ type
     procedure HLine(APX, APY, AWidth: integer); virtual;
     procedure VLine(APX, APY, AHeight: integer); virtual;
     procedure Rectangle(ARect: TRect); virtual;
+    procedure Fill(AX1, AY1, AWidth, AHeight: integer); virtual;
     procedure FillRect(ARect: TRect); virtual;
     procedure BezierQuad(AP1: TPoint; AP2: TPoint; AControl: TPoint; AResolution: integer);
-    procedure BezierCubic(AP1: TPoint; AP2: TPoint; AControl1: TPoint; AControl2: TPoint; AResolution: integer);
+    procedure BezierCubic(AP1: TPoint; AP2: TPoint; AControl1: TPoint;
+      AControl2: TPoint; AResolution: integer);
     procedure Ellipse(AX1, AY1, AX2, AY2: integer); virtual;
     procedure EllipseRect(ARect: TRect); virtual;
     procedure EllipsePoints(AP1, AP2: TPoint); virtual;
@@ -375,6 +381,11 @@ end;
 procedure TGraphicsDriver.SetBackColor(AColor: longint);
 begin
   State^.BackColor := AColor;
+end;
+
+procedure TGraphicsDriver.SetFillPattern(APattern: PFillPattern);
+begin
+  State^.FillPattern := APattern;
 end;
 
 procedure TGraphicsDriver.ResetMode;
@@ -767,6 +778,13 @@ begin
   FreeAndNil(oldState);
 end;
 
+procedure TGraphicsDriver.Fill(AX1, AY1, AWidth, AHeight: integer);
+var
+  rect: TRect;
+begin
+  rect.CreateDims(AX1, AY1, AWidth, AHeight);
+end;
+
 destructor TGraphicsDriver.Free;
 begin
   ResetMode;
@@ -1033,7 +1051,7 @@ end;
 
 procedure TFont.SetPixelB(AChar: char; APX, APY: integer);
 var
-  ptr: Pbyte;
+  ptr: PByte;
   px, currentLine: byte;
 begin
   ptr := PByte(FontData);
@@ -1433,6 +1451,7 @@ begin
   FontColor := scWhite;
   FontShade := 0;
   Bounds.Create;
+  FillPattern := nil;
 end;
 
 procedure TGraphicsState.Assign(var ASource: TObject);
@@ -1451,6 +1470,7 @@ begin
   ViewPort.SetRect(state^.ViewPort);
   Bounds.SetRect(state^.Bounds);
   BufferMode := state^.BufferMode;
+  FillPattern := state^.FillPattern;
 end;
 
 function TFontList.GetItem(AIndex: integer): PFont;

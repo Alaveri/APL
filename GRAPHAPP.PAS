@@ -9,7 +9,7 @@ uses
   Lists,
   AplApps,
   Graphics,
-  GrDrv8,
+  Gr8Drv,
   Drawing,
   MouseDrv,
   GraphIni;

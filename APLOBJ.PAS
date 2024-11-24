@@ -97,8 +97,8 @@ type
     procedure SetCapacity(ACapacity: word);
     function Grow(AMin: word): word;
   public
-    constructor Create;
     constructor CreateCapacity(ACapacity: word);
+    constructor CreateString(const AString: string);
     destructor Free; virtual;
     procedure Init; virtual;
     function Append(AString: PChar): PStringBuilder;
@@ -107,7 +107,18 @@ type
     function AppendChar(AChar: char): PStringBuilder;
     function AppendLine(AString: PChar): PStringBuilder;
     function AppendLineString(const AString: string): PStringBuilder;
+    function Replace(AOldValue, ANewValue: PChar;
+      ACompareOptions: TStringCompareOptions): PStringBuilder;
+    function ReplaceString(const AOldValue, ANewValue: string;
+      ACompareOptions: TStringCompareOptions): PStringBuilder;
+    function Insert(AIndex: word; AString: PChar): PStringBuilder;
+    function InsertString(AIndex: word; const AString: string): PStringBuilder;
+    function InsertChar(AIndex: word; AChar: char): PStringBuilder;
     function Clear: PStringBuilder;
+    function Find(AString: PChar; AStart: word;
+      ACompareOptions: TStringCompareOptions; var APos: word): PChar;
+    function FindString(const AString: string; AStart: word;
+      ACompareOptions: TStringCompareOptions; var APos: word): PChar;
     function ToPChar: PChar;
     function ToString: string;
     function AsPChar: PChar;
@@ -139,7 +150,7 @@ end;
 
 constructor TObject.Create;
 begin
-  init;
+  Init;
 end;
 
 procedure TObject.Init;
@@ -383,19 +394,22 @@ begin
   Status := sOk;
 end;
 
-constructor TStringBuilder.Create;
-begin
-  inherited Create;
-end;
-
 constructor TStringBuilder.CreateCapacity(ACapacity: word);
 begin
   inherited Create;
-  SetCapacity(ACapacity);
+  Grow(ACapacity);
+end;
+
+constructor TStringBuilder.CreateString(const AString: string);
+begin
+  inherited Create;
+  Grow(System.Length(AString) + 1);
+  AppendString(AString);
 end;
 
 procedure TStringBuilder.Init;
 begin
+  inherited Init;
   FBuffer := nil;
   FLength := 0;
   FCapacity := 0;
@@ -405,6 +419,7 @@ destructor TStringBuilder.Free;
 begin
   if Assigned(FBuffer) then
     FreeMem(FBuffer, FCapacity);
+  FBuffer := nil;
   inherited Free;
 end;
 
@@ -423,8 +438,10 @@ begin
   end;
   if not Assigned(FBuffer) then begin
     GetMem(FBuffer, ACapacity);
-    if not NilPtr(FBuffer, ecNotEnoughMemory) then
-      FCapacity := ACapacity;
+    if NilPtr(FBuffer, ecNotEnoughMemory) then
+      exit;
+    FillChar(FBuffer^, ACapacity, 0);
+    FCapacity := ACapacity;
     exit;
   end;
   GetMem(newBuffer, ACapacity);
@@ -435,6 +452,8 @@ begin
     Move(FBuffer^, newBuffer^, ACapacity)
   else
     Move(FBuffer^, newBuffer^, FCapacity);
+  FreeMem(FBuffer, FCapacity);
+  FBuffer := newBuffer;
   FCapacity := ACapacity;
 end;
 
@@ -446,7 +465,7 @@ begin
   while newCapacity < AMin do begin
     if newCapacity > 64 then
       newCapacity := (newCapacity * 3) div 2
-    else if newCapacity >= 8 then
+    else if newCapacity > 8 then
       Inc(newCapacity, 16)
     else
       Inc(newCapacity, 4);
@@ -517,6 +536,109 @@ begin
   AppendChar(#10);
 end;
 
+function TStringBuilder.Replace(AOldValue, ANewValue: PChar;
+  ACompareOptions: TStringCompareOptions): PStringBuilder;
+var
+  str, ptr: PChar;
+  pos, len, oldLen, newLen, diff: word;
+begin
+  Replace := @Self;
+  if not Assigned(AOldValue) then
+    exit;
+  pos := 0;
+  str := Find(AOldValue, pos, ACompareOptions, pos);
+  if not Assigned(str) then
+    exit;
+  newLen := StrLen(ANewValue);
+  oldLen := StrLen(AOldValue);
+  len := FLength;
+  while Assigned(str) do begin
+    if newLen > oldLen then begin
+      diff := newLen - oldLen;
+      Grow(FLength + diff + 1);
+      str := FBuffer;
+      Inc(str, pos);
+      Inc(FLength, diff);
+      len := FLength - pos;
+      ptr := str;
+      Inc(ptr, diff);
+      Move(str^, ptr^, len - diff);
+    end
+    else if newLen < oldLen then begin
+      diff := oldLen - newLen;
+      Grow(FLength - diff + 1);
+      str := FBuffer;
+      Inc(str, pos);
+      len := FLength - pos;
+      ptr := str;
+      Inc(ptr, newLen);
+      Move(ptr^, str^, len - newLen);
+      FillChar(ptr^, diff, 0);
+      Dec(FLength, diff);
+    end;
+    Move(ANewValue^, str^, newLen);
+    Inc(str, newLen);
+    str := Find(AOldValue, pos, ACompareOptions, pos);
+  end;
+end;
+
+function TStringBuilder.ReplaceString(const AOldValue, ANewValue: string;
+  ACompareOptions: TStringCompareOptions): PStringBuilder;
+var
+  old, new: PChar;
+  oldValue, newValue: string;
+begin
+  oldValue := AOldValue + #0;
+  newValue := ANewValue + #0;
+  old := @oldValue[1];
+  new := @newValue[1];
+  ReplaceString := Replace(old, new, ACompareOptions);
+end;
+
+function TStringBuilder.Insert(AIndex: word; AString: PChar): PStringBuilder;
+var
+  len, cap: word;
+  ptr, dest: PChar;
+begin
+  Insert := @Self;
+  if not Assigned(AString) then
+    exit;
+  len := StrLen(AString);
+  if len = 0 then
+    exit;
+  if AIndex > FLength then
+    AIndex := FLength;
+  cap := FLength + len;
+  if cap > FCapacity then
+    Grow(cap);
+  ptr := FBuffer;
+  Inc(ptr, AIndex);
+  dest := ptr;
+  Inc(dest, len);
+  Move(ptr^, dest^, FLength - AIndex);
+  Move(AString^, ptr^, len);
+  Inc(FLength, len);
+end;
+
+function TStringBuilder.InsertString(AIndex: word; const AString: string): PStringBuilder;
+var
+  ptr: PChar;
+  str: string;
+begin
+  str := AString + #0;
+  ptr := @str[1];
+  InsertString := Insert(AIndex, ptr);
+end;
+
+function TStringBuilder.InsertChar(AIndex: word; AChar: char): PStringBuilder;
+var
+  str: array[0..1] of char;
+begin
+  str[0] := AChar;
+  str[1] := #0;
+  InsertChar := Insert(AIndex, @str);
+end;
+
 function TStringBuilder.Clear: PStringBuilder;
 begin
   SetCapacity(0);
@@ -538,7 +660,7 @@ end;
 
 function TStringBuilder.ToString: string;
 begin
-  ToString := StrPas(ToPChar);
+  ToString := StrPas(FBuffer);
 end;
 
 function TStringBuilder.AsPChar: PChar;
@@ -554,6 +676,55 @@ end;
 function TStringBuilder.Capacity: word;
 begin
   Capacity := FCapacity;
+end;
+
+function TStringBuilder.Find(AString: PChar; AStart: word;
+  ACompareOptions: TStringCompareOptions; var APos: word): PChar;
+var
+  str, bufferPtr, stringPtr: PChar;
+  index: word;
+begin
+  Find := nil;
+  APos := 0;
+  if not Assigned(AString) then
+    exit;
+  if AStart >= FLength then
+    exit;
+  str := nil;
+  index := AStart;
+  stringPtr := AString;
+  for index := AStart to FLength - 1 do begin
+    bufferPtr := FBuffer;
+    Inc(bufferPtr, index);
+    if scIgnoreCase in ACompareOptions then begin
+      if StrLIComp(bufferPtr, stringPtr, StrLen(AString)) = 0 then begin
+        str := bufferPtr;
+        APos := index;
+        break;
+      end;
+    end
+    else begin
+      if StrLComp(bufferPtr, stringPtr, StrLen(AString)) = 0 then begin
+        str := bufferPtr;
+        APos := index;
+        break;
+      end;
+    end;
+  end;
+  if not Assigned(str) then
+    exit;
+  Find := str;
+end;
+
+function TStringBuilder.FindString(const AString: string; AStart: word;
+  ACompareOptions: TStringCompareOptions; var APos: word): PChar;
+var
+  ptr: PChar;
+  str: string;
+begin
+  str := AString + #0;
+  ptr := @str[1];
+  FindString := Find(ptr, AStart, ACompareOptions, APos);
 end;
 
 var

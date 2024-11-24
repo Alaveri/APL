@@ -13,7 +13,7 @@ uses
   AplMath,
   Streams,
   Graphics,
-  GrDrv8,
+  Gr8Drv,
   MemDrv,
   Palettes,
   VbeTypes,
@@ -43,6 +43,7 @@ type
     FBankShift: word;
     FScreenOffset: longint;
     procedure SetBank(ABank: word);
+    procedure FillPattern(ARect: TRect);
   public
     function SupportsRegions: boolean; virtual;
     function GetScreenPointer(APX, APY: integer): PByte; virtual;
@@ -53,6 +54,9 @@ type
     procedure Line(AX1, AY1, AX2, AY2: integer); virtual;
     procedure HLine(APX, APY, AWidth: integer); virtual;
     procedure VLine(ApX, APY, AHeight: integer); virtual;
+    procedure FillRect(ARect: TRect); virtual;
+    procedure InverseHLine(APX, APY, AWidth: integer); virtual;
+    procedure InverseVLine(APX, APY, AHeight: integer); virtual;
     procedure DrawImage(APX, APY, AWidth, AHeight: integer; AImage: PByte); virtual;
     procedure DrawImageT(APX, APY, AWidth, AHeight: integer; AImage: PByte); virtual;
     procedure DrawImageStream(APX, APY, AWidth, AHeight: integer; AStream: PStream); virtual;
@@ -286,7 +290,7 @@ var
     Inc(sy);
   end;
 
-  procedure DrawCharlineW;
+  procedure DrawCharLineW;
   var
     currentLine: word;
     linePtr: PWord;
@@ -314,13 +318,14 @@ var
     if State^.Font^.BytesPerCharacter = 1 then
       DrawCharLineB
     else
-      DrawCharlineW;
+      DrawCharLineW;
   end;
 
 begin
   if HasException then
     exit;
   State^.Bounds.GetIntersection(State^.ViewPort, drawRect);
+  drawRect.Intersect(Mode^.Bounds);
   if drawRect.IsEmpty then
     exit;
   if APX > drawRect.Right then
@@ -356,7 +361,134 @@ begin
 end;
 
 procedure TSVga8Driver.Line(AX1, AY1, AX2, AY2: integer);
+var
+  aError, aError2, sx, sy, dlx, dly: integer;
+  screenPtr: PByte;
+  x, y, right, bottom, width: integer;
+  color: byte;
+  drawRect: TRect;
 begin
+  GetDrawRect(drawRect);
+  dlx := Abs(AX2 - AX1);
+  if AX1 < AX2 then
+    sx := 1
+  else
+    sx := -1;
+
+  dly := -Abs(AY2 - AY1);
+  if AY1 < AY2 then
+    sy := 1
+  else
+    sy := -1;
+
+  aError := dlx + dly;
+  x := drawRect.X;
+  y := drawRect.Y;
+  right := drawRect.Right;
+  bottom := drawRect.Bottom;
+  screenPtr := State^.FrameBuffer;
+  width := Mode^.Width;
+  color := State^.ForeColor;
+
+  while true do begin
+    if State^.ViewPort.Contains(AX1, AY1) then begin
+      screenPtr := GetScreenPointer(AX1, AY1);
+      screenPtr^ := color;
+    end;
+    if (AX1 = AX2) and (AY1 = AY2) then
+      break;
+    aError2 := 2 * aError;
+    if aError2 >= dly then begin
+      if AX1 = AX2 then
+        break;
+      Inc(aError, dly);
+      Inc(AX1, sx);
+    end;
+    if aError2 <= dlx then begin
+      if AY1 = AY2 then
+        break;
+      Inc(aError, dlx);
+      Inc(AY1, sy);
+    end;
+  end;
+end;
+
+procedure TSVga8Driver.FillPattern(ARect: TRect);
+var
+  screen: PByte;
+  px, py, sy, width, partialWidth, index: integer;
+  procedure FillPatternHLine(Width: integer);
+  var
+    pattern: word;
+    patternIndex: integer;
+    fore, back: byte;
+  begin
+    fore := State^.ForeColor;
+    back := State^.BackColor;
+    pattern := State^.FillPattern^[py];
+    for patternIndex := 0 to Width - 1 do begin
+      if pattern and (1 shl px) > 0 then
+        screen^ := fore
+      else
+        screen^ := back;
+      Inc(screen);
+      Inc(px);
+      px := px mod 16;
+    end;
+  end;
+begin
+  width := ARect.Width;
+  for index := 0 to ARect.Height - 1 do begin
+    sy := ARect.Y + index;
+    screen := GetScreenPointer(ARect.X, sy);
+    px := ARect.X mod 16;
+    py := sy mod 16;
+    if width + FScreenOffset > FWinSize then begin
+      partialWidth := FWinSize - FScreenOffset + 1;
+      FillPatternHLine(partialWidth);
+      SetBank(FCurrentBank + 1);
+      screen := Mode^.FrameBuffer;
+      FillPatternHLine(width - partialWidth);
+    end
+    else
+      FillPatternHLine(width);
+  end;
+end;
+
+procedure TSVga8Driver.FillRect(ARect: TRect);
+var
+  screen: PByte;
+  drawRect: TRect;
+  width, partialWidth, index: integer;
+  color: byte;
+begin
+  if HasException then
+    exit;
+  State^.Bounds.GetIntersection(State^.ViewPort, drawRect);
+  drawRect.Intersect(Mode^.Bounds);
+  if drawRect.IsEmpty then
+    exit;
+  if not drawRect.IntersectsRect(ARect) then
+    exit;
+  ARect.Intersect(drawRect);
+  color := byte(State^.BackColor);
+  width := ARect.Width;
+  if Assigned(State^.FillPattern) then begin
+    FillPattern(ARect);
+    exit;
+  end;
+  for index := 0 to ARect.Height - 1 do begin
+    screen := GetScreenPointer(ARect.X, ARect.Y + index);
+    if width + FScreenOffset > FWinSize then begin
+      partialWidth := FWinSize - FScreenOffset + 1;
+      FillChar(screen^, partialWidth, color);
+      SetBank(FCurrentBank + 1);
+      screen := Mode^.FrameBuffer;
+      FillChar(screen^, width - partialWidth, color);
+    end
+    else
+      FillChar(screen^, width, color);
+  end;
 end;
 
 procedure TSVga8Driver.HLine(APX, APY, AWidth: integer);
@@ -369,6 +501,7 @@ begin
   if HasException then
     exit;
   State^.Bounds.GetIntersection(State^.ViewPort, drawRect);
+  drawRect.Intersect(Mode^.Bounds);
   if (APY < drawRect.Y) or (APY > drawRect.Bottom) then
     exit;
   if APX < drawRect.X then
@@ -400,6 +533,7 @@ begin
   if HasException then
     exit;
   State^.Bounds.GetIntersection(State^.ViewPort, drawRect);
+  drawRect.Intersect(Mode^.Bounds);
   if (APX < drawRect.X) or (APX > drawRect.Right) then
     exit;
   APY := Clamp(APY, drawRect.Y, drawRect.Bottom);
@@ -411,6 +545,58 @@ begin
     screen^ := ForeColor;
   end;
 end;
+
+procedure TSVga8Driver.InverseHLine(APX, APY, AWidth: integer);
+var
+  drawRect: TRect;
+  index: integer;
+  screen: PByte;
+begin
+  State^.Bounds.GetIntersection(State^.ViewPort, drawRect);
+  drawRect.Intersect(Mode^.Bounds);
+  if (APY < drawRect.Y) or (APY > drawRect.Bottom) then
+    exit;
+  if APX < drawRect.X then
+    APX := drawRect.X;
+  if APX + AWidth > drawRect.Right then
+    AWidth := drawRect.Right - APX + 1;
+  if AWidth <= 0 then
+    exit;
+  screen := GetScreenPointer(APX, APY);
+  for index := drawRect.X to drawRect.Right do begin
+    if FScreenOffset > FWinSize then begin
+      SetBank(FCurrentBank + 1);
+      screen := Mode^.FrameBuffer;
+      FScreenOffset := 0;
+    end;
+    screen^ := screen^ xor 15;
+    Inc(screen);
+  end;
+end;
+
+procedure TSVga8Driver.InverseVLine(APX, APY, AHeight: integer);
+var
+  index: integer;
+  screen: PByte;
+  drawRect: TRect;
+begin
+  if HasException then
+    exit;
+  State^.Bounds.GetIntersection(State^.ViewPort, drawRect);
+  drawRect.Intersect(Mode^.Bounds);
+  if (APX < drawRect.X) or (APX > drawRect.Right) then
+    exit;
+  APY := Clamp(APY, drawRect.Y, drawRect.Bottom);
+  AHeight := MinL(drawRect.Height, AHeight);
+  if AHeight <= 0 then
+    exit;
+  screen := GetScreenPointer(APX, APY);
+  for index := drawRect.Y to drawRect.Bottom do begin
+    screen := GetScreenPointer(APX, index);
+    screen^ := screen^ xor 15;
+  end;
+end;
+
 
 procedure TSVga8Driver.DrawImage(APX, APY, AWidth, AHeight: integer; AImage: PByte);
 var
