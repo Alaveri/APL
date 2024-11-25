@@ -32,10 +32,6 @@ type
     procedure DrawImageT(APX, APY, AWidth, AHeight: integer; AImage: PByte); virtual;
     procedure DrawImageStream(APX, APY, AWidth, AHeight: integer; AStream: PStream); virtual;
     procedure DrawImageStreamT(APX, APY, AWidth, AHeight: integer; AStream: PStream); virtual;
-    procedure FastFillScreen(AColor: byte); virtual;
-    procedure FastDrawScreen(AImage: PByte); virtual;
-    procedure FastDrawImage(APX, APY, AWidth, AHeight: integer; AImage: PByte); virtual;
-    procedure FastSetPixel(APX, APY: integer); virtual;
     procedure WaitForVSync; virtual;
     procedure Init; virtual;
     destructor Free; virtual;
@@ -98,69 +94,6 @@ begin
     test al, 8h
     jz @loop
   end;
-end;
-
-procedure TVga8Driver.FastFillScreen(AColor: byte);
-var
-  buffer: PByte;
-begin
-  buffer := Mode^.FrameBuffer;
-  asm
-    les di, buffer
-    mov cx, 32000
-    mov al, AColor
-    mov ah, al
-    rep stosw
-  end;
-end;
-
-procedure TVga8Driver.FastDrawScreen(AImage: PByte);
-var
-  buffer: PByte;
-begin
-  buffer := Mode^.FrameBuffer;
-  asm
-    push ds
-    les di, buffer
-    lds si, AImage
-    mov cx, 32000
-    rep movsw
-    pop ds
-  end;
-end;
-
-procedure TVga8Driver.FastDrawImage(APX, APY, AWidth, AHeight: integer; AImage: PByte);
-var
-  screen: PByte;
-  screenWidth: word;
-begin
-  screenWidth := Mode^.BytesPerScanline;
-  screen := Mode^.FrameBuffer;
-  Inc(screen, APY * screenWidth + APX);
-  asm
-    push ds
-    les di, screen
-    lds si, AImage
-    mov ax, screenWidth
-    mov dx, AWidth
-    mov bx, AHeight
-    sub ax, dx
-    @loop:
-      mov cx, dx
-      rep movsb
-      add di, ax
-      dec bx
-      jnz @loop
-    pop ds
-  end;
-end;
-
-procedure TVga8Driver.FastSetPixel(APX, APY: integer);
-var
-  ptr: PBufferArray;
-begin
-  ptr := Mode^.FrameBuffer;
-  ptr^[APY * Mode^.BytesPerScanLine + APX] := State^.ForeColor;
 end;
 
 function TVga8Driver.InitializeDrawRect(APX, APY, AWidth, AHeight: integer; var ADrawRect: TRect): boolean;

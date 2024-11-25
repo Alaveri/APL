@@ -83,7 +83,7 @@ type
     function CurrentReference: PReference;
     function ReferencePointer(AReference: PReference): pointer;
     function Alloc(ASize: word): Preference;
-    function GetReference(ABuffer: pointer; ASize: word): PReference;
+    function CreateReference(ABuffer: pointer; ASize: word): PReference;
     procedure InitXms;
     procedure Init; virtual;
     procedure SetCurrentReference(AReference: PReference);
@@ -154,15 +154,13 @@ begin
   { Default to return nil on error }
   OnHeapError := 1;
 
-  { Purge conventional references until there is ASize avail + enough space
-  for at least 1 reference to be swapped }
-  minSize := MaxVarSize;
-  Memory.PurgeConventional(minSize);
+  { Purge conventional references until there is enough space }
+  Memory.PurgeConventional(Size);
 
   { If enough could not be purged, try custom OnAllocError function.  If this
-  returns false, then return s1 for "nil on error", otherwise clear
+  returns false, then return 1 for "nil on error", otherwise clear
   error and retry. }
-  if (System.MaxAvail < minSize) or (Memory.HasException) then begin
+  if (System.MaxAvail < Size) or (Memory.HasException) then begin
     if Assigned(Memory.OnAllocError) and TMemoryAllocErrorProc(Memory.OnAllocError)(Size) then
       Memory.ClearException
     else
@@ -484,21 +482,21 @@ begin
   end;
 end;
 
-function TMemoryDriver.GetReference(ABuffer: pointer; ASize: word): PReference;
+function TMemoryDriver.CreateReference(ABuffer: pointer; ASize: word): PReference;
 var
   reference: PReference;
 begin
   reference := New(PReference);
   if not Assigned(reference) then begin
     Raise(ecNotEnoughMemory);
-    GetReference := nil;
+    CreateReference := nil;
     exit;
   end;
   reference^.Size := ASize;
   reference^.Ptr := ABuffer;
   reference^.Xms := false;
   FReferences^.Add(reference);
-  GetReference := reference;
+  CreateReference := reference;
 end;
 
 function TMemoryDriver.Alloc(ASize: word): PReference;

@@ -37,6 +37,7 @@ type
   PGraphicsModeListProc = ^TGraphicsModeListProc;
   PFontListProc = ^TFontListProc;
   PFillPattern = ^TFillPattern;
+  PLinePattern = ^TLinePattern;
 
   TFontWidthArray = array[byte] of word;
   TGraphicsModeListProc = procedure(ASender: PGraphicsModeList; AMode: PGraphicsMode);
@@ -44,6 +45,7 @@ type
 
   TFontFormat = (ffNone, ffMonoSpace, ffProportional, ffSystem, ffColored, ffVector);
   TFillPattern = array[0..15] of word;
+  TLinePattern = word;
 
   TGraphicsMode = object(TIdentifiable)
   private
@@ -91,7 +93,7 @@ type
     Reserved: array[0..250] of byte;
   end;
 
-  TFont = object(TStatusObject)
+  TFont = object(TPersistent)
   private
     FFontData: PWord;
     FFontDataSize: word;
@@ -120,9 +122,7 @@ type
     procedure SetPixel(AChar: char; APX, APY: integer); virtual;
     procedure ClearPixel(AChar: char; APX, APY: integer); virtual;
     procedure SaveToStream(AStream: PStream); virtual;
-    procedure SaveToFile(const AFilename: string); virtual;
     procedure LoadFromStream(AStream: PStream); virtual;
-    procedure LoadFromFile(const AFilename: string); virtual;
     procedure SetCharWidths; virtual;
     function Format: TFontFormat; virtual;
     function IsPixelSet(AChar: char; APX, APY: integer): boolean; virtual;
@@ -197,6 +197,7 @@ type
     FontShade: byte;
     Bounds: TRect;
     FillPattern: PFillPattern;
+    LinePattern: PLinePattern;
     procedure Init; virtual;
     procedure Assign(var ASource: TObject); virtual;
   end;
@@ -224,12 +225,10 @@ type
     procedure SetForeColor(AColor: longint); virtual;
     procedure SetBackColor(AColor: longint); virtual;
     procedure SetFillPattern(APattern: PFillPattern); virtual;
+    procedure SetLinePattern(APattern: PLinePattern); virtual;
     procedure SetMode(AMode: PGraphicsMode); virtual;
     procedure SetViewport(ARect: TRect); virtual;
     procedure SetPixel(APX, APY: integer); virtual;
-    procedure FastSetPixel(APX, APY: integer); virtual;
-    procedure FastFillScreen(AColor: byte); virtual;
-    procedure FastDrawImage(APX, APY, AWidth, AHeight: integer; AImage: PByte); virtual;
     procedure MoveTo(APX, APY: integer); virtual;
     procedure LineTo(APX, APY: integer); virtual;
     procedure Line(AX1, AY1, AX2, AY2: integer); virtual;
@@ -281,6 +280,29 @@ type
     procedure Insert(AIndex: integer; AItem: PFont);
   end;
 
+const
+  CheckerFillPattern: TFillPattern =
+  (
+    $AAAA,
+    $5555,
+    $AAAA,
+    $5555,
+    $AAAA,
+    $5555,
+    $AAAA,
+    $5555,
+    $AAAA,
+    $5555,
+    $AAAA,
+    $5555,
+    $AAAA,
+    $5555,
+    $AAAA,
+    $5555
+  );
+
+  CheckerLinePattern: TLinePattern = $AAAA;
+
 var
   Graph: PGraphicsDriver;
 
@@ -314,6 +336,7 @@ end;
 
 procedure TGraphicsDriver.RenderText(APX, APY, ALength: integer; AText: PChar);
 begin
+  Abstract;
 end;
 
 function TGraphicsDriver.GetScreenPointer(APX, APY: integer): PByte; assembler;
@@ -334,18 +357,6 @@ asm
   mov ax, di
   mov dx, es
   pop ds
-end;
-
-procedure TGraphicsDriver.FastFillScreen(AColor: byte);
-begin
-end;
-
-procedure TGraphicsDriver.FastDrawImage(APX, APY, AWidth, AHeight: integer; AImage: PByte);
-begin
-end;
-
-procedure TGraphicsDriver.FastSetPixel(APX, APY: integer);
-begin
 end;
 
 procedure TGraphicsDriver.SetViewport(ARect: TRect);
@@ -386,6 +397,11 @@ end;
 procedure TGraphicsDriver.SetFillPattern(APattern: PFillPattern);
 begin
   State^.FillPattern := APattern;
+end;
+
+procedure TGraphicsDriver.SetLinePattern(APattern: PLinePattern);
+begin
+  State^.LinePattern := APattern;
 end;
 
 procedure TGraphicsDriver.ResetMode;
@@ -455,6 +471,7 @@ end;
 
 procedure TGraphicsDriver.Line(AX1, AY1, AX2, AY2: integer);
 begin
+  Abstract;
 end;
 
 procedure TGraphicsDriver.Rectangle(ARect: TRect);
@@ -467,10 +484,12 @@ end;
 
 procedure TGraphicsDriver.HLine(APX, APY, AWidth: integer);
 begin
+  Abstract;
 end;
 
 procedure TGraphicsDriver.VLine(APX, APY, AHeight: integer);
 begin
+  Abstract;
 end;
 
 procedure TGraphicsDriver.FillRect(ARect: TRect);
@@ -568,7 +587,7 @@ begin
   error := 0;
   stopX := twoBSquared * ARadiusX;
   stopY := 0;
-  while stopX >= stopy do begin
+  while stopX >= stopY do begin
     SetPixel(APX + x, APY + y);
     SetPixel(APX - x, APY + y);
     SetPixel(APX - x, APY - y);
@@ -664,6 +683,7 @@ end;
 
 procedure TGraphicsDriver.GetImage(APX, APY, AWidth, AHeight: longint; ABuffer: PByte);
 begin
+  Abstract;
 end;
 
 procedure TGraphicsDriver.GetImageRect(ARect: TRect; ABuffer: PByte);
@@ -673,6 +693,7 @@ end;
 
 procedure TGraphicsDriver.GetImageStream(APX, APY, AWidth, AHeight: longint; AStream: PStream);
 begin
+  Abstract;
 end;
 
 procedure TGraphicsDriver.GetImageStreamRect(ARect: TRect; AStream: PStream);
@@ -682,10 +703,12 @@ end;
 
 procedure TGraphicsDriver.DrawImage(APX, APY, AWidth, AHeight: integer; AImage: PByte);
 begin
+  Abstract;
 end;
 
 procedure TGraphicsDriver.DrawImageT(APX, APY, AWidth, AHeight: integer; AImage: PByte);
 begin
+  Abstract;
 end;
 
 procedure TGraphicsDriver.DrawImageRectT(ARect: TRect; AImage: PByte);
@@ -700,6 +723,7 @@ end;
 
 procedure TGraphicsDriver.DrawImageStream(APX, APY, AWidth, AHeight: integer; AStream: PStream);
 begin
+  Abstract;
 end;
 
 procedure TGraphicsDriver.DrawImageStreamRect(ARect: TRect; AStream: PStream);
@@ -709,6 +733,7 @@ end;
 
 procedure TGraphicsDriver.DrawImageStreamT(APX, APY, AWidth, AHeight: integer; AStream: PStream);
 begin
+  Abstract;
 end;
 
 procedure TGraphicsDriver.DrawImageStreamRectT(ARect: TRect; AStream: PStream);
@@ -718,10 +743,12 @@ end;
 
 procedure TGraphicsDriver.DrawImageStreamSection(ASourceRect: TRect; ADestX, ADestY: integer);
 begin
+  Abstract;
 end;
 
 procedure TGraphicsDriver.DrawImageStreamSectionT(ASourceRect: TRect; ADestX, ADestY: integer);
 begin
+  Abstract;
 end;
 
 procedure TGraphicsDriver.GetImageDrawRects(APX, APY, AWidth, AHeight: longint;
@@ -797,6 +824,7 @@ end;
 
 procedure TGraphicsDriver.WaitForVSync;
 begin
+  Abstract;
 end;
 
 procedure TGraphicsMode.Init;
@@ -942,10 +970,12 @@ end;
 
 function TFont.CharWidth(AChar: char): integer;
 begin
+  Abstract;
 end;
 
 function TFont.TextWidthAny(AText: PChar; ALength: word): longint;
 begin
+  Abstract;
 end;
 
 function TFont.TextWidth(const AText: string): longint;
@@ -976,6 +1006,7 @@ end;
 
 procedure TFont.SetCharWidths;
 begin
+  Abstract;
 end;
 
 constructor TFont.CreateLoadStream(AStream: PStream);
@@ -1245,15 +1276,6 @@ begin
   stream.Free;
 end;
 
-procedure TFont.SaveToFile(const AFilename: string);
-var
-  fileStream: TFileStream;
-begin
-  fileStream.Create(AFilename, fmWrite);
-  SaveToStream(@fileStream);
-  fileStream.Free;
-end;
-
 procedure TFont.LoadFromStream(AStream: PStream);
 var
   header: TFontHeader;
@@ -1317,15 +1339,6 @@ begin
     end;
   end;
   stream.Free;
-end;
-
-procedure TFont.LoadFromFile(const AFilename: string);
-var
-  fileStream: TFileStream;
-begin
-  fileStream.Create(AFilename, fmRead);
-  LoadFromStream(@fileStream);
-  fileStream.Free;
 end;
 
 constructor TColoredFont.CreateSize(AMaxWidth, AHeight: byte);
@@ -1452,6 +1465,7 @@ begin
   FontShade := 0;
   Bounds.Create;
   FillPattern := nil;
+  LinePattern := nil;
 end;
 
 procedure TGraphicsState.Assign(var ASource: TObject);
@@ -1471,6 +1485,7 @@ begin
   Bounds.SetRect(state^.Bounds);
   BufferMode := state^.BufferMode;
   FillPattern := state^.FillPattern;
+  LinePattern := state^.LinePattern;
 end;
 
 function TFontList.GetItem(AIndex: integer): PFont;

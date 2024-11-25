@@ -50,6 +50,7 @@ type
     ProgressIncrement: word;
     ReadTotal, WriteTotal: longint;
     AddTotalToStream: boolean;
+    CompressionLevel: TCompressionLevel;
     constructor CreateBufferSize(AReadBufferSize, AWriteBufferSize: word);
     constructor Create;
     function CompressStream(ASource, ADest: PStream; ALength: longint): longint; virtual;
@@ -127,6 +128,7 @@ begin
   FWritePtr := nil;
   Source := nil;
   Dest := nil;
+  CompressionLevel := clHigh;
   FReadBitCounter := 0;
   FWriteBitCounter := 0;
   FReadBitBuffer := 0;
@@ -317,6 +319,7 @@ end;
 
 procedure TCompressor.SetCompressionLevel(ALevel: TCompressionLevel);
 begin
+  CompressionLevel := ALevel;
 end;
 
 function TNonCompressor.CompressStream(ASource, ADest: PStream; ALength: longint): longint;

@@ -32,9 +32,11 @@ type
 
   TObject = object
     constructor Create;
+    function IsPersistent: boolean; virtual;
     procedure Init; virtual;
     procedure Assign(var ASource: TObject); virtual;
     procedure AssignTo(var ADest: TObject); virtual;
+    procedure Abstract; virtual;
     destructor Free; virtual;
   end;
 
@@ -153,6 +155,11 @@ begin
   Init;
 end;
 
+procedure TObject.Abstract;
+begin
+  RunError(211);
+end;
+
 procedure TObject.Init;
 begin
 end;
@@ -164,6 +171,11 @@ end;
 procedure TObject.AssignTo(var ADest: TObject);
 begin
   ADest.Assign(Self);
+end;
+
+function TObject.IsPersistent: boolean;
+begin
+  IsPersistent := false;
 end;
 
 destructor TObject.Free;

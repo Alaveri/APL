@@ -44,6 +44,9 @@ type
     FScreenOffset: longint;
     procedure SetBank(ABank: word);
     procedure FillPattern(ARect: TRect);
+    procedure HLinePattern(AWidth: integer; AScreen: PByte; APattern: word;
+      var APX: integer);
+    procedure VLinePattern(AHeight: integer; APattern: word; APX, APY: integer);
   public
     function SupportsRegions: boolean; virtual;
     function GetScreenPointer(APX, APY: integer): PByte; virtual;
@@ -204,7 +207,8 @@ begin
   bank := FScreenOffset shr 16;
   FScreenOffset := FScreenOffset and FWinSize;
   Inc(screen, FScreenOffset);
-  SetBank(bank);
+  if bank <> FCurrentBank then
+    SetBank(bank);
   GetScreenPointer := screen;
 end;
 
@@ -417,25 +421,6 @@ procedure TSVga8Driver.FillPattern(ARect: TRect);
 var
   screen: PByte;
   px, py, sy, width, partialWidth, index: integer;
-  procedure FillPatternHLine(Width: integer);
-  var
-    pattern: word;
-    patternIndex: integer;
-    fore, back: byte;
-  begin
-    fore := State^.ForeColor;
-    back := State^.BackColor;
-    pattern := State^.FillPattern^[py];
-    for patternIndex := 0 to Width - 1 do begin
-      if pattern and (1 shl px) > 0 then
-        screen^ := fore
-      else
-        screen^ := back;
-      Inc(screen);
-      Inc(px);
-      px := px mod 16;
-    end;
-  end;
 begin
   width := ARect.Width;
   for index := 0 to ARect.Height - 1 do begin
@@ -445,13 +430,13 @@ begin
     py := sy mod 16;
     if width + FScreenOffset > FWinSize then begin
       partialWidth := FWinSize - FScreenOffset + 1;
-      FillPatternHLine(partialWidth);
+      HLinePattern(partialWidth, screen, State^.FillPattern^[py], px);
       SetBank(FCurrentBank + 1);
       screen := Mode^.FrameBuffer;
-      FillPatternHLine(width - partialWidth);
+      HLinePattern(width - partialWidth, screen, State^.FillPattern^[py], px);
     end
     else
-      FillPatternHLine(width);
+      HLinePattern(width, screen, State^.FillPattern^[py], px);
   end;
 end;
 
@@ -491,12 +476,58 @@ begin
   end;
 end;
 
+procedure TSVga8Driver.HLinePattern(AWidth: integer; AScreen: PByte; APattern: word;
+  var APX: integer);
+var
+  patternIndex: integer;
+  fore, back: byte;
+begin
+  fore := State^.ForeColor;
+  back := State^.BackColor;
+  for patternIndex := 0 to AWidth - 1 do begin
+    if APattern and (1 shl APX) > 0 then
+      AScreen^ := fore
+    else
+      AScreen^ := back;
+    Inc(AScreen);
+    Inc(APX);
+    APX := APX mod 16;
+  end;
+end;
+
+procedure TSVga8Driver.VLinePattern(AHeight: integer; APattern: word; APX, APY: integer);
+var
+  patternIndex: integer;
+  fore, back: byte;
+  screen: PByte;
+  py: integer;
+begin
+  fore := State^.ForeColor;
+  back := State^.BackColor;
+  screen := GetScreenPointer(APX, APY);
+  for patternIndex := 0 to AHeight - 1 do begin
+    py := APY mod 16;
+    if APattern and (1 shl py) > 0 then
+      screen^ := fore
+    else
+      screen^ := back;
+    Inc(screen, Mode^.Width);
+    Inc(FScreenOffset, Mode^.Width);
+    Inc(APY);
+    if FScreenOffset > FWinSize then begin
+      screen := GetScreenPointer(APX, APY);
+      Inc(FScreenOffset, Mode^.Width);
+    end;
+  end;
+end;
+
 procedure TSVga8Driver.HLine(APX, APY, AWidth: integer);
 var
   screen: PByte;
   partialWidth, lineWidth: integer;
   color: byte;
   drawRect: TRect;
+  px: integer;
 begin
   if HasException then
     exit;
@@ -511,6 +542,11 @@ begin
   if AWidth <= 0 then
     exit;
   screen := GetScreenPointer(APX, APY);
+  if Assigned(State^.LinePattern) then begin
+    px := APX mod 16;
+    HLinePattern(AWidth, screen, State^.LinePattern^, px);
+    exit;
+  end;
   color := byte(State^.ForeColor);
   if AWidth + FScreenOffset > FWinSize then begin
     partialWidth := FWinSize - FScreenOffset + 1;
@@ -540,7 +576,12 @@ begin
   AHeight := MinL(drawRect.Height, AHeight);
   if AHeight <= 0 then
     exit;
-  for index := MaxL(APY, 0) to MinL(APY + AHeight - 1, Mode^.MaxY) do begin
+  if Assigned(State^.LinePattern) then begin
+    screen := GetScreenPointer(APX, APY);
+    VLinePattern(AHeight, State^.LinePattern^, APX, APY);
+    exit;
+  end;
+  for index := APY to APY + AHeight - 1 do begin
     screen := GetScreenPointer(APX, index);
     screen^ := ForeColor;
   end;

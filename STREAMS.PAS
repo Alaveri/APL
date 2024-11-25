@@ -73,6 +73,16 @@ type
     procedure WritePChar(AValue: PChar); virtual;
   end;
 
+  TPersistent = object(TStatusObject)
+  private
+  public
+    function IsPersistent: boolean; virtual;
+    procedure LoadFromFile(const AFileName: string); virtual;
+    procedure LoadFromStream(AStream: PStream); virtual;
+    procedure SaveToFile(const AFileName: string); virtual;
+    procedure SaveToStream(AStream: PStream); virtual;
+  end;
+
   TMemoryStream = object(TStream)
   private
     FReferences: PReferenceList;
@@ -97,6 +107,7 @@ type
 
   TFileStreamMode =
   (
+    fmCreate,
     fmRead,
     fmWrite,
     fmReadWrite
@@ -188,10 +199,12 @@ end;
 
 function TStream.Read(ABuffer: pointer; ACount: longint): longint;
 begin
+  Abstract;
 end;
 
 function TStream.Write(ABuffer: pointer; ACount: longint): longint;
 begin
+  Abstract;
 end;
 
 function TStream.Seek(AOffset: longint; AOrigin: TSeekOrigin): longint;
@@ -281,6 +294,7 @@ end;
 
 function TStream.WriteToStream(AStream: PStream; ACount: longint): longint;
 begin
+  Abstract;
 end;
 
 function TStream.ReadFromStream(AStream: PStream; ACount: longint): longint;
@@ -419,7 +433,7 @@ var
   reference: PReference;
 begin
   inherited Create;
-  reference := Memory.GetReference(ABuffer, ASize);
+  reference := Memory.CreateReference(ABuffer, ASize);
   Size :=  ASize;
   if not Assigned(reference) then begin
     Raise(Memory.Exception^.Code);
@@ -845,7 +859,8 @@ end;
 
 function TFileStream.CanWrite: boolean;
 begin
-  CanWrite := NoException and ((FMode = fmWrite) or (FMode = fmReadWrite));
+  CanWrite := NoException and
+  ((FMode = fmWrite) or (FMode = fmReadWrite) or (FMode = fmCreate));
 end;
 
 function TFileStream.CanSeek: boolean;
@@ -858,11 +873,11 @@ begin
   inherited Seek(AOffset, AOrigin);
   if HasException then
     exit;
-  {$I+}
+  {$I-}
   System.Seek(FFile, Position);
   if (IOResult <> 0) then
     Raise(ecStreamSeekError);
-  {$I-}
+  {$I+}
 end;
 
 procedure TFileStream.Open;
@@ -874,11 +889,11 @@ begin
   if FileExists(FFilename) then begin
     System.Assign(FFile, FFilename);
     case FMode of
-      fmRead, fmReadWrite: begin
+      fmRead, fmReadWrite, fmWrite: begin
         Reset(FFile, 1);
         Size := FileSize(FFile);
       end;
-      fmWrite: begin
+      fmCreate: begin
         Rewrite(FFile, 1);
         Size := 0;
       end;
@@ -889,7 +904,7 @@ begin
     System.Assign(FFile, FFilename);
     case FMode of
       fmRead, fmReadWrite: Raise(ecFileNotFound);
-      fmWrite: Rewrite(FFile, 1);
+      fmWrite, fmCreate: Rewrite(FFile, 1);
     end;
   end;
   if IOResult <> 0 then
@@ -996,6 +1011,43 @@ end;
 procedure TMemoryStreamList.Delete(AIndex: integer);
 begin
   inherited Delete(AIndex);
+end;
+
+function TPersistent.IsPersistent: boolean;
+begin
+  IsPersistent := true;
+end;
+
+procedure TPersistent.LoadFromFile(const AFileName: string);
+var
+  stream: PFileStream;
+begin
+  stream := New(PFileStream, Create(AFileName, fmRead));
+  if not CheckReraise(stream) then
+    LoadFromStream(stream);
+  CheckReraise(stream);
+  FreeAndNil(stream);
+end;
+
+procedure TPersistent.LoadFromStream(AStream: PStream);
+begin
+  Abstract;
+end;
+
+procedure TPersistent.SaveToFile(const AFileName: string);
+var
+  stream: PFileStream;
+begin
+  stream := New(PFileStream, Create(AFileName, fmCreate));
+  if not CheckReraise(stream) then
+    SaveToStream(stream);
+  CheckReraise(stream);
+  FreeAndNil(stream);
+end;
+
+procedure TPersistent.SaveToStream(AStream: PStream);
+begin
+  Abstract;
 end;
 
 begin

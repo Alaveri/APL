@@ -40,7 +40,7 @@ type
   TObjectListProc = procedure(ASender: PObject; AItem: PObject);
   TStringListProc = procedure(ASender: PObject; AItem: PChar);
   TIdentifiableListProc = procedure(ASender: PObject; AItem: PIdentifiable);
-  TListGrowFunc = function(ACapacity: integer): integer;
+  TListGrowFunc = function(AMin: integer): integer;
 
   TList = object(TStatusObject)
   private
@@ -67,8 +67,8 @@ type
     function BinarySearchUsing(AComparer: TComparer; var AValue): integer; virtual;
     function BinarySearch(var AValue): integer; virtual;
     function Capacity: integer;
-    procedure Grow; virtual;
-    procedure GrowUsing(AGrowFunc: TListGrowFunc);
+    function Grow(AMin: integer): integer; virtual;
+    function GrowUsing(AGrowFunc: TListGrowFunc; AMin: integer): integer; virtual;
     procedure ForEach(AProc: PListProc); virtual;
     procedure SetComparer(AComparer: TComparer); virtual;
     procedure Swap(AIndex1, AIndex2: integer); virtual;
@@ -183,6 +183,8 @@ type
     function AddString(const AString: string): integer;
     function GetItem(AIndex: integer): PChar;
     function GetString(AIndex: integer): string;
+    procedure Insert(AIndex: integer; AItem: PChar);
+    procedure InsertString(AIndex: integer; const AString: string);
     procedure Clear; virtual;
     procedure Delete(AIndex: integer); virtual;
     procedure Init; virtual;
@@ -210,7 +212,7 @@ type
 var
   TStringCompare: TStringComparer;
 
-function DefaultListGrow(ACapacity: integer): integer; far;
+function DefaultListGrow(AMin: integer): integer; far;
 
 implementation
 
@@ -252,30 +254,39 @@ begin
   inherited Free;
 end;
 
-procedure TList.GrowUsing(AGrowFunc: TListGrowFunc);
+function DefaultListGrow(AMin: integer): integer;
 var
   newCapacity: integer;
 begin
-  newCapacity := AGrowFunc(FCapacity);
-  SetCapacity(newCapacity);
-end;
-
-function DefaultListGrow(ACapacity: integer): integer;
-var
-  newCapacity: integer;
-begin
-  if ACapacity >= 64 then
-    newCapacity := (ACapacity * 3) div 2
-  else if ACapacity >= 8 then
-    newCapacity := ACapacity + 16
-  else
-    newCapacity := ACapacity + 4;
+  newCapacity := 0;
+  while newCapacity < AMin do begin
+    if newCapacity > 64 then
+      newCapacity := (newCapacity * 3) div 2
+    else if newCapacity > 8 then
+      Inc(newCapacity, 16)
+    else
+      Inc(newCapacity, 4);
+  end;
+  newCapacity := Min(newCapacity, ListBufferSize);
   DefaultListGrow := newCapacity;
 end;
 
-procedure TList.Grow;
+function TList.GrowUsing(AGrowFunc: TListGrowFunc; AMin: integer): integer;
+var
+  newCapacity: integer;
 begin
-  GrowUsing(DefaultListGrow);
+  newCapacity := AGrowFunc(AMin);
+  if newCapacity < AMin then begin
+    Raise(ecListCapacityOverflow);
+    exit;
+  end;
+  SetCapacity(newCapacity);
+  GrowUsing := newCapacity;
+end;
+
+function TList.Grow(AMin: integer): integer;
+begin
+  Grow := GrowUsing(DefaultListGrow, AMin);
 end;
 
 procedure TList.SetCapacity(ACapacity: integer);
@@ -283,7 +294,6 @@ var
   newBuffer: pointer;
   max: word;
   dataSize: longint;
-  error: TException;
 begin
   if FCapacity = ACapacity then
     exit;
@@ -338,7 +348,7 @@ var
   index: integer;
 begin
   if Count + 1 > FCapacity then begin
-    Grow;
+    Grow(Count + 1);
     if HasException then
       exit;
   end;
@@ -581,7 +591,7 @@ begin
     exit;
   end;
   if Count + 1 > FCapacity then begin
-    Grow;
+    Grow(Count + 1);
     if HasException then
       exit;
   end;
@@ -825,6 +835,16 @@ end;
 function TStringList.AddString(const AString: string): integer;
 begin
   AddString := inherited Add(TString.New(AString));
+end;
+
+procedure TStringList.InsertString(AIndex: integer; const AString: string);
+begin
+  Insert(AIndex, TString.New(AString));
+end;
+
+procedure TStringList.Insert(AIndex: integer; AItem: PChar);
+begin
+  inherited Insert(AIndex, AItem);
 end;
 
 procedure TStringList.Delete(AIndex: integer);

@@ -240,6 +240,7 @@ end;
 
 procedure TLzw.SetCompressionLevel(ALevel: TCompressionLevel);
 begin
+  inherited SetCompressionLevel(ALevel);
   BitSize := LzwCompressionBitSize[ALevel];
 end;
 

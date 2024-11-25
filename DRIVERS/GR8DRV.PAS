@@ -38,29 +38,6 @@ type
     procedure InverseRectangle(ARect: TRect); virtual;
   end;
 
-const
-  CheckerFillPattern: array[0..15] of word =
-  (
-    $AAAA,
-    $5555,
-    $AAAA,
-    $5555,
-    $AAAA,
-    $5555,
-    $AAAA,
-    $5555,
-    $AAAA,
-    $5555,
-    $AAAA,
-    $5555,
-    $AAAA,
-    $5555,
-    $AAAA,
-    $5555
-  );
-
-  CheckerLinePattern: word = $AAAA;
-
 implementation
 
 procedure TGraphics8Driver.Init;

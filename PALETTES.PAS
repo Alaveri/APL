@@ -55,17 +55,17 @@ type
 
   TRgbColors = array[0..MaxVarSize div SizeOf(TRgbColor) - 1] of TRgbColor;
 
-  TRgbPalette = object(TStatusObject)
+  TRgbPalette = object(TPersistent)
   private
     FColors: PRgbColors;
     FColorCount: word;
     FFormat: TPaletteFormat;
     FCompression: TAplCompression;
     FCompressionLevel: TCompressionLevel;
-    procedure LoadPalettesette(AStream: PStream);
+    procedure LoadPalette(AStream: PStream);
     procedure LoadJascPalette(AStream: PStream);
     procedure LoadGimpPalette(AStream: PStream);
-    procedure SavePalettesette(AStream: PStream);
+    procedure SavePalette(AStream: PStream);
     procedure SaveJascPalette(AStream: PStream);
     procedure SaveGimpPalette(AStream: PStream);
     function ReadLine(AStream: PStream): string;
@@ -81,10 +81,8 @@ type
     procedure SetFormat(AFormat: TPaletteFormat);
     procedure SetPaletteData(AData: PRgbColors);
     procedure SetColor(AIndex: word; var AColor: TRgbColor);
-    procedure SaveToFile(const AFilename: string);
-    procedure SaveToStream(AStream: PStream);
-    procedure LoadFromFile(AFilename: string);
-    procedure LoadFromStream(AStream: PStream);
+    procedure SaveToStream(AStream: PStream); virtual;
+    procedure LoadFromStream(AStream: PStream); virtual;
     procedure SetCompression(ACompression: TAplCompression;
       ACompressionLevel: TCompressionLevel);
     procedure Init; virtual;
@@ -262,17 +260,10 @@ begin
 end;
 
 constructor TRgbPalette.CreateFromFile(AFilename: string; AFormat: TPaletteFormat);
-var
-  stream: PFileStream;
 begin
   inherited Create;
   FFormat := AFormat;
-  stream := New(PFileStream, Create(AFilename, fmRead));
-  if NilPtr(stream, ecNotEnoughMemory) then
-    exit;
-  LoadFromStream(stream);
-  CheckReraise(stream);
-  FreeAndNil(stream);
+  LoadFromFile(AFilename);
 end;
 
 constructor TRgbPalette.CreateFromStream(AStream: PStream; AFormat: TPaletteFormat);
@@ -280,7 +271,6 @@ begin
   inherited Create;
   FFormat := AFormat;
   LoadFromStream(AStream);
-  CheckReraise(AStream);
 end;
 
 procedure TRgbPalette.SetCompression(ACompression: TAplCompression;
@@ -425,7 +415,7 @@ begin
   end;
 end;
 
-procedure TRgbPalette.LoadPalettesette(AStream: PStream);
+procedure TRgbPalette.LoadPalette(AStream: PStream);
 var
   count: word;
   compressor: PCompressor;
@@ -456,7 +446,7 @@ begin
   end;
 end;
 
-procedure TRgbPalette.SavePalettesette(AStream: PStream);
+procedure TRgbPalette.SavePalette(AStream: PStream);
 var
   compressor: PCompressor;
   source: PMemoryStream;
@@ -524,23 +514,11 @@ begin
   FColorCount := 0;
   FColors := nil;
   case FFormat of
-    pfApl: LoadPalettesette(AStream);
+    pfApl: LoadPalette(AStream);
     pfJasc: LoadJascPalette(AStream);
     pfGimp: LoadGimpPalette(AStream);
   end;
   CheckReraise(AStream);
-end;
-
-procedure TRgbPalette.LoadFromFile(AFilename: string);
-var
-  stream: PFileStream;
-begin
-  stream := New(PFileStream, Create(AFilename, fmRead));
-  if NilPtr(stream, ecNotEnoughMemory) then
-    exit;
-  LoadFromStream(stream);
-  CheckReraise(stream);
-  FreeAndNil(stream);
 end;
 
 procedure TRgbPalette.SetFormat(AFormat: TPaletteFormat);
@@ -548,22 +526,10 @@ begin
   FFormat := AFormat;
 end;
 
-procedure TRgbPalette.SaveToFile(const AFilename: string);
-var
-  stream: PFileStream;
-begin
-  stream := New(PFileStream, Create(AFilename, fmWrite));
-  if NilPtr(stream, ecNotEnoughMemory) then
-    exit;
-  SaveToStream(stream);
-  CheckReraise(stream);
-  FreeAndNil(stream);
-end;
-
 procedure TRgbPalette.SaveToStream(AStream: PStream);
 begin
   case FFormat of
-    pfApl: SavePalettesette(AStream);
+    pfApl: SavePalette(AStream);
     pfJasc: SaveJascPalette(AStream);
     pfGimp: SaveGimpPalette(AStream);
   end;
