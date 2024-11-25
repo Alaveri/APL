@@ -148,80 +148,236 @@ var
 
 implementation
 
+uses
+  AplObj,
+  AplStr,
+  AplUtils,
+  Strings,
+  Lists;
+
+type
+  PError = ^TError;
+  PErrorList = ^TErrorList;
+
+  TError = object(TObject)
+  private
+  public
+    ErrorCode: integer;
+    ErrorMessage: PChar;
+    constructor Create(AErrorCode: word; AErrorMessage: string);
+    constructor CreateCode(AErrorCode: word);
+    destructor Free; virtual;
+    procedure Init; virtual;
+    function GetErrorMessage: string;
+  end;
+
+  TErrorList = object(TObjectList)
+  private
+  public
+    constructor Create;
+    procedure Init; virtual;
+    function Add(AItem: PError): integer;
+    function GetItem(AIndex: integer): PError;
+    function GetErrorByCode(AErrorCode: word): PError;
+    function IndexOf(AItem: PError): integer;
+    procedure SetItem(AIndex: integer; AItem: PError);
+    procedure Insert(AIndex: integer; AItem: PError);
+    procedure RemoveItem(AItem: PError);
+    procedure AddError(AErrorCode: word; AErrorMessage: string);
+  end;
+
+var
+  ErrorList: PErrorList;
+
 function ErrorMessage(AErrorCode: word): string;
 var
+  error: PError;
   found: boolean;
 begin
-  case AErrorCode of
-    ecFileNotFound: ErrorMessage := 'File not found';
-	  ecFileCreateError: ErrorMessage := 'File could not be created';
-  	ecFileOpenError: ErrorMessage := 'File could not be opened';
-  	ecFileReadError: ErrorMessage := 'Error writing file';
-  	ecFileWriteError: ErrorMessage := 'Error writing file';
-  	ecFileVersionError: ErrorMessage := 'File version mismatch';
-  	ecFileTypeError: ErrorMessage := 'File type not supported';
-  	ecFileInvalid: ErrorMessage := 'File is invalid';
-  	ecGraphicsNotSupported: ErrorMessage := 'Graphics type not supported';
-  	ecTextDriverNotSupported: ErrorMessage := 'Text type not supported';
-  	ecTextDriverError: ErrorMessage := 'Text driver error';
-  	ecTextModeNotFound: ErrorMessage := 'Text mode not found';
-  	ecMemoryReferenceNotFound: ErrorMessage := 'Memory reference not found';
-  	ecInvalidMemoryReference: ErrorMessage := 'Invalid memory reference';
-  	ecNotEnoughMemory: ErrorMessage := 'Not enough memory';
-  	ecInvalidAllocSize: ErrorMessage := 'Invalid allocation size';
-  	ecGraphicsDriverError: ErrorMessage := 'Graphics mode not supported';
-  	ecStreamSeekNotSupported: ErrorMessage := 'Stream does not support seeking';
-  	ecStreamWriteNotSupported: ErrorMessage := 'Stream does not support writing';
-  	ecStreamReadNotSupported: ErrorMessage := 'Stream does not support reading';
-  	ecSeekPastStreamEnd: ErrorMessage := 'Seek past end of stream';
-  	ecWritePastStreamEnd: ErrorMessage := 'Write past end of stream';
-  	ecReadPastStreamEnd: ErrorMessage := 'Read past end of stream';
-  	ecStreamNotOpen: ErrorMessage := 'Stream is not open';
-  	ecXmsNotInitialized: ErrorMessage := 'XMS memory could not be initialized';
-  	ecXmsNotSupported: ErrorMessage := 'XMS memory is not supported';
-  	ecStreamCloseError: ErrorMessage := 'Error closing stream';
-  	ecStreamOpenError: ErrorMessage := 'Error opening stream';
-  	ecStreamReadError: ErrorMessage := 'Error reading stream';
-  	ecStreamWriteError: ErrorMessage := 'Error writing stream';
-  	ecStreamSeekError: ErrorMessage := 'Stream seek error';
-  	ecGraphicsModeNotFound: ErrorMessage := 'Graphics mode not found';
-  	ecInvalidCompressionSource: ErrorMessage := 'Compression source is invalid';
-  	ecImageBppNotSupported: ErrorMessage := 'Image bit depth not supported';
-  	ecListCapacityOverflow: ErrorMessage := 'List capacity overflow';
-  	ecInvalidImage: ErrorMessage := 'Invalid image data';
-  	ecImageCompressionNotSupported: ErrorMessage := 'Image compression not supported';
-  	ecImageVersionNotSupported: ErrorMessage := 'Image version not supported';
-    ecStreamFormatNotSupported: ErrorMessage := 'Stream format not supported';
-    ecFontVersionNotSupported: ErrorMessage := 'Font version not supported';
-    ecPathNotFound: ErrorMessage := 'Path not found';
-    ecFileAccessDenied: ErrorMessage := 'File access denied';
-    ecFileInvalidHandle: ErrorMessage := 'Invalid file handle';
-    ecFileInvalidEnvironment: ErrorMessage := 'Invalid environment';
-    ecFileInvalidFormat: ErrorMessage := 'Invalid file format';
-    ecDirChangeError: ErrorMessage := 'Error changing directory';
-    ecIndexOutOfBounds: ErrorMessage := 'List index out of bounds';
-    ecFileInvalidVersion: ErrorMessage := 'Unsupported file version';
-    ecNullParameter: ErrorMessage := 'Null parameter';
-    ecInvalidOperation: ErrorMessage := 'Invalid operation';
-    ecInvalidArgument: ErrorMessage := 'Invalid argument';
-    ecUnsupportedPaletteFormat: ErrorMessage := 'Unsupported palette format';
-    ecInvalidPalette: ErrorMessage := 'Invalid palette';
-    ecCompressionBitSizeError: ErrorMessage := 'Compression bit size too large';
-    ecCompressorNotSpecified: ErrorMessage := 'Compressor not specified';
-    ecImageTooLarge: ErrorMessage := 'Image too large';
-    else begin
-      if AErrorCode >= ecUser then begin
-        if Assigned(CustomErrorMessageProc) then begin
-          ErrorMessage := TCustomErrorMessageProc(CustomErrorMessageProc)(AErrorCode, found);
-          if found then
-            exit;
-        end;
+  error := ErrorList^.GetErrorByCode(AErrorCode);
+  if Assigned(error) then
+    ErrorMessage := error^.GetErrorMessage
+  else begin
+    if AErrorCode >= ecUser then begin
+      if Assigned(CustomErrorMessageProc) then begin
+        found := false;
+        ErrorMessage := TCustomErrorMessageProc(CustomErrorMessageProc)(AErrorCode, found);
+        if found then
+          exit;
       end;
-      ErrorMessage := 'Unknown error';
     end;
+    ErrorMessage := 'Unknown error';
   end;
 end;
 
+constructor TError.Create(AErrorCode: word; AErrorMessage: string);
 begin
+  inherited Create;
+  ErrorCode := AErrorCode;
+  ErrorMessage := TString.New(AErrorMessage);
+end;
+
+constructor TError.CreateCode(AErrorCode: word);
+begin
+  inherited Create;
+  ErrorCode := AErrorCode;
+end;
+
+destructor TError.Free;
+begin
+  TString.Free(ErrorMessage);
+  inherited Free;
+end;
+
+procedure TError.Init;
+begin
+  inherited Init;
+  ErrorCode := 0;
+  ErrorMessage := nil;
+end;
+
+function TError.GetErrorMessage: string;
+begin
+  GetErrorMessage := StrPas(ErrorMessage);
+end;
+
+function ErrorCodeCompare(AItem1, AItem2: pointer): integer; far;
+begin
+  ErrorCodeCompare := PError(AItem1)^.ErrorCode - PError(AItem2)^.ErrorCode;
+end;
+
+constructor TErrorList.Create;
+var
+  index: integer;
+  item: PError;
+begin
+  inherited CreateSorted(ErrorCodeCompare);
+  AddError(ecImageVersionNotSupported, 'Image version not supported');
+  AddError(ecFileNotFound, 'File not found');
+  AddError(ecFileCreateError, 'File could not be created');
+  AddError(ecFileOpenError, 'File could not be opened');
+  AddError(ecFileReadError, 'Error writing file');
+  AddError(ecFileWriteError, 'Error writing file');
+  AddError(ecFileVersionError, 'File version mismatch');
+  AddError(ecFileTypeError, 'File type not supported');
+  AddError(ecFileInvalid, 'File is invalid');
+  AddError(ecGraphicsNotSupported, 'Graphics type not supported');
+  AddError(ecTextDriverNotSupported, 'Text type not supported');
+  AddError(ecTextDriverError, 'Text driver error');
+  AddError(ecTextModeNotFound, 'Text mode not found');
+  AddError(ecMemoryReferenceNotFound, 'Memory reference not found');
+  AddError(ecInvalidMemoryReference, 'Invalid memory reference');
+  AddError(ecNotEnoughMemory, 'Not enough memory');
+  AddError(ecInvalidAllocSize, 'Invalid allocation size');
+  AddError(ecGraphicsDriverError, 'Graphics mode not supported');
+  AddError(ecStreamSeekNotSupported, 'Stream does not support seeking');
+  AddError(ecStreamWriteNotSupported, 'Stream does not support writing');
+  AddError(ecStreamReadNotSupported, 'Stream does not support reading');
+  AddError(ecSeekPastStreamEnd, 'Seek past end of stream');
+  AddError(ecWritePastStreamEnd, 'Write past end of stream');
+  AddError(ecReadPastStreamEnd, 'Read past end of stream');
+  AddError(ecStreamNotOpen, 'Stream is not open');
+  AddError(ecXmsNotInitialized, 'XMS memory could not be initialized');
+  AddError(ecXmsNotSupported, 'XMS memory is not supported');
+  AddError(ecStreamCloseError, 'Error closing stream');
+  AddError(ecStreamOpenError, 'Error opening stream');
+  AddError(ecStreamReadError, 'Error reading stream');
+  AddError(ecStreamWriteError, 'Error writing stream');
+  AddError(ecStreamSeekError, 'Stream seek error');
+  AddError(ecGraphicsModeNotFound, 'Graphics mode not found');
+  AddError(ecInvalidCompressionSource, 'Compression source is invalid');
+  AddError(ecImageBppNotSupported, 'Image bit depth not supported');
+  AddError(ecListCapacityOverflow, 'List capacity overflow');
+  AddError(ecInvalidImage, 'Invalid image data');
+  AddError(ecImageCompressionNotSupported, 'Image compression not supported');
+  AddError(ecStreamFormatNotSupported, 'Stream format not supported');
+  AddError(ecFontVersionNotSupported, 'Font version not supported');
+  AddError(ecPathNotFound, 'Path not found');
+  AddError(ecFileAccessDenied, 'File access denied');
+  AddError(ecFileInvalidHandle, 'Invalid file handle');
+  AddError(ecFileInvalidEnvironment, 'Invalid environment');
+  AddError(ecFileInvalidFormat, 'Invalid file format');
+  AddError(ecDirChangeError, 'Error changing directory');
+  AddError(ecIndexOutOfBounds, 'List index out of bounds');
+  AddError(ecFileInvalidVersion, 'Unsupported file version');
+  AddError(ecNullParameter, 'Null parameter');
+  AddError(ecInvalidOperation, 'Invalid operation');
+  AddError(ecInvalidArgument, 'Invalid argument');
+  AddError(ecUnsupportedPaletteFormat, 'Unsupported palette format');
+  AddError(ecInvalidPalette, 'Invalid palette');
+  AddError(ecCompressionBitSizeError, 'Compression bit size too large');
+  AddError(ecCompressorNotSpecified, 'Compressor not specified');
+  AddError(ecImageTooLarge, 'Image too large');
+end;
+
+procedure TErrorList.AddError(AErrorCode: word; AErrorMessage: string);
+begin
+  Add(New(PError, Create(AErrorCode, AErrorMessage)));
+end;
+
+procedure TErrorList.Init;
+var
+  error: PError;
+begin
+  inherited Init;
+end;
+
+function TErrorList.Add(AItem: PError): integer;
+begin
+  inherited Add(AItem);
+end;
+
+function TErrorList.GetItem(AIndex: integer): PError;
+begin
+  GetItem := PError(inherited GetItem(AIndex));
+end;
+
+function TErrorList.IndexOf(AItem: PError): integer;
+begin
+  IndexOf := inherited IndexOf(AItem);
+end;
+
+procedure TErrorList.SetItem(AIndex: integer; AItem: PError);
+begin
+  inherited SetItem(AIndex, AItem);
+end;
+
+procedure TErrorList.Insert(AIndex: integer; AItem: PError);
+begin
+  inherited Insert(AIndex, AItem);
+end;
+
+procedure TErrorList.RemoveItem(AItem: PError);
+begin
+  inherited RemoveItem(AItem);
+end;
+
+function TErrorList.GetErrorByCode(AErrorCode: word): PError;
+var
+  index: integer;
+  searchValue: TError;
+  item: PError;
+begin
+  GetErrorByCode := nil;
+  searchValue.CreateCode(AErrorCode);
+  index := BinarySearch(@searchValue);
+  searchValue.Free;
+  if index >= 0 then
+    GetErrorByCode := GetItem(index);
+end;
+
+var
+  PreviousExitProc: PProc;
+
+procedure Finalize; far;
+begin
+  ExitProc := PreviousExitProc;
+  FreeAndNil(ErrorList);
+end;
+
+begin
+  PreviousExitProc := ExitProc;
+  ExitProc := @Finalize;
   CustomErrorMessageProc := nil;
+  ErrorList := New(PErrorList, Create);
 end.

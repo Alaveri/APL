@@ -294,7 +294,7 @@ begin
   bits := ASource^.ReadByte;
   total := ASource^.ReadLong;
   ASource^.Seek(startPos, soFromBeginning);
-  CheckReraise(ASource);
+  CheckReRaise(ASource);
   if HasException then
     exit;
   GetOriginalSize := total;

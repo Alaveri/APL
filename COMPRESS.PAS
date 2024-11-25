@@ -154,7 +154,7 @@ begin
       Raise(ecWritePastStreamEnd);
       exit;
     end;
-    if CheckReraise(Dest) then
+    if CheckReRaise(Dest) then
       exit;
     FWritePos := 0;
     FWritePtr := FWriteBuffer;
@@ -196,7 +196,7 @@ begin
       Raise(ecReadPastStreamEnd);
       exit;
     end;
-    if CheckReraise(Source) then
+    if CheckReRaise(Source) then
       exit;
     FReadPos := 0;
     FReadPtr := FReadBuffer;

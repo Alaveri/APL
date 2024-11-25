@@ -157,7 +157,7 @@ begin
     exit;
   end;
   Graph^.SetMode(mode);
-  CheckReraise(Graph);
+  CheckReRaise(Graph);
 end;
 
 procedure TGraphApp.Init;

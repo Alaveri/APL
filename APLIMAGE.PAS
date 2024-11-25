@@ -249,7 +249,7 @@ begin
   AStream^.Write(@CompressionLevel, SizeOf(CompressionLevel));
   AStream^.Write(@DataSize, SizeOf(DataSize));
   AStream^.Write(@HasExtendedData, SizeOf(HasExtendedData));
-  CheckReraise(AStream);
+  CheckReRaise(AStream);
 end;
 
 procedure TAplImageHeader.LoadFromStream(AStream: PStream);
@@ -269,7 +269,7 @@ begin
   AStream^.Read(@CompressionLevel, SizeOf(CompressionLevel));
   AStream^.Read(@DataSize, SizeOf(DataSize));
   AStream^.Read(@HasExtendedData, SizeOf(HasExtendedData));
-  CheckReraise(AStream);
+  CheckReRaise(AStream);
 end;
 
 procedure TAplImage.InitAll(AWidth, AHeight, ABpp, APlanes: word;
@@ -414,7 +414,7 @@ begin
   if NilPtr(stream, ecNotEnoughMemory) then
     exit;
   LoadFromStream(stream);
-  CheckReraise(stream);
+  CheckReRaise(stream);
   FreeAndNil(stream);
 end;
 
@@ -429,7 +429,7 @@ begin
   if NilPtr(stream, ecNotEnoughMemory) then
     exit;
   SaveToStreamCompressed(stream, ACompression, ACompressionLevel);
-  CheckReraise(stream);
+  CheckReRaise(stream);
   FreeAndNil(stream);
 end;
 
@@ -439,11 +439,11 @@ begin
   if FHeader.HasPalette then
     FHeader.PaletteSize := FPalette^.ColorCount;
   AWriter^.WriteHeader(FHeader);
-  if CheckReraise(AWriter) then
+  if CheckReRaise(AWriter) then
     exit;
   if FHeader.HasPalette then begin
     AWriter^.WritePalette(FPalette^);
-    if CheckReraise(AWriter) then
+    if CheckReRaise(AWriter) then
       exit;
   end;
 end;
@@ -451,13 +451,13 @@ end;
 procedure TAplImage.LoadHeaderAndPalette(AStream: PStream; AReader: PAplImageReader);
 begin
   AReader^.ReadHeader(FHeader);
-  if CheckReraise(AReader) then
+  if CheckReRaise(AReader) then
     exit;
   FreeAndNil(FPalette);
   FHeader.PaletteSize := 0;
   if FHeader.HasPalette then begin
     FPalette := AReader^.ReadPalette;
-    if CheckReraise(FPalette) then
+    if CheckReRaise(FPalette) then
       exit;
     FHeader.PaletteSize := FPalette^.ColorCount;
   end;
@@ -643,12 +643,12 @@ begin
   FHeader.CompressionLevel := ACompressionLevel;
   writer.Create(AStream, ACompression, ACompressionLevel);
   SaveHeaderAndPalette(AStream, @writer);
-  if CheckReraise(@writer) then begin
+  if CheckReRaise(@writer) then begin
     writer.Free;
     exit;
   end;
   writer.WriteImage(FBuffer, FHeader);
-  CheckReraise(@writer);
+  CheckReRaise(@writer);
   writer.Free;
 end;
 
@@ -667,7 +667,7 @@ begin
   end;
   reader.Create(AStream, FHeader.Compression, FHeader.CompressionLevel);
   LoadHeaderAndPalette(AStream, @reader);
-  if CheckReraise(@reader) then
+  if CheckReRaise(@reader) then
     exit;
   error := CheckVersion(FHeader);
   if error <> ecNone then begin
@@ -675,7 +675,7 @@ begin
     exit;
   end;
   FBuffer := reader.ReadImage(FHeader);
-  CheckReraise(@reader);
+  CheckReRaise(@reader);
   reader.Free;
 end;
 
@@ -775,12 +775,12 @@ begin
   FHeader.CompressionLevel := ACompressionLevel;
   writer.Create(AStream, ACompression, ACompressionLevel);
   SaveHeaderAndPalette(AStream, @writer);
-  if CheckReraise(@writer) then begin
+  if CheckReRaise(@writer) then begin
     writer.Free;
     exit;
   end;
   writer.WriteImage(PMemoryStream(FBuffer), FHeader);
-  CheckReraise(@writer);
+  CheckReRaise(@writer);
   writer.Free;
 end;
 
@@ -798,7 +798,7 @@ begin
   end;
   reader.Create(AStream, FHeader.Compression, FHeader.CompressionLevel);
   LoadHeaderAndPalette(AStream, @reader);
-  if CheckReraise(@reader) then
+  if CheckReRaise(@reader) then
     exit;
   error := CheckVersion(FHeader);
   if error <> ecNone then begin
@@ -806,7 +806,7 @@ begin
     exit;
   end;
   FBuffer := reader.ReadImage(FHeader);
-  CheckReraise(@reader);
+  CheckReRaise(@reader);
   reader.Free;
 end;
 
@@ -854,7 +854,7 @@ begin
   if HasException then
     exit;
   AHeader.LoadFromStream(FStream);
-  CheckReraise(FStream);
+  CheckReRaise(FStream);
 end;
 
 function TAplImageReader.GetHeader: PAplImageHeader;
@@ -867,7 +867,7 @@ begin
   result := New(PAplImageHeader, CreateFromStream(FStream));
   if NilPtr(result, ecNotEnoughMemory) then
     exit;
-  if CheckReraise(FStream) then
+  if CheckReRaise(FStream) then
     exit;
   GetHeader := result;
 end;
@@ -882,7 +882,7 @@ begin
   result := New(PRgbPalette, CreateFromStream(FStream, pfApl));
   if NilPtr(result, ecNotEnoughMemory) then
     exit;
-  if CheckReraise(result) then
+  if CheckReRaise(result) then
     exit;
   ReadPalette := result;
 end;
@@ -925,7 +925,7 @@ begin
   if HasException then
     exit;
   AHeader.SaveToStream(FStream);
-  CheckReraise(FStream);
+  CheckReRaise(FStream);
 end;
 
 procedure TAplImageWriter.WritePalette(var APalette: TRgbPalette);
@@ -935,7 +935,7 @@ begin
   APalette.SetCompression(FCompression, FCompressionLevel);
   APalette.SetFormat(pfApl);
   APalette.SaveToStream(FStream);
-  CheckReraise(FStream);
+  CheckReRaise(FStream);
 end;
 
 function TAplImageStreamReader.ReadImage(var AHeader: TAplImageHeader): PMemoryStream;
@@ -962,16 +962,16 @@ begin
       exit;
     end;
     compressor^.DecompressStream(FStream, result, AHeader.DataSize);
-    CheckReraise(compressor);
+    CheckReRaise(compressor);
     FreeAndNil(compressor);
   end;
-  CheckReraise(FStream);
+  CheckReRaise(FStream);
   if HasException then begin
     result := nil;
     FreeAndNil(result);
   end;
   result^.Seek(0, soFromBeginning);
-  CheckReraise(result);
+  CheckReRaise(result);
   ReadImage := result;
 end;
 
@@ -998,7 +998,7 @@ begin
   stream := New(PMemoryStream, CreateBuffer(result, AHeader.DataSize));
   if NilPtr(stream, ecNotEnoughMemory) then
     exit;
-  if CheckReraise(stream) then
+  if CheckReRaise(stream) then
     exit;
   stream^.FreeBuffers := false;
   if AHeader.Compression = acNone then
@@ -1006,11 +1006,11 @@ begin
   else begin
     compressor := TCompression.GetCompressor(AHeader.Compression, AHeader.CompressionLevel);
     compressor^.DecompressStream(FStream, stream, AHeader.DataSize);
-    CheckReraise(compressor);
+    CheckReRaise(compressor);
     FreeAndNil(compressor);
   end;
   FreeAndNil(stream);
-  CheckReraise(FStream);
+  CheckReRaise(FStream);
   if HasException then begin
     result := nil;
     FreeMem(result, AHeader.DataSize);
@@ -1035,16 +1035,16 @@ begin
     stream := New(PMemoryStream, CreateBuffer(AImageData, AHeader.DataSize));
     if NilPtr(stream, ecNotEnoughMemory) then
       exit;
-    if CheckReraise(stream) then
+    if CheckReRaise(stream) then
       exit;
     stream^.FreeBuffers := false;
     compressor := TCompression.GetCompressor(AHeader.Compression, AHeader.CompressionLevel);
     compressor^.CompressStream(stream, FStream, AHeader.DataSize);
-    CheckReraise(compressor);
+    CheckReRaise(compressor);
     FreeAndNil(compressor);
     FreeAndNil(stream);
   end;
-  CheckReraise(FStream);
+  CheckReRaise(FStream);
 end;
 
 procedure TAplImageStreamWriter.WriteImage(AImageData: PMemoryStream; var AHeader: TAplImageHeader);
@@ -1063,10 +1063,10 @@ begin
   else begin
     compressor := TCompression.GetCompressor(AHeader.Compression, AHeader.CompressionLevel);
     compressor^.CompressStream(AImageData, FStream, AHeader.DataSize);
-    CheckReraise(compressor);
+    CheckReRaise(compressor);
     FreeAndNil(compressor);
   end;
-  CheckReraise(FStream);
+  CheckReRaise(FStream);
 end;
 
 begin

@@ -1023,9 +1023,9 @@ var
   stream: PFileStream;
 begin
   stream := New(PFileStream, Create(AFileName, fmRead));
-  if not CheckReraise(stream) then
+  if not CheckReRaise(stream) then
     LoadFromStream(stream);
-  CheckReraise(stream);
+  CheckReRaise(stream);
   FreeAndNil(stream);
 end;
 
@@ -1039,9 +1039,9 @@ var
   stream: PFileStream;
 begin
   stream := New(PFileStream, Create(AFileName, fmCreate));
-  if not CheckReraise(stream) then
+  if not CheckReRaise(stream) then
     SaveToStream(stream);
-  CheckReraise(stream);
+  CheckReRaise(stream);
   FreeAndNil(stream);
 end;
 

@@ -64,8 +64,8 @@ type
     function GetItem(AIndex: integer): pointer;
     function IndexOfPtr(AItem: pointer): integer; virtual;
     function IndexOf(AItem: pointer): integer;
-    function BinarySearchUsing(AComparer: TComparer; var AValue): integer; virtual;
-    function BinarySearch(var AValue): integer; virtual;
+    function BinarySearchUsing(AComparer: TComparer; AValue: pointer): integer; virtual;
+    function BinarySearch(AValue: pointer): integer; virtual;
     function Capacity: integer;
     function Grow(AMin: integer): integer; virtual;
     function GrowUsing(AGrowFunc: TListGrowFunc; AMin: integer): integer; virtual;
@@ -616,12 +616,12 @@ begin
     TListProc(AProc)(@self, GetItem(index));
 end;
 
-function TList.BinarySearch(var AValue): integer;
+function TList.BinarySearch(AValue: pointer): integer;
 begin
   BinarySearch := BinarySearchUsing(FComparer, AValue);
 end;
 
-function TList.BinarySearchUsing(AComparer: TComparer; var AValue): integer;
+function TList.BinarySearchUsing(AComparer: TComparer; AValue: pointer): integer;
 var
   compared: integer;
   upper, lower, middle: integer;
@@ -632,7 +632,7 @@ begin
   while lower <= upper do begin
     middle := lower + (upper - lower) shr 1;
     item2 := GetItem(middle);
-    compared := AComparer(item2, pointer(AValue));
+    compared := AComparer(item2, AValue);
     if compared = 0 then begin
       BinarySearchUsing := middle;
       exit;

@@ -52,7 +52,7 @@ type
     destructor Free; virtual;
   end;
 
-  TException = object(TIdentifiable)
+  TException = object(TObject)
   private
   public
     Code: TExceptionCode;
@@ -73,18 +73,19 @@ type
     Status: TObjectStatus;
     procedure Init; virtual;
     procedure Raise(ACode: TExceptionCode);
+    procedure RaiseException(AException: PException);
     procedure RaiseNullParameter(AParam: string);
     procedure RaiseInvalidOperation(AMessage: string);
     procedure RaiseWarning(ACode: TExceptionCode);
     procedure RaiseHint(ACode: TExceptionCode);
     procedure RaiseSeverity(ACode: TExceptionCode; ASeverity: TExceptionSeverity);
-    procedure Reraise(AObject: PStatusObject);
+    procedure ReRaise(AObject: PStatusObject);
     procedure ClearException;
     procedure Assign(var ASource: TObject); virtual;
     function HasException: boolean;
     function NoException: boolean;
     function GetBaseException: PException;
-    function CheckReraise(AObject: PStatusObject): boolean;
+    function CheckReRaise(AObject: PStatusObject): boolean;
     function NilPtr(APtr: pointer; ACode: TExceptionCode): boolean;
     function NilPtrSeverity(APtr: pointer; ACode: TExceptionCode;
       ASeverity: TExceptionSeverity): boolean;
@@ -227,7 +228,7 @@ procedure TException.Init;
 begin
   inherited Init;
   Code := 0;
-  Severity := esNone;
+  Severity := esError;
   InnerException := nil;
 end;
 
@@ -261,7 +262,7 @@ end;
 
 function TException.Message: string;
 begin
-  ErrorMessage(Code);
+  Message := ErrorMessage(Code);
 end;
 
 function TStatusObject.GetBaseException: PException;
@@ -305,25 +306,30 @@ begin
   Status := sException;
 end;
 
+procedure TStatusObject.RaiseException(AException: PException);
+begin
+  if not Assigned(AException) then
+    exit;
+  RaiseSeverity(AException^.Code, AException^.Severity);
+end;
+
 procedure TStatusObject.RaiseSeverity(ACode: TExceptionCode; ASeverity: TExceptionSeverity);
 begin
   Raise(ACode);
   Exception^.Severity := ASeverity;
 end;
 
-function TStatusObject.CheckReraise(AObject: PStatusObject): boolean;
+function TStatusObject.CheckReRaise(AObject: PStatusObject): boolean;
 var
   result: boolean;
 begin
-  CheckReraise := false;
+  CheckReRaise := false;
   if not Assigned(AObject) then
     exit;
   result := AObject^.HasException;
-  if result then begin
-    Reraise(AObject);
-    AObject^.ClearException;
-  end;
-  CheckReraise := result;
+  if result then
+    ReRaise(AObject);
+  CheckReRaise := result;
 end;
 
 function TStatusObject.NilPtr(APtr: pointer; ACode: TExceptionCode): boolean;
@@ -347,11 +353,11 @@ begin
   NilPtrSeverity := result;
 end;
 
-procedure TStatusObject.Reraise(AObject: PStatusObject);
+procedure TStatusObject.ReRaise(AObject: PStatusObject);
 begin
   if not (Assigned(AObject) and AObject^.HasException) then
     exit;
-  RaiseSeverity(AObject^.Exception^.Code, AObject^.Exception^.Severity);
+  RaiseException(AObject^.Exception);
   AObject^.ClearException;
 end;
 

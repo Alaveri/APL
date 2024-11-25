@@ -428,7 +428,7 @@ begin
   Inc(screenPtr, 2 * (drawRect.Y * Mode^.Width + drawRect.X));
   for index := drawRect.Y to drawRect.Bottom do begin
     AStream^.Read(screenPtr, drawRect.Width * 2);
-    if CheckReraise(AStream) then
+    if CheckReRaise(AStream) then
       exit;
     Inc(screenPtr, Mode^.Width * 2);
   end;
@@ -467,7 +467,7 @@ begin
   Inc(screenPtr, 2 * (drawRect.Y * Mode^.Width + drawRect.X));
   for index := drawRect.Y to drawRect.Bottom do begin
     AStream^.Write(screenPtr, drawRect.Width * 2);
-    if CheckReraise(AStream) then
+    if CheckReRaise(AStream) then
       exit;
     Inc(screenPtr, Mode^.Width * 2);
   end;

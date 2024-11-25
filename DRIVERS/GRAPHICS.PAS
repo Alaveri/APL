@@ -1321,7 +1321,7 @@ begin
         else
           lzw.CreateBitSize(LzwCompressionBitSize[header.CompressionLevel]);
         lzw.DecompressStream(AStream, @stream, header.DataSize);
-        CheckReraise(@lzw);
+        CheckReRaise(@lzw);
         lzw.Free;
         stream.Seek(0, soFromBeginning);
         stream.Read(PByte(FFontData), header.DataSize);

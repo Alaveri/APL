@@ -310,7 +310,7 @@ var
 begin
   buffer := ALine + #13#10;
   AStream^.Write(@buffer[1], Length(buffer));
-  if CheckReraise(AStream) then
+  if CheckReRaise(AStream) then
     exit;
 end;
 
@@ -341,24 +341,24 @@ var
   index: word;
 begin
   line := ReadLine(AStream);
-  if CheckReraise(AStream) then
+  if CheckReRaise(AStream) then
     exit;
   if line <> 'JASC-PAL' then begin
     Raise(ecInvalidPalette);
     exit;
   end;
   line := ReadLine(AStream);
-  if CheckReraise(AStream) then
+  if CheckReRaise(AStream) then
     exit;
   if line <> '0100' then begin
     Raise(ecInvalidPalette);
     exit;
   end;
   line := ReadLine(AStream);
-  if CheckReraise(AStream) then
+  if CheckReRaise(AStream) then
     exit;
   count := StrToInt(line, 0);
-  if CheckReraise(AStream) then
+  if CheckReRaise(AStream) then
     exit;
   GetMem(FColors, count * SizeOf(TRgbColor));
   if NilPtr(FColors, ecNotEnoughMemory) then
@@ -367,7 +367,7 @@ begin
   index := 0;
   while not AStream^.EndOfStream do begin
     line := ReadLine(AStream);
-    if CheckReraise(AStream) then
+    if CheckReRaise(AStream) then
       exit;
     {// Change this to not read padding for each color component}
     color.Red := StrToInt(Trim(Copy(line, 1, 3)), 0);
@@ -423,7 +423,7 @@ var
   size: word;
 begin
   count := AStream^.ReadWord;
-  if CheckReraise(AStream) then
+  if CheckReRaise(AStream) then
     exit;
   size := count * SizeOf(TRgbColor);
   GetMem(FColors, size);
@@ -437,7 +437,7 @@ begin
         exit;
       dest := New(PMemoryStream, CreateBuffer(FColors, size));
       compressor^.DecompressStream(AStream, dest, count * SizeOf(TRgbColor));
-      CheckReraise(dest);
+      CheckReRaise(dest);
       FreeAndNil(compressor);
       FreeAndNil(dest);
     end;
@@ -453,7 +453,7 @@ var
   size: word;
 begin
   AStream^.WriteWord(FColorCount);
-  if CheckReraise(AStream) then
+  if CheckReRaise(AStream) then
     exit;
   size := FColorCount * SizeOf(TRgbColor);
   case FCompression of
@@ -463,7 +463,7 @@ begin
         exit;
       source := New(PMemoryStream, CreateBuffer(FColors, size));
       compressor^.CompressStream(source, AStream, size);
-      CheckReraise(source);
+      CheckReRaise(source);
       FreeAndNil(compressor);
       FreeAndNil(source);
     end;
@@ -518,7 +518,7 @@ begin
     pfJasc: LoadJascPalette(AStream);
     pfGimp: LoadGimpPalette(AStream);
   end;
-  CheckReraise(AStream);
+  CheckReRaise(AStream);
 end;
 
 procedure TRgbPalette.SetFormat(AFormat: TPaletteFormat);
@@ -533,7 +533,7 @@ begin
     pfJasc: SaveJascPalette(AStream);
     pfGimp: SaveGimpPalette(AStream);
   end;
-  CheckReraise(AStream);
+  CheckReRaise(AStream);
 end;
 
 function TRgbPalette.GetPaletteDataVga: PRgbColors;
