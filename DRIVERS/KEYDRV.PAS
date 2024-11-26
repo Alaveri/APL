@@ -269,7 +269,6 @@ type
 
 var
   Keyboard: TKeyboardDriver;
-  ShiftStateFlags: TKeyboardFlags absolute $0000:$0057;
 
 implementation
 
@@ -489,7 +488,6 @@ var
   key: word;
   flags: TKeyboardFlags;
 begin
-  flags := ShiftStateFlags;
   GetKey := 0;
   if not KeyPressed then
     exit;
@@ -498,14 +496,17 @@ begin
     int 16h
     mov [character], al
     mov [scanCode], ah
+    mov ah, 2
+    int 16h
+    mov [flags], al
   end;
   if character = 0 then begin
     key := ExtKeyFlag + scanCode;
-    if (kfLeftShift in ShiftStateFlags) or (kfRightShift in ShiftStateFlags) then
+    if (kfLeftShift in flags) or (kfRightShift in flags) then
       Inc(key, ExtShiftFlag);
   end
   else begin
-    if ((kfLeftShift in ShiftStateFlags) or (kfRightShift in ShiftStateFlags))
+    if ((kfLeftShift in flags) or (kfRightShift in flags))
       and (scanCode in [71..75, 77..83]) then begin
       key := ExtShiftFlag + ExtKeyFlag + scanCode;
     end
