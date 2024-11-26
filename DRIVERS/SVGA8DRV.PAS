@@ -604,7 +604,7 @@ begin
   if AWidth <= 0 then
     exit;
   screen := GetScreenPointer(APX, APY);
-  for index := drawRect.X to drawRect.Right do begin
+  for index := APX to APX + AWidth - 1 do begin
     if FScreenOffset > FWinSize then begin
       SetBank(FCurrentBank + 1);
       screen := Mode^.FrameBuffer;
@@ -632,7 +632,7 @@ begin
   if AHeight <= 0 then
     exit;
   screen := GetScreenPointer(APX, APY);
-  for index := drawRect.Y to drawRect.Bottom do begin
+  for index := APY to APY + AHeight - 1 do begin
     screen := GetScreenPointer(APX, index);
     screen^ := screen^ xor 15;
   end;

@@ -139,8 +139,8 @@ procedure TGraphics8Driver.InverseRectangle(ARect: TRect);
 begin
   InverseHLine(ARect.X, ARect.Y, ARect.Width);
   InverseHLine(ARect.X, ARect.Bottom, ARect.Width);
-  InverseVLine(ARect.X, ARect.Y, ARect.Height);
-  InverseVLine(ARect.Right, ARect.Y, ARect.Height);
+  InverseVLine(ARect.X, ARect.Y + 1, ARect.Height - 2);
+  InverseVLine(ARect.Right, ARect.Y + 1, ARect.Height - 2);
 end;
 
 end.

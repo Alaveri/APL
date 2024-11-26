@@ -14,7 +14,7 @@ uses
 
 const
   AplImageIdentifier: string[6] = 'APLIMG';
-  AplImageExtension = 'APG';
+  AplImageExtension = 'AMG';
   AplImageMajorVersion = 1;
   AplImageMinorVersion = 0;
 

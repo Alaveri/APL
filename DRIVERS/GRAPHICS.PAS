@@ -234,6 +234,9 @@ type
     procedure Line(AX1, AY1, AX2, AY2: integer); virtual;
     procedure HLine(APX, APY, AWidth: integer); virtual;
     procedure VLine(APX, APY, AHeight: integer); virtual;
+    procedure InverseHLine(APX, APY, AWidth: integer); virtual;
+    procedure InverseVLine(APX, APY, AHeight: integer); virtual;
+    procedure InverseRectangle(ARect: TRect); virtual;
     procedure Rectangle(ARect: TRect); virtual;
     procedure Fill(AX1, AY1, AWidth, AHeight: integer); virtual;
     procedure FillRect(ARect: TRect); virtual;
@@ -506,6 +509,21 @@ begin
   for index := ARect.Y to ARect.Bottom do
     HLine(ARect.X, index, ARect.Width);
   State^.ForeColor := tempColor;
+end;
+
+procedure TGraphicsDriver.InverseHLine(APX, APY, AWidth: integer);
+begin
+  Abstract;
+end;
+
+procedure TGraphicsDriver.InverseVLine(APX, APY, AHeight: integer);
+begin
+  Abstract;
+end;
+
+procedure TGraphicsDriver.InverseRectangle(ARect: TRect);
+begin
+  Abstract;
 end;
 
 procedure TGraphicsDriver.BezierQuad(AP1: TPoint; AP2: TPoint; AControl: TPoint; AResolution: integer);
