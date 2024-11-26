@@ -611,6 +611,7 @@ begin
       FScreenOffset := 0;
     end;
     screen^ := screen^ xor 15;
+    Inc(FScreenOffset);
     Inc(screen);
   end;
 end;
