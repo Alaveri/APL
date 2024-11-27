@@ -760,7 +760,6 @@ function TKeyboardShortcutList.GetShortcutByKey(AKey: word): PKeyboardShortcut;
 var
   index: integer;
   searchValue: TKeyboardShortcut;
-  item: PKeyboardShortcut;
 begin
   GetShortcutByKey := nil;
   searchValue.CreateKey(AKey);

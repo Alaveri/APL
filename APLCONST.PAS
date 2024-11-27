@@ -356,7 +356,6 @@ function TErrorList.GetErrorByCode(AErrorCode: word): PError;
 var
   index: integer;
   searchValue: TError;
-  item: PError;
 begin
   GetErrorByCode := nil;
   searchValue.CreateCode(AErrorCode);

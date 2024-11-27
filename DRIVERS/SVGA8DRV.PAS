@@ -535,10 +535,15 @@ begin
   drawRect.Intersect(Mode^.Bounds);
   if (APY < drawRect.Y) or (APY > drawRect.Bottom) then
     exit;
-  if APX < drawRect.X then
+  if APX < drawRect.X then begin
+    AWidth := AWidth - (drawRect.X - APX);
     APX := drawRect.X;
-  if APX + AWidth > drawRect.Right then
+  end;
+  if APX + AWidth - 1 > drawRect.Right then begin
     AWidth := drawRect.Right - APX + 1;
+    if AWidth <= 0 then
+      exit;
+  end;
   if AWidth <= 0 then
     exit;
   screen := GetScreenPointer(APX, APY);
@@ -597,10 +602,15 @@ begin
   drawRect.Intersect(Mode^.Bounds);
   if (APY < drawRect.Y) or (APY > drawRect.Bottom) then
     exit;
-  if APX < drawRect.X then
+  if APX < drawRect.X then begin
+    AWidth := AWidth - (drawRect.X - APX);
     APX := drawRect.X;
-  if APX + AWidth > drawRect.Right then
+  end;
+  if APX + AWidth - 1 > drawRect.Right then begin
     AWidth := drawRect.Right - APX + 1;
+    if AWidth <= 0 then
+      exit;
+  end;
   if AWidth <= 0 then
     exit;
   screen := GetScreenPointer(APX, APY);
