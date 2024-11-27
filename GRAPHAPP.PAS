@@ -20,7 +20,7 @@ type
   PMouseCursorList = ^TMouseCursorList;
   PMouseCursorListProc = ^TMouseCursorListProc;
 
-  TMouseCursorImage = array[0..14, 0..12] of byte;
+  TMouseCursorImage = array[0..14, 0..14] of byte;
   TMouseCursorListProc = procedure(ASender: PMouseCursorList; AMouseCursor: PMouseCursor);
 
   TMouseCursor = object(TIdentifiable)
@@ -79,116 +79,116 @@ type
 const
   DefaultMouseCursor: TMouseCursorImage =
   (
-    ($0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($0F, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($0F, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($0F, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($0F, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($0F, $00, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($0F, $00, $00, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($0F, $00, $00, $00, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF),
-    ($0F, $00, $00, $00, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF),
-    ($0F, $00, $00, $00, $0F, $0F, $0F, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($0F, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($FF, $0F, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF)
+    ($0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($0F, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($0F, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($0F, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($0F, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($0F, $00, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($0F, $00, $00, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($0F, $00, $00, $00, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($0F, $00, $00, $00, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($0F, $00, $00, $00, $0F, $0F, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($0F, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $0F, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF)
   );
 
   DefaultBeamMouseCursor: TMouseCursorImage =
   (
-    ($0F, $0F, $0F, $FF, $0F, $0F, $0F, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($0F, $00, $00, $0F, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($0F, $0F, $0F, $00, $0F, $0F, $0F, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($FF, $FF, $0F, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($FF, $FF, $0F, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($FF, $FF, $0F, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($FF, $FF, $0F, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($FF, $FF, $0F, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($FF, $FF, $0F, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($FF, $FF, $0F, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($FF, $FF, $0F, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($FF, $FF, $0F, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($0F, $0F, $0F, $00, $0F, $0F, $0F, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($0F, $00, $00, $0F, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($0F, $0F, $0F, $FF, $0F, $0F, $0F, $FF, $FF, $FF, $FF, $FF, $FF)
+    ($0F, $0F, $0F, $FF, $0F, $0F, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($0F, $00, $00, $0F, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($0F, $0F, $0F, $00, $0F, $0F, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $0F, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $0F, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $0F, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $0F, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $0F, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $0F, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $0F, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $0F, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $0F, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($0F, $0F, $0F, $00, $0F, $0F, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($0F, $00, $00, $0F, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($0F, $0F, $0F, $FF, $0F, $0F, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF)
   );
 
   DefaultNWSECursor: TMouseCursorImage =
   (
-    ($0F, $0F, $0F, $0F, $0F, $0F, $0F, $0F, $FF, $FF, $FF, $FF, $FF),
-    ($0F, $00, $00, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($0F, $00, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($0F, $00, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($0F, $00, $00, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($0F, $00, $0F, $0F, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $0F),
-    ($0F, $0F, $FF, $FF, $0F, $00, $00, $00, $0F, $FF, $FF, $0F, $0F),
-    ($0F, $FF, $FF, $FF, $FF, $0F, $00, $00, $00, $0F, $0F, $00, $0F),
-    ($FF, $FF, $FF, $FF, $FF, $FF, $0F, $00, $00, $00, $00, $00, $0F),
-    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $0F, $00, $00, $00, $00, $0F),
-    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $0F, $00, $00, $00, $00, $0F),
-    ($FF, $FF, $FF, $FF, $FF, $FF, $0F, $00, $00, $00, $00, $00, $0F),
-    ($FF, $FF, $FF, $FF, $FF, $0F, $0F, $0F, $0F, $0F, $0F, $0F, $0F),
-    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF)
+    ($0F, $0F, $0F, $0F, $0F, $0F, $0F, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($0F, $00, $00, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($0F, $00, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($0F, $00, $00, $00, $00, $00, $0F, $FF, $FF, $FF, $0F, $FF, $FF, $FF, $FF),
+    ($0F, $00, $00, $00, $00, $00, $00, $0F, $FF, $0F, $0F, $FF, $FF, $FF, $FF),
+    ($0F, $00, $0F, $00, $00, $00, $00, $00, $0F, $00, $0F, $FF, $FF, $FF, $FF),
+    ($0F, $0F, $FF, $0F, $00, $00, $00, $00, $00, $00, $0F, $FF, $FF, $FF, $FF),
+    ($0F, $FF, $FF, $FF, $0F, $00, $00, $00, $00, $00, $0F, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $FF, $0F, $00, $00, $00, $00, $0F, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $0F, $00, $00, $00, $00, $00, $0F, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $0F, $0F, $0F, $0F, $0F, $0F, $0F, $0F, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF)
   );
 
   DefaultNESWCursor: TMouseCursorImage =
   (
-    ($FF, $FF, $FF, $FF, $FF, $0F, $0F, $0F, $0F, $0F, $0F, $0F, $0F),
-    ($FF, $FF, $FF, $FF, $FF, $FF, $0F, $00, $00, $00, $00, $00, $0F),
-    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $0F, $00, $00, $00, $00, $0F),
-    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $0F, $00, $00, $00, $00, $0F),
-    ($FF, $FF, $FF, $FF, $FF, $FF, $0F, $00, $00, $0F, $00, $00, $0F),
-    ($0F, $FF, $FF, $FF, $FF, $0F, $00, $00, $0F, $FF, $0F, $00, $0F),
-    ($0F, $0F, $FF, $FF, $0F, $00, $00, $0F, $FF, $FF, $FF, $0F, $0F),
-    ($0F, $00, $0F, $0F, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $0F),
-    ($0F, $00, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($0F, $00, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($0F, $00, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($0F, $00, $00, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($0F, $0F, $0F, $0F, $0F, $0F, $0F, $0F, $FF, $FF, $FF, $FF, $FF),
-    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF)
+    ($FF, $FF, $FF, $0F, $0F, $0F, $0F, $0F, $0F, $0F, $0F, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $0F, $00, $00, $00, $00, $00, $0F, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $FF, $0F, $00, $00, $00, $00, $0F, $FF, $FF, $FF, $FF),
+    ($0F, $FF, $FF, $FF, $0F, $00, $00, $00, $00, $00, $0F, $FF, $FF, $FF, $FF),
+    ($0F, $0F, $FF, $0F, $00, $00, $00, $00, $00, $00, $0F, $FF, $FF, $FF, $FF),
+    ($0F, $00, $0F, $00, $00, $00, $00, $00, $0F, $00, $0F, $FF, $FF, $FF, $FF),
+    ($0F, $00, $00, $00, $00, $00, $00, $0F, $FF, $0F, $0F, $FF, $FF, $FF, $FF),
+    ($0F, $00, $00, $00, $00, $00, $0F, $FF, $FF, $FF, $0F, $FF, $FF, $FF, $FF),
+    ($0F, $00, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($0F, $00, $00, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($0F, $0F, $0F, $0F, $0F, $0F, $0F, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF)
   );
 
   DefaultNSCursor: TMouseCursorImage =
   (
-    ($FF, $FF, $FF, $FF, $0F, $FF, $FF, $FF, $0F, $FF, $FF, $FF, $FF),
-    ($FF, $FF, $FF, $0F, $0F, $FF, $FF, $FF, $0F, $0F, $FF, $FF, $FF),
-    ($FF, $FF, $0F, $00, $0F, $0F, $0F, $0F, $0F, $00, $0F, $FF, $FF),
-    ($FF, $0F, $00, $00, $00, $00, $00, $00, $00, $00, $00, $0F, $FF),
-    ($0F, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $0F),
-    ($FF, $0F, $00, $00, $00, $00, $00, $00, $00, $00, $00, $0F, $FF),
-    ($FF, $FF, $0F, $00, $0F, $0F, $0F, $0F, $0F, $00, $0F, $FF, $FF),
-    ($FF, $FF, $FF, $0F, $0F, $FF, $FF, $FF, $0F, $0F, $FF, $FF, $FF),
-    ($FF, $FF, $FF, $FF, $0F, $FF, $FF, $FF, $0F, $FF, $FF, $FF, $FF),
-    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF)
+    ($FF, $FF, $FF, $FF, $FF, $0F, $FF, $FF, $FF, $0F, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $0F, $0F, $FF, $FF, $FF, $0F, $0F, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $0F, $00, $0F, $FF, $FF, $FF, $0F, $00, $0F, $FF, $FF, $FF),
+    ($FF, $FF, $0F, $00, $00, $0F, $0F, $0F, $0F, $0F, $00, $00, $0F, $FF, $FF),
+    ($FF, $0F, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $0F, $FF),
+    ($0F, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $0F),
+    ($FF, $0F, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $00, $0F, $FF),
+    ($FF, $FF, $0F, $00, $00, $0F, $0F, $0F, $0F, $0F, $00, $00, $0F, $FF, $FF),
+    ($FF, $FF, $FF, $0F, $00, $0F, $FF, $FF, $FF, $0F, $00, $0F, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $0F, $0F, $FF, $FF, $FF, $0F, $0F, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $FF, $0F, $FF, $FF, $FF, $0F, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF)
   );
 
   DefaultEWCursor: TMouseCursorImage =
   (
-    ($FF, $FF, $FF, $FF, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($FF, $FF, $FF, $0F, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($FF, $FF, $0F, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($FF, $0F, $00, $00, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF),
-    ($0F, $0F, $0F, $00, $00, $00, $0F, $0F, $0F, $FF, $FF, $FF, $FF),
-    ($FF, $FF, $0F, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($FF, $FF, $0F, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($FF, $FF, $0F, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($0F, $0F, $0F, $00, $00, $00, $0F, $0F, $0F, $FF, $FF, $FF, $FF),
-    ($FF, $0F, $00, $00, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF),
-    ($FF, $FF, $0F, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($FF, $FF, $FF, $0F, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($FF, $FF, $FF, $FF, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
-    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF)
+    ($FF, $FF, $FF, $FF, $FF, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $0F, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $0F, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $0F, $00, $00, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $0F, $00, $00, $00, $00, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF),
+    ($0F, $0F, $0F, $0F, $00, $00, $00, $0F, $0F, $0F, $0F, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $0F, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $0F, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $0F, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($0F, $0F, $0F, $0F, $00, $00, $00, $0F, $0F, $0F, $0F, $FF, $FF, $FF, $FF),
+    ($FF, $0F, $00, $00, $00, $00, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $0F, $00, $00, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $0F, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $0F, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $FF, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF)
   );
 
 
@@ -248,26 +248,26 @@ var
   sens: integer;
 begin
   MouseCursors := New(PMouseCursorList, Create);
-  cursor := New(PMouseCursor, Create('Default', 13, 15, @DefaultMouseCursor));
+  cursor := New(PMouseCursor, Create('Default', 15, 15, @DefaultMouseCursor));
   MouseCursors^.Add(cursor);
-  cursor := New(PMouseCursor, Create('Beam', 13, 15, @DefaultBeamMouseCursor));
+  cursor := New(PMouseCursor, Create('Beam', 15, 15, @DefaultBeamMouseCursor));
   cursor^.OffsetX := 4;
   cursor^.OffsetY := 7;
   MouseCursors^.Add(cursor);
-  cursor := New(PMouseCursor, Create('NWSE', 13, 15, @DefaultNWSECursor));
-  cursor^.OffsetX := 5;
-  cursor^.OffsetY := 5;
-  MouseCursors^.Add(cursor);
-  cursor := New(PMouseCursor, Create('NESW', 13, 15, @DefaultNESWCursor));
-  cursor^.OffsetX := 5;
-  cursor^.OffsetY := 5;
-  MouseCursors^.Add(cursor);
-  cursor := New(PMouseCursor, Create('NS', 13, 15, @DefaultNSCursor));
+  cursor := New(PMouseCursor, Create('NWSE', 15, 15, @DefaultNWSECursor));
   cursor^.OffsetX := 6;
-  cursor^.OffsetY := 4;
+  cursor^.OffsetY := 5;
   MouseCursors^.Add(cursor);
-  cursor := New(PMouseCursor, Create('EW', 13, 15, @DefaultEWCursor));
-  cursor^.OffsetX := 4;
+  cursor := New(PMouseCursor, Create('NESW', 15, 15, @DefaultNESWCursor));
+  cursor^.OffsetX := 6;
+  cursor^.OffsetY := 5;
+  MouseCursors^.Add(cursor);
+  cursor := New(PMouseCursor, Create('NS', 15, 15, @DefaultNSCursor));
+  cursor^.OffsetX := 6;
+  cursor^.OffsetY := 8;
+  MouseCursors^.Add(cursor);
+  cursor := New(PMouseCursor, Create('EW', 15, 15, @DefaultEWCursor));
+  cursor^.OffsetX := 8;
   cursor^.OffsetY := 6;
   MouseCursors^.Add(cursor);
   MouseCursor := MouseCursors^.GetItemById('Default');
