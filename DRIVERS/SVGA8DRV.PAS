@@ -26,7 +26,7 @@ type
   private
     FAttributes: TVbeModeAttributes;
     FWinSize: word;
-    FWinFuncPtr: pointer;
+    FWinFunc: pointer;
     FGranularity: word;
   public
     procedure Init; virtual;
@@ -79,7 +79,7 @@ begin
   inherited Init;
   FWinSize := 0;
   FAttributes := [];
-  FWinFuncPtr := nil;
+  FWinFunc := nil;
   FGranularity := 0;
 end;
 
@@ -96,7 +96,7 @@ begin
   mode := PSVga8Mode(@ASource);
   FAttributes := mode^.FAttributes;
   FWinSize := mode^.FWinSize;
-  FWinFuncPtr := mode^.FWinFuncPtr;
+  FWinFunc := mode^.FWinFunc;
   FGranularity := 0;
 end;
 
@@ -180,7 +180,7 @@ begin
       BytesPerScanLine := vbeMode.v1.BytesPerScanLine;
       FAttributes := vbeMode.v1.ModeAttributes;
       FWinSize := vbeMode.v1.WinSize;
-      FWinFuncPtr := vbeMode.v1.WinFuncPtr;
+      FWinFunc := vbeMode.v1.WinFuncPtr;
       HelpText := TString.New('Requires Super VGA card supporting VBE extensions.');
       FrameBuffer := Ptr(vbeMode.v1.WinSegmentA, 0);
       FGranularity := vbeMode.v1.WinGranularity;
@@ -232,7 +232,7 @@ begin
   State^.Bpp := AMode^.Bpp;
   SetVgaPalette;
   FWinSize := longint(SVgaMode^.FWinSize) * 1024 - 1;
-  FWinFunc := SVgaMode^.FWinFuncPtr;
+  FWinFunc := SVgaMode^.FWinFunc;
   FCurrentBank := -1;
   FBankShift := 0;
   while (64 shr FBankShift <> SVgaMode^.FGranularity) do
@@ -251,11 +251,10 @@ begin
   asm
     mov bx, 0
     mov dx, [ABank]
-    call [winFunc]
-
+    call winFunc
     mov bx, 1
     mov dx, [ABank]
-    call [winFunc]
+    call winFunc
   end;
 end;
 
@@ -354,7 +353,7 @@ begin
       continue;
     end;
     minX := Max(0, drawRect.X - sx);
-    maxX := Min(width - 1, drawRect.Right - sx + 1);
+    maxX := Min(width - 1, drawRect.Right - sx);
     sy := Max(drawRect.Y, APY);
     while sy <= maxY do begin
       screen := GetScreenPointer(sx + minX, sy);
@@ -529,11 +528,8 @@ var
   drawRect: TRect;
   px: integer;
 begin
-  if HasException then
-    exit;
-  State^.Bounds.GetIntersection(State^.ViewPort, drawRect);
-  drawRect.Intersect(Mode^.Bounds);
-  if (APY < drawRect.Y) or (APY > drawRect.Bottom) then
+  GetDrawRect(drawRect);
+  if HasException or (APY < drawRect.Y) or (APY > drawRect.Bottom) then
     exit;
   if APX < drawRect.X then begin
     AWidth := AWidth - (drawRect.X - APX);
@@ -555,11 +551,21 @@ begin
   color := byte(State^.ForeColor);
   if AWidth + FScreenOffset > FWinSize then begin
     partialWidth := FWinSize - FScreenOffset + 1;
-    FillChar(screen^, partialWidth, color);
+    asm
+      les di, screen
+      mov cx, partialWidth
+      mov al, color
+      rep stosb
+     end;
     SetBank(FCurrentBank + 1);
     screen := Mode^.FrameBuffer;
     Dec(AWidth, partialWidth);
-    FillChar(screen^, AWidth, color);
+    asm
+      les di, screen
+      mov cx, AWidth
+      mov al, color
+      rep stosb
+    end;
   end
   else
     FillChar(screen^, AWidth, color);
@@ -598,9 +604,8 @@ var
   index: integer;
   screen: PByte;
 begin
-  State^.Bounds.GetIntersection(State^.ViewPort, drawRect);
-  drawRect.Intersect(Mode^.Bounds);
-  if (APY < drawRect.Y) or (APY > drawRect.Bottom) then
+  GetDrawRect(drawRect);
+  if HasException or (APY < drawRect.Y) or (APY > drawRect.Bottom) then
     exit;
   if APX < drawRect.X then begin
     AWidth := AWidth - (drawRect.X - APX);
@@ -614,7 +619,14 @@ begin
   if AWidth <= 0 then
     exit;
   screen := GetScreenPointer(APX, APY);
-  for index := APX to APX + AWidth - 1 do begin
+  if State^.BufferMode then begin
+    for index := 0 to AWidth - 1 do begin
+      screen^ := screen^ xor 15;
+      Inc(screen);
+    end;
+    exit;
+  end;
+  for index := 0 to AWidth - 1 do begin
     if FScreenOffset > FWinSize then begin
       SetBank(FCurrentBank + 1);
       screen := Mode^.FrameBuffer;

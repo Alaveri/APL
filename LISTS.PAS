@@ -19,7 +19,6 @@ const
 type
   PObjectList = ^TObjectList;
   PList = ^TList;
-  PLinkedObjectList = ^TLinkedObjectList;
   PStack = ^TStack;
   PObjectStack = ^TStack;
   PQueue = ^TQueue;
@@ -69,6 +68,13 @@ type
     function Capacity: integer;
     function Grow(AMin: integer): integer; virtual;
     function GrowUsing(AGrowFunc: TListGrowFunc; AMin: integer): integer; virtual;
+    function Exists(AItem: pointer): boolean;
+    function First: pointer;
+    function Last: pointer;
+    function FirstOrDefault(ADefault: pointer): pointer;
+    function LastOrDefault(ADefault: pointer): pointer;
+    function FirstThat(AFunc: TPredicate): pointer;
+    function MoveIndex(AFromIndex, AToIndex: integer): boolean;
     procedure ForEach(AProc: PListProc); virtual;
     procedure SetComparer(AComparer: TComparer); virtual;
     procedure Swap(AIndex1, AIndex2: integer); virtual;
@@ -90,30 +96,6 @@ type
     Next: PListNode;
   end;
 
-  TLinkedList = object(TObject)
-  private
-    FHead: PListNode;
-    FTail: PListNode;
-    function SortedMerge(AComparer: TComparer; AItem1: PListNode; AItem2: PListNode): PListNode;
-    procedure MergeSort(AComparer: TComparer; var AHead: PListNode);
-    procedure FrontBackSplit(ASource: PListNode; var Afront, ABack: PListNode);
-    procedure FreeNode(ANode: PListNode); virtual;
-  public
-    Count: longint;
-    destructor Free; virtual;
-    procedure Init; virtual;
-    function Add(AItem: pointer): PListNode;
-    function GetItem(AIndex: longint): pointer;
-    function GetNode(AIndex: longint): PListNode;
-    function IndexOf(AItem: pointer): longint;
-    procedure Swap(var AItem1, AItem2: PListNode);
-    procedure SetItem(AIndex: longint; AItem: pointer);
-    procedure Sort(AComparer: TComparer); virtual;
-    procedure Insert(AIndex: longint; AItem: pointer);
-    procedure Delete(AIndex: longint);
-    procedure Clear; virtual;
-  end;
-
   TObjectList = object(TList)
   private
   public
@@ -129,18 +111,6 @@ type
     procedure Delete(AIndex: integer); virtual;
     procedure Clear; virtual;
     destructor Free; virtual;
-  end;
-
-  TLinkedObjectList = object(TLinkedList)
-  public
-    DisposeObjects: boolean;
-    procedure Init; virtual;
-    function Add(AItem: PObject): PListNode;
-    function GetItem(AIndex: longint): PObject;
-    procedure SetItem(AIndex: longint; AItem: PObject);
-    function IndexOf(AItem: PObject): longint;
-    procedure Insert(AIndex: longint; AItem: PObject);
-    procedure FreeNode(ANode: PListNode); virtual;
   end;
 
   TStack = object(TList)
@@ -364,6 +334,57 @@ begin
   AddPtr := index;
 end;
 
+function TList.Exists(AItem: pointer): boolean;
+begin
+  Exists := IndexOfPtr(AItem) >= 0;
+end;
+
+function TList.First: pointer;
+begin
+  if Count = 0 then
+    First := nil
+  else
+    First := GetItem(0);
+end;
+
+function TList.Last: pointer;
+begin
+  if Count = 0 then
+    Last := nil
+  else
+    Last := GetItem(Count - 1);
+end;
+
+function TList.MoveIndex(AFromIndex, AToIndex: integer): boolean;
+var
+  item: pointer;
+begin
+  MoveIndex := false;
+  if (AFromIndex < 0) or (AFromIndex > Count - 1)
+    or (AToIndex < 0) or (AToIndex > Count - 1) then
+    exit;
+  item := GetItem(AFromIndex);
+  Delete(AFromIndex);
+  Insert(AToIndex, item);
+  MoveIndex := true;
+end;
+
+function TList.FirstOrDefault(ADefault: pointer): pointer;
+begin
+  if Count = 0 then
+    FirstOrDefault := ADefault
+  else
+    FirstOrDefault := GetItem(0);
+end;
+
+function TList.LastOrDefault(ADefault: pointer): pointer;
+begin
+  if Count = 0 then
+    LastOrDefault := ADefault
+  else
+    LastOrDefault := GetItem(Count - 1);
+end;
+
 procedure TList.Clear;
 begin
   while Count > 0 do
@@ -557,6 +578,23 @@ begin
     end;
     Inc(index);
   until index > Count - 1;
+end;
+
+function TList.FirstThat(AFunc: TPredicate): pointer;
+var
+  index: integer;
+  item: pointer;
+begin
+  FirstThat := nil;
+  if Count = 0 then
+    exit;
+  for index := 0 to Count - 1 do begin
+    item := GetItem(index);
+    if TPredicate(AFunc)(item) then begin
+      FirstThat := item;
+      break;
+    end;
+  end;
 end;
 
 procedure TList.CustomSort(AComparer: TComparer; ASortFunc: TSortFunc);
@@ -923,266 +961,6 @@ end;
 procedure TIdentifiableList.Insert(AIndex: integer; AItem: PIdentifiable);
 begin
   inherited Insert(AIndex, AItem);
-end;
-
-procedure TLinkedList.Init;
-begin
-  inherited Init;
-  FHead := nil;
-  FTail := nil;
-  Count := 0;
-end;
-
-function TLinkedList.Add(AItem: pointer): PListNode;
-var
-  node: PListNode;
-begin
-  node := New(PListNode);
-  node^.Item := AItem;
-  node^.Next := nil;
-  Add := node;
-  Inc(Count);
-  if not Assigned(FHead) then begin
-    FHead := node;
-    FTail := node;
-    exit;
-  end;
-  FTail^.Next := node;
-  FTail := node;
-end;
-
-function TLinkedList.GetNode(AIndex: longint): PListNode;
-var
-  index: longint;
-  current: PListNode;
-begin
-  GetNode := nil;
-  if (AIndex < 0) or (AIndex > Count - 1) then
-    exit;
-  index := -1;
-  current := FHead;
-  while Assigned(current) do begin
-    Inc(index);
-    if index = AIndex then
-      break;
-    current := current^.Next;
-  end;
-  GetNode := current;
-end;
-
-function TLinkedList.GetItem(AIndex: longint): pointer;
-var
-  node: PListNode;
-begin
-  GetItem := nil;
-  node := GetNode(AIndex);
-  if not Assigned(node) then
-    exit;
-  GetItem := node^.Item;
-end;
-
-procedure TLinkedList.SetItem(AIndex: longint; AItem: pointer);
-var
-  node: PListNode;
-begin
-  node := GetNode(AIndex);
-  if Assigned(node) then
-    node^.Item := AItem;
-end;
-
-function TLinkedList.IndexOf(AItem: pointer): longint;
-var
-  index: longint;
-  current: PListNode;
-begin
-  IndexOf := -1;
-  if not Assigned(FHead) then
-    exit;
-  index := 0;
-  current := FHead;
-  while current^.Item <> AItem do begin
-    if not Assigned(current^.Next) then begin
-      IndexOf := -1;
-      exit;
-    end;
-    Inc(index);
-    current := current^.Next;
-  end;
-  IndexOf := index;
-end;
-
-procedure TLinkedList.Swap(var AItem1, AItem2: PListNode);
-var
-  temp: pointer;
-begin
-  temp := AItem1^.Item;
-  AItem1^.Item := AItem2^.Item;
-  AItem2^.Item := temp;
-end;
-
-procedure TLinkedList.Sort(AComparer: TComparer);
-begin
-  MergeSort(AComparer, FHead);
-end;
-
-procedure TLinkedList.Insert(AIndex: longint; AItem: pointer);
-var
-  prev, item, newNode: PListNode;
-  head: PListNode;
-begin
-  AIndex := MaxL(AIndex, 0);
-  if AIndex >= Count then begin
-    FTail := Add(AItem);
-    exit;
-  end;
-  Inc(Count);
-  newNode := New(PListNode);
-  newNode^.Next := nil;
-  newNode^.Item := AItem;
-  if AIndex = 0 then begin
-    head := FHead;
-    FHead := newNode;
-    FHead^.Next := head;
-    exit;
-  end;
-  prev := GetNode(AIndex - 1);
-  prev^.Next := newNode;
-end;
-
-procedure TLinkedList.Delete(AIndex: longint);
-var
-  prev, item: PListNode;
-begin
-  if (AIndex < 0) or (AIndex > Count - 1) then
-    exit;
-  Dec(Count);
-  if AIndex = 0 then begin
-    if Assigned(FHead) then begin
-      if FHead = FTail then
-        FTail := nil;
-      item := FHead;
-      FHead := item^.Next;
-      FreeNode(item);
-    end;
-    exit;
-  end;
-  prev := GetNode(AIndex - 1);
-  item := prev^.Next;
-  prev^.Next := item^.Next;
-  FreeNode(item);
-end;
-
-procedure TLinkedList.MergeSort(AComparer: TComparer; var AHead: PListNode);
-var
-  head, item1, item2: PListNode;
-begin
-  head := AHead;
-  if (not Assigned(head)) or (not Assigned(head^.Next)) then
-      exit;
-  FrontBackSplit(head, item1, item2);
-  MergeSort(AComparer, item1);
-  MergeSort(AComparer, item2);
-  AHead := SortedMerge(AComparer, item1, item2);
-end;
-
-procedure TLinkedList.FrontBackSplit(ASource: PListNode; var Afront, ABack: PListNode);
-var
-  fast, slow: PListNode;
-begin
-  slow := ASource;
-  fast := ASource^.Next;
-  while Assigned(fast) do begin
-    fast := fast^.Next;
-    if Assigned(fast) then begin
-      slow := slow^.Next;
-      fast := fast^.Next;
-    end;
-  end;
-  AFront := ASource;
-  ABack := slow^.Next;
-  slow^.Next := nil;
-end;
-
-function TLinkedList.SortedMerge(AComparer: TComparer; AItem1: PListNode; AItem2: PListNode): PListNode;
-var
-  result: PListNode;
-begin
-  result := nil;
-
-  if not Assigned(AItem1) then begin
-    SortedMerge := AItem2;
-    exit;
-  end
-  else if not Assigned(AItem2) then begin
-    SortedMerge := AItem1;
-    exit;
-  end;
-
-  if AComparer(AItem1^.Item, AItem2^.Item) <= 0 then begin
-    result := AItem1;
-    result^.Next := SortedMerge(AComparer, AItem1^.Next, AItem2);
-  end
-  else begin
-    result := AItem2;
-    result^.Next := SortedMerge(AComparer, AItem1, AItem2^.Next);
-  end;
-
-  SortedMerge := result;
-end;
-
-procedure TLinkedList.FreeNode(ANode: PListNode);
-begin
-  Dispose(ANode);
-end;
-
-destructor TLinkedList.Free;
-begin
-  Clear;
-  inherited Free;
-end;
-
-procedure TLinkedList.Clear;
-begin
-  while Count > 0 do
-    Delete(0);
-end;
-
-procedure TLinkedObjectList.Init;
-begin
-  inherited Init;
-  DisposeObjects := true;
-end;
-
-function TLinkedObjectList.Add(AItem: PObject): PListNode;
-begin
-  Add := inherited Add(AItem);
-end;
-
-function TLinkedObjectList.GetItem(AIndex: longint): PObject;
-begin
-  GetItem := inherited GetItem(AIndex);
-end;
-
-procedure TLinkedObjectList.SetItem(AIndex: longint; AItem: PObject);
-begin
-  inherited SetItem(AIndex, AItem);
-end;
-
-function TLinkedObjectList.IndexOf(AItem: PObject): longint;
-begin
-  IndexOf := inherited IndexOf(AItem);
-end;
-
-procedure TLinkedObjectList.Insert(AIndex: longint; AItem: PObject);
-begin
-  inherited Insert(AIndex, AItem);
-end;
-
-procedure TLinkedObjectList.FreeNode(ANode: PListNode);
-begin
-  if DisposeObjects then
-    FreeAndNil(ANode^.Item);
-  inherited FreeNode(ANode);
 end;
 
 begin

@@ -16,7 +16,7 @@ type
   PStringBuilder = ^TStringBuilder;
 
   TComparer = function(AItem1, AItem2: pointer): integer;
-  TPredicate = function(AItem: pointer; var AValue): boolean;
+  TPredicate = function(AItem: pointer): boolean;
   TCustomErrorMessageProc = function(AErrorCode: word; var AFound: boolean): string;
   TObjectStatus = integer;
   TExceptionCode = word;

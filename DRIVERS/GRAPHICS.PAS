@@ -422,6 +422,7 @@ end;
 procedure TGraphicsDriver.GetDrawRect(var ARect: TRect);
 begin
   State^.Bounds.GetIntersection(State^.ViewPort, ARect);
+  ARect.Intersect(Mode^.Bounds);
 end;
 
 function TGraphicsDriver.GetPixel(APX, APY: integer): byte;

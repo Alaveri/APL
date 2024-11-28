@@ -132,12 +132,15 @@ type
     procedure SetBottom(ABottom: integer);
     procedure Translate(ADX, ADY: integer);
     procedure TranslateToOrigin;
+    procedure Clear;
     procedure Grow(ADW, ADH: integer);
     procedure Intersect(var ARect: TRect);
     procedure GetIntersection(ARect: TRect; var AResult: TRect);
     procedure Init; virtual;
     procedure GetInversionPoints(AList: PInversionPointList;
       AMode: TRegionMode; AY, AStartX, AEndX: integer);
+    procedure GetCoords(var APX, APY, ARight, ABottom: integer);
+    procedure GetDims(var APX, APY, AWidth, AHeight: integer);
     function GetNewObject: PObject; virtual;
     function Equals(ARect: TRect): boolean;
     function EqualsCoords(AX, AY, AWidth, AHeight: integer): boolean;
@@ -246,13 +249,19 @@ end;
 constructor TRect.CreateDims(AX, AY, AWidth, AHeight: integer);
 begin
   inherited Create;
-  SetDims(AX, AY, AWidth, AHeight);
+  if (AWidth < 0) or (AHeight < 0) then
+    SetDims(AX, AY, 0, 0)
+  else
+    SetDims(AX, AY, AWidth, AHeight);
 end;
 
 constructor TRect.CreateCoords(AX, AY, ARight, ABottom: integer);
 begin
   inherited Create;
-  SetCoords(AX, AY, ARight, ABottom);
+  if (ARight < AX) or (ABottom < AY) then
+    SetDims(AX, AY, 0, 0)
+  else
+    SetCoords(AX, AY, ARight, ABottom);
 end;
 
 function TRect.GetNewObject: PObject;
@@ -283,6 +292,11 @@ procedure TRect.Translate(ADX, ADY: integer);
 begin
   Inc(X, ADX);
   Inc(Y, ADY);
+end;
+
+procedure TRect.Clear;
+begin
+  SetDims(0, 0, 0, 0);
 end;
 
 procedure TRect.TranslateToOrigin;
@@ -377,6 +391,22 @@ begin
   ClampY := Clamp(APY, Y, Bottom);
 end;
 
+procedure TRect.GetCoords(var APX, APY, ARight, ABottom: integer);
+begin
+  APX := X;
+  APY := Y;
+  ARight := Right;
+  ABottom := Bottom;
+end;
+
+procedure TRect.GetDims(var APX, APY, AWidth, AHeight: integer);
+begin
+  APX := X;
+  APY := Y;
+  AWidth := Width;
+  AHeight := Height;
+end;
+
 function TRect.ContainsX(APX: integer): boolean; assembler;
 asm
     xor ax, ax
@@ -468,18 +498,9 @@ begin
      (ARect.Y > Bottom));
 end;
 
-function TRect.IsEmpty: boolean; assembler;
-asm
-  les di, self
-  mov al, 0
-  mov dx, es:[di].TRect.Width
-  cmp dx, 0
-  jg @end
-  mov dx, es:[di].TRect.Height
-  cmp dx, 0
-  jg @end
-  inc ax
-  @end:
+function TRect.IsEmpty: boolean;
+begin
+  IsEmpty := (Width <= 0) or (Height <= 0);
 end;
 
 procedure TRect.Intersect(var ARect: TRect);

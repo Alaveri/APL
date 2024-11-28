@@ -72,7 +72,8 @@ type
     procedure HideMouseCursor; virtual;
     procedure EraseMouseCursor(const AMouseState: TMouseState); virtual;
     procedure DrawMouseCursor(const AMouseState: TMouseState); virtual;
-    procedure MoveMouseCursor(const AMouseState, AOldMouseState: TMouseState); virtual;
+    procedure MoveMouseCursor(const AMouseState, AOldMouseState: TMouseState;
+      AWaitForVSync: boolean); virtual;
     procedure RedrawMouseCursor(var AViewPort: TRect; const AMouseState: TMouseState);
   end;
 
@@ -296,13 +297,15 @@ begin
   MouseCursor^.Draw;
 end;
 
-procedure TGraphApp.MoveMouseCursor(const AMouseState, AOldMouseState: TMouseState);
+procedure TGraphApp.MoveMouseCursor(const AMouseState, AOldMouseState: TMouseState;
+  AWaitForVSync: boolean);
 var
   oldRect, newRect: TRect;
 begin
-  if (not MouseCursor^.Visible) or not (AMouseState.Visible) then
+  if not (MouseCursor^.Visible and AMouseState.Visible) then
     exit;
-  Graph^.WaitForVSync;
+  if AWaitForVSync then
+    Graph^.WaitForVSync;
   if Assigned(MouseCursor^.FBackData) then
     EraseMouseCursor(AOldMouseState);
   DrawMouseCursor(AMouseState);

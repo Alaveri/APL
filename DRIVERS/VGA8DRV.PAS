@@ -119,18 +119,14 @@ var
   charIndex, fore: byte;
   count: word;
 begin
-  if HasException then
-    exit;
   State^.Bounds.GetIntersection(State^.ViewPort, drawRect);
   drawRect.Intersect(Mode^.Bounds);
-  if drawRect.IsEmpty then
-    exit;
-  if APX > drawRect.Right then
-    exit;
-  if APY > drawRect.Bottom then
-    exit;
   height := State^.Font^.Height;
-  if APY + height < drawRect.Y then
+  if HasException
+    or drawRect.IsEmpty
+    or (APX > drawRect.Right)
+    or (APY > drawRect.Bottom)
+    or (APY + height < drawRect.Y) then
     exit;
   sx := APX;
   charIndex := 0;
@@ -205,10 +201,7 @@ begin
     sy := -1;
 
   aError := dlx + dly;
-  x := drawRect.X;
-  y := drawRect.Y;
-  right := drawRect.Right;
-  bottom := drawRect.Bottom;
+  drawRect.GetCoords(x, y, right, bottom);
   screenPtr := State^.FrameBuffer;
   width := Mode^.Width;
   color := State^.ForeColor;
@@ -283,16 +276,13 @@ var
   color: byte;
   drawRect: TRect;
 begin
-  if HasException then
-    exit;
   GetDrawRect(drawRect);
-  if not drawRect.ContainsY(APY) then
+  if HasException or not drawRect.ContainsY(APY) then
     exit;
-  APX := drawRect.ClampY(APX);
+  APX := drawRect.ClampX(APX);
   AWidth := MinL(drawRect.Width, AWidth);
   if AWidth <= 0 then
     exit;
-
   screen := GetScreenPointer(APX, APY);
   color := byte(State^.ForeColor);
   asm
@@ -321,13 +311,11 @@ begin
   AHeight := MinL(drawRect.Height, AHeight);
   if AHeight <= 0 then
     exit;
-
   screen := GetScreenPointer(APX, APY);
   color := ForeColor;
   screenWidth := Mode^.BytesPerScanLine;
   if State^.BufferMode then
     screenWidth := State^.ViewPort.Width;
-
   asm
     mov ax, screenWidth
     mov cx, AHeight
