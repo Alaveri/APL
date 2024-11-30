@@ -143,10 +143,6 @@ type
       const ALevel: TCompressionLevel);
     procedure LoadFromStream(AStream: PStream); virtual;
     procedure SaveToStream(AStream: PStream); virtual;
-    procedure SaveToFileCompressed(const AFileName: string; ACompression: TAplCompression;
-      ACompressionLevel: TCompressionLevel); virtual;
-    procedure SaveToStreamCompressed(AStream: PStream; ACompression: TAplCompression;
-      ACompressionLevel: TCompressionLevel); virtual;
     procedure Clear(AColor: byte); virtual;
     procedure ClearWord(AColor: word); virtual;
     procedure ClearLong(AColor: longint); virtual;
@@ -164,8 +160,6 @@ type
     procedure ClearWord(AColor: word); virtual;
     procedure ClearLong(AColor: longint); virtual;
     procedure SaveToStream(AStream: PStream); virtual;
-    procedure SaveToStreamCompressed(AStream: PStream; ACompression: TAplCompression;
-      ACompressionLevel: TCompressionLevel); virtual;
     procedure LoadFromStream(AStream: PStream); virtual;
   end;
 
@@ -177,8 +171,7 @@ type
     procedure Clear(AColor: byte); virtual;
     procedure ClearWord(AColor: word); virtual;
     procedure ClearLong(AColor: longint); virtual;
-    procedure SaveToStreamCompressed(AStream: PStream; ACompression: TAplCompression;
-      ACompressionLevel: TCompressionLevel); virtual;
+    procedure SaveToStream(AStream: PStream); virtual;
     procedure LoadFromStream(AStream: PStream); virtual;
   end;
 
@@ -404,35 +397,6 @@ begin
   FHeader.CompressionLevel := ALevel;
 end;
 
-procedure TAplImage.LoadFromFile(const AFileName: string);
-var
-  stream: PFileStream;
-begin
-  if HasException then
-    exit;
-  stream := New(PFileStream, Create(AFileName, fmRead));
-  if NilPtr(stream, ecNotEnoughMemory) then
-    exit;
-  LoadFromStream(stream);
-  CheckReRaise(stream);
-  FreeAndNil(stream);
-end;
-
-procedure TAplImage.SaveToFile(const AFileName: string; ACompression: TAplCompression;
-  ACompressionLevel: TCompressionLevel);
-var
-  stream: PFileStream;
-begin
-  if HasException then
-    exit;
-  stream := New(PFileStream, Create(AFileName, fmWrite));
-  if NilPtr(stream, ecNotEnoughMemory) then
-    exit;
-  SaveToStreamCompressed(stream, ACompression, ACompressionLevel);
-  CheckReRaise(stream);
-  FreeAndNil(stream);
-end;
-
 procedure TAplImage.SaveHeaderAndPalette(AStream: PStream; AWriter: PAplImageWriter);
 begin
   FHeader.HasPalette := Assigned(FPalette);
@@ -474,12 +438,6 @@ begin
 end;
 
 procedure TAplImage.SaveToStream(AStream: PStream);
-begin
-  SaveToStreamCompressed(AStream, FHeader.Compression, FHeader.CompressionLevel);
-end;
-
-procedure TAplImage.SaveToStreamCompressed(AStream: PStream; ACompression: TAplCompression;
-  ACompressionLevel: TCompressionLevel);
 begin
   Abstract;
 end;
@@ -624,8 +582,7 @@ begin
     exit;
 end;
 
-procedure TAplBufferImage.SaveToStreamCompressed(AStream: PStream; ACompression: TAplCompression;
-  ACompressionLevel: TCompressionLevel);
+procedure TAplBufferImage.SaveToStream(AStream: PStream);
 var
   writer: TAplImageBufferWriter;
 begin
@@ -639,9 +596,7 @@ begin
     Raise(ecInvalidImage);
     exit;
   end;
-  FHeader.Compression := ACompression;
-  FHeader.CompressionLevel := ACompressionLevel;
-  writer.Create(AStream, ACompression, ACompressionLevel);
+  writer.Create(AStream, FHeader.Compression, FHeader.CompressionLevel);
   SaveHeaderAndPalette(AStream, @writer);
   if CheckReRaise(@writer) then begin
     writer.Free;
@@ -756,8 +711,7 @@ begin
   PMemoryStream(FBuffer)^.FreeBuffers := true;
 end;
 
-procedure TAplStreamImage.SaveToStreamCompressed(AStream: PStream; ACompression: TAplCompression;
-  ACompressionLevel: TCompressionLevel);
+procedure TAplStreamImage.SaveToStream(AStream: PStream);
 var
   writer: TAplImageStreamWriter;
 begin
@@ -771,9 +725,7 @@ begin
     Raise(ecInvalidImage);
     exit;
   end;
-  FHeader.Compression := ACompression;
-  FHeader.CompressionLevel := ACompressionLevel;
-  writer.Create(AStream, ACompression, ACompressionLevel);
+  writer.Create(AStream, FHeader.Compression, FHeader.CompressionLevel);
   SaveHeaderAndPalette(AStream, @writer);
   if CheckReRaise(@writer) then begin
     writer.Free;

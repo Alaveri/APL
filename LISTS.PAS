@@ -74,6 +74,7 @@ type
     function FirstOrDefault(ADefault: pointer): pointer;
     function LastOrDefault(ADefault: pointer): pointer;
     function FirstThat(AFunc: TPredicate): pointer;
+    function LastThat(AFunc: TPredicate): pointer;
     function MoveIndex(AFromIndex, AToIndex: integer): boolean;
     procedure ForEach(AProc: PListProc); virtual;
     procedure SetComparer(AComparer: TComparer); virtual;
@@ -592,6 +593,23 @@ begin
     item := GetItem(index);
     if TPredicate(AFunc)(item) then begin
       FirstThat := item;
+      break;
+    end;
+  end;
+end;
+
+function TList.LastThat(AFunc: TPredicate): pointer;
+var
+  index: integer;
+  item: pointer;
+begin
+  LastThat := nil;
+  if Count = 0 then
+    exit;
+  for index := Count - 1 downto 0 do begin
+    item := GetItem(index);
+    if TPredicate(AFunc)(item) then begin
+      LastThat := item;
       break;
     end;
   end;

@@ -579,12 +579,12 @@ var
 begin
   if HasException then
     exit;
-  State^.Bounds.GetIntersection(State^.ViewPort, drawRect);
-  drawRect.Intersect(Mode^.Bounds);
+  GetDrawRect(drawRect);
   if (APX < drawRect.X) or (APX > drawRect.Right) then
     exit;
   APY := Clamp(APY, drawRect.Y, drawRect.Bottom);
-  AHeight := MinL(drawRect.Height, AHeight);
+  if APY + AHeight - 1 > drawRect.Bottom then
+    AHeight := drawRect.Bottom - APY + 1;
   if AHeight <= 0 then
     exit;
   if Assigned(State^.LinePattern) then begin
