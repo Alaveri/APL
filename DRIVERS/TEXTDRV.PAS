@@ -23,8 +23,6 @@ type
   PTextModeListProc = ^TTextModeListProc;
   PTextDriver = ^TTextDriver;
 
-  TTextModeListProc = procedure(ASender: PTextModeList; AItem: PTextMode);
-
   TTextModeList = object(TObjectList)
   private
   public

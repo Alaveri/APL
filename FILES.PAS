@@ -30,7 +30,7 @@ type
   );
 
   TFileAttributes = set of TFileAttribute;
-  TFileListProc = procedure(ASender: PObject; AItem: PFile);
+  TFileListProc = procedure(AItem: PFile);
   TFile = object(TObject)
   private
   public

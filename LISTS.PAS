@@ -35,10 +35,10 @@ type
 
   TSortFunc = procedure(AList: PList; AComparer: TComparer);
   TListBuffer = array[0..ListBufferSize] of pointer;
-  TListProc = procedure(ASender: PObject; AItem: pointer);
-  TObjectListProc = procedure(ASender: PObject; AItem: PObject);
-  TStringListProc = procedure(ASender: PObject; AItem: PChar);
-  TIdentifiableListProc = procedure(ASender: PObject; AItem: PIdentifiable);
+  TListProc = procedure(AItem: pointer);
+  TObjectListProc = procedure(AItem: PObject);
+  TStringListProc = procedure(AItem: PChar);
+  TIdentifiableListProc = procedure(AItem: PIdentifiable);
   TListGrowFunc = function(AMin: integer): integer;
 
   TList = object(TStatusObject)
@@ -669,7 +669,7 @@ var
   index: integer;
 begin
   for index := 0 to Count - 1 do
-    TListProc(AProc)(@self, GetItem(index));
+    TListProc(AProc)(GetItem(index));
 end;
 
 function TList.BinarySearch(AValue: pointer): integer;

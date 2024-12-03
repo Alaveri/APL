@@ -23,8 +23,8 @@ type
   PStreamListProc = ^TStreamListProc;
   PMemoryStreamListProc = ^TMemoryStreamListProc;
 
-  TStreamListProc = procedure(ASender: PObject; AItem: PStream);
-  TMemoryStreamListProc = procedure(ASender: PObject; AItem: PMemoryStream);
+  TStreamListProc = procedure(AItem: PStream);
+  TMemoryStreamListProc = procedure(AItem: PMemoryStream);
 
   TSeekOrigin =
   (

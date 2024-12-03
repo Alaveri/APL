@@ -18,10 +18,8 @@ type
   PGraphApp = ^TGraphApp;
   PMouseCursor = ^TMouseCursor;
   PMouseCursorList = ^TMouseCursorList;
-  PMouseCursorListProc = ^TMouseCursorListProc;
 
   TMouseCursorImage = array[0..14, 0..14] of byte;
-  TMouseCursorListProc = procedure(ASender: PMouseCursorList; AMouseCursor: PMouseCursor);
 
   TMouseCursor = object(TIdentifiable)
   private

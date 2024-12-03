@@ -14,14 +14,9 @@ uses
 
 type
   PAction = ^TAction;
-  PActionUpdateProc = ^TActionUpdateProc;
   PActionList = ^TActionList;
   PActionExecuteProc = ^TActionExecuteProc;
-  PActionListProc = ^TActionListProc;
-
-  TActionUpdateProc = procedure(ASender: PObject; AAction: PAction; AActionId: integer);
-  TActionExecuteProc = procedure(ASender: PObject; AAction: PAction);
-  TActionListProc = procedure(ASender: PObject; AAction: PAction);
+  PActionEvent = ^TActionEvent;
 
   TAction = object(TObject)
   private
@@ -35,12 +30,12 @@ type
     Enabled: boolean;
     OnExecute: PActionExecuteProc;
     ModalResult: TModalResult;
-    OnUpdate: PActionUpdateProc;
+    OnUpdate: PEventProc;
     constructor Create(AActionId: integer; AText: string; AShortcut: word);
     constructor CreateEmpty;
     procedure SetHelpText(AHelpText: string); virtual;
-    procedure SetText(AText: string); virtual;
     procedure Execute(ASender: PObject); virtual;
+    procedure SetText(AText: string); virtual;
     destructor Free; virtual;
     procedure Init; virtual;
   end;
@@ -54,6 +49,17 @@ type
     procedure Init; virtual;
     destructor Free; virtual;
   end;
+
+  TActionEvent = object(TEvent)
+  private
+  public
+    Action: PAction;
+    function ActionId: integer;
+    procedure Assign(var ASource: TObject); virtual;
+    procedure Clear; virtual;
+  end;
+
+  TActionExecuteProc = procedure(var AEvent: TActionEvent);
 
 implementation
 
@@ -88,6 +94,18 @@ begin
   ModalResult := mrNone;
 end;
 
+procedure TAction.Execute(ASender: PObject);
+var
+  event: TActionEvent;
+begin
+  if not Assigned(OnExecute) then
+    exit;
+  event.Create;
+  event.Action := @self;
+  event.Sender := ASender;
+  TEventProc(OnExecute)(event);
+end;
+
 destructor TAction.Free;
 begin
   TString.Free(Text);
@@ -104,13 +122,6 @@ end;
 procedure TAction.SetText(AText: string);
 begin
   TString.AssignString(Text, AText);
-end;
-
-procedure TAction.Execute(ASender: PObject);
-begin
-  if Assigned(OnExecute) then begin
-    TActionExecuteProc(OnExecute)(ASender, @Self);
-  end;
 end;
 
 function TActionList.NewAction(AActionId: integer; AText: string;
@@ -159,6 +170,28 @@ end;
 destructor TActionList.Free;
 begin
   inherited Free;
+end;
+
+procedure TActionEvent.Clear;
+begin
+  inherited Clear;
+  Action := nil;
+end;
+
+procedure TActionEvent.Assign(var ASource: TObject);
+var
+  source: PActionEvent;
+begin
+  inherited Assign(ASource);
+  source := PActionEvent(@ASource);
+  Action := source^.Action;
+end;
+
+function TActionEvent.ActionId: integer;
+begin
+  ActionId := -1;
+  if Assigned(Action) then
+    ActionId := Action^.ActionId;
 end;
 
 end.

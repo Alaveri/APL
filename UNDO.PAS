@@ -12,9 +12,6 @@ type
   PUndoItem = ^TUndoItem;
   PUndoAction = ^TUndoAction;
   PUndoActionList = ^TUndoActionList;
-  PUndoEventProc = ^TUndoEventProc;
-
-  TUndoEventProc = procedure(ASender: PObject; AItem: PUndoItem);
 
   TUndoAction = object(TObject)
   private

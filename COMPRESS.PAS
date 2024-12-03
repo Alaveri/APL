@@ -27,7 +27,7 @@ type
     clHigh
   );
 
-  TCompressProgressProc = procedure(ASender: PCompressor; AMax, ACurrent: longint);
+  TCompressProgressProc = procedure(var AEvent: TProgressEvent);
 
   TCompressor = object(TStatusObject)
   private
@@ -170,6 +170,7 @@ procedure TCompressor.EndWriteBits;
 var
   aByte: byte;
   written: word;
+  event: TProgressEvent;
 begin
   if HasException then
     exit;
@@ -182,8 +183,13 @@ begin
     FWriteBitCounter := 0;
   end;
   FlushWriteBuffer;
-  if Assigned(OnProgress) and (ReadTotal mod ProgressIncrement = 0) then
-    TCompressProgressProc(OnProgress)(@self, Source^.Size, ReadTotal);
+  if Assigned(OnProgress) and (ReadTotal mod ProgressIncrement = 0) then begin
+    event.Create;
+    event.Max := Source^.Size;
+    event.Current := ReadTotal;
+    event.Sender := @self;
+    TCompressProgressProc(OnProgress)(event);
+  end;
 end;
 
 function TCompressor.ReadByte: byte;
@@ -238,10 +244,17 @@ begin
 end;
 
 procedure TCompressor.UpdateProgress(const AMax, ACurrent: longint);
+var
+  event: TProgressEvent;
 begin
   if (ACurrent >= AMax) or (FProgressCounter >= ProgressIncrement) then begin
-    if Assigned(OnProgress) then
-      TCompressProgressProc(OnProgress)(@self, AMax, ACurrent);
+    if Assigned(OnProgress) then begin
+      event.Create;
+      event.Max := AMax;
+      event.Current := ACurrent;
+      event.Sender := @self;
+      TCompressProgressProc(OnProgress)(event);
+    end;
     FProgressCounter := 0;
     exit;
   end;

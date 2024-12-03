@@ -34,15 +34,10 @@ type
   PProportionalFont = ^TProportionalFont;
   PVectorFont = ^TVectorFont;
   PColoredFont = ^TColoredFont;
-  PGraphicsModeListProc = ^TGraphicsModeListProc;
-  PFontListProc = ^TFontListProc;
   PFillPattern = ^TFillPattern;
   PLinePattern = ^TLinePattern;
 
   TFontWidthArray = array[byte] of word;
-  TGraphicsModeListProc = procedure(ASender: PGraphicsModeList; AMode: PGraphicsMode);
-  TFontListProc = procedure(ASender: PFontList; AFont: PFont);
-
   TFontFormat = (ffNone, ffMonoSpace, ffProportional, ffSystem, ffColored, ffVector);
   TFillPattern = array[0..15] of word;
   TLinePattern = word;
@@ -227,7 +222,7 @@ type
     procedure SetFillPattern(APattern: PFillPattern); virtual;
     procedure SetLinePattern(APattern: PLinePattern); virtual;
     procedure SetMode(AMode: PGraphicsMode); virtual;
-    procedure SetViewport(ARect: TRect); virtual;
+    procedure SetViewport(var ARect: TRect); virtual;
     procedure SetPixel(APX, APY: integer); virtual;
     procedure MoveTo(APX, APY: integer); virtual;
     procedure LineTo(APX, APY: integer); virtual;
@@ -362,7 +357,7 @@ asm
   pop ds
 end;
 
-procedure TGraphicsDriver.SetViewport(ARect: TRect);
+procedure TGraphicsDriver.SetViewport(var ARect: TRect);
 begin
   State^.ViewPort.Assign(ARect);
 end;

@@ -18,10 +18,8 @@ type
   PMemoryDriver = ^TMemoryDriver;
   PMemoryAllocErrorProc = ^TMemoryAllocErrorProc;
   PBuffer = ^TBuffer;
-  PReferenceListProc = ^TReferenceListProc;
 
   TMemoryAllocErrorProc = function(ASize: word): boolean;
-  TReferenceListProc = procedure(ASender: PReferenceList; AReference: PReference);
 
   TReferenceList = object(TList)
   private

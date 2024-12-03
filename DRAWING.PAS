@@ -25,9 +25,9 @@ type
   PSetPixelProc = ^TSetPixelProc;
 
   TRegionMode = (rmInclude, rmExclude);
-  TPointListProc = procedure(ASender: PObject; APoint: PPoint);
-  TRectListProc = procedure(ASender: PObject; ARect: PRect);
-  TInversionPointListProc = procedure(ASender: PObject; AInversionPoint: PInversionPoint);
+  TPointListProc = procedure(APoint: PPoint);
+  TRectListProc = procedure(ARect: PRect);
+  TInversionPointListProc = procedure(AInversionPoint: PInversionPoint);
   TSetPixelProc = procedure(AX, AY: integer; AData: pointer);
 
   TPointList = object(TObjectList)
