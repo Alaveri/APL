@@ -43,6 +43,7 @@ type
     Code: word;
     MessageType: TMessageType;
     Processed: boolean;
+    Data: pointer;
     constructor Create(var ASender; ACode: word);
     procedure Init; virtual;
   end;
@@ -183,6 +184,7 @@ begin
   Code := 0;
   MessageType := mMessage;
   Processed := false;
+  Data := nil;
 end;
 
 constructor TMouseMessage.Create(var ASender; ACode: word; var AMouseState: TMouseState);

@@ -264,6 +264,7 @@ type
     function KeyToShortcut(AKey: word): string;
     function CharToAltChar(AChar: char): word;
     function UpCase(AKey: word): word;
+    procedure GetFlags(var AFlags: TKeyboardFlags);
     procedure CursorOn;
     procedure CursorOff;
     procedure Init; virtual;
@@ -361,6 +362,18 @@ begin
     mov   BX, 0
     int   10h
   end;
+end;
+
+procedure TKeyboardDriver.GetFlags(var AFlags: TKeyboardFlags);
+var
+  flags: TKeyboardFlags;
+begin
+  asm
+    mov ah, 2
+    int 16h
+    mov [flags], al
+  end;
+  AFlags := flags;
 end;
 
 function TKeyboardDriver.GetKey : word;
