@@ -43,6 +43,23 @@ type
     bsRight
   );
 
+  TModalResult =
+  (
+    mrNone,
+    mrYes,
+    mrOk,
+    mrAll,
+    mrYesToAll,
+    mrNo,
+    mrNoToAll,
+    mrContinue,
+    mrRetry,
+    mrAbort,
+    mrIgnore,
+    mrHelp,
+    mrCancel
+  );
+
   TButtonStates = set of TButtonState;
 
   TMouseState = object(TObject)
@@ -99,16 +116,6 @@ type
     procedure Assign(var ASource: TObject); virtual;
     procedure Clear; virtual;
   end;
-
-  TModalResult =
-  (
-    mrNone,
-    mrYes,
-    mrNo,
-    mrOk,
-    mrCancel,
-    mrHelp
-  );
 
   TEventProc = procedure(var AEvent: TEvent);
 

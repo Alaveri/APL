@@ -20,7 +20,7 @@ type
   PObjectList = ^TObjectList;
   PList = ^TList;
   PStack = ^TStack;
-  PObjectStack = ^TStack;
+  PObjectStack = ^TObjectStack;
   PQueue = ^TQueue;
   PStringList = ^TStringList;
   PSortFunc = ^TSortFunc;
@@ -642,7 +642,7 @@ procedure TList.Insert(AIndex: integer; AItem: pointer);
 var
   ptr, next: PPointer;
 begin
-  if (AIndex < 0) or (AIndex > Count - 1) then begin
+  if (AIndex < 0) or (AIndex > Count) then begin
     Raise(ecIndexOutOfBounds);
     exit;
   end;
@@ -826,13 +826,11 @@ begin
 end;
 
 function TObjectStack.Pop: PObject;
-var
-  result: PObject;
 begin
-  result := Peek;
-  Pop := result;
-  if (Count = 0) or not Assigned(result) then
+  Pop := nil;
+  if Count = 0 then
     exit;
+  Pop := GetItem(Count - 1);
   Delete(Count - 1);
 end;
 
@@ -855,13 +853,11 @@ begin
 end;
 
 function TStack.Pop: pointer;
-var
-  result: pointer;
 begin
-  result := Peek;
-  Pop := result;
-  if (Count = 0) or not Assigned(result) then
+  Pop := nil;
+  if Count = 0 then
     exit;
+  Pop := GetItem(Count - 1);
   Delete(Count - 1);
 end;
 

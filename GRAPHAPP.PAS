@@ -285,7 +285,6 @@ var
 begin
   if not MouseCursor^.Visible then
     exit;
-  Graph^.WaitForVSync;
   drawRect.CreateDims(AMouseState.X, AMouseState.Y,
     MouseCursor^.Width, MouseCursor^.Height);
   drawRect.Translate(-MouseCursor^.OffsetX, MouseCursor^.OffsetY);

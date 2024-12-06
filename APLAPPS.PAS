@@ -24,15 +24,23 @@ type
   PKeyMessage = ^TKeyMessage;
   PMouseMessage = ^TMouseMessage;
   PMessageObject = ^TMessageObject;
+  PEventObject = ^TEventObject;
 
   TApplicationErrorProc = procedure(var ASender; ACode: word);
 
   TMessageType = (mMessage, mMouse, mKey);
 
-  TMessageObject = object(TIdentifiable)
+  TMessageObject = object(TStatusObject)
   private
   public
     procedure ProcessMessage(var AMessage: PMessage); virtual;
+  end;
+
+  TEventObject = object(TMessageObject)
+  private
+  public
+    procedure InvokeSender(AEventProc: pointer; ASender: PObject; var AEvent: TEvent);
+    procedure Invoke(AEventProc: pointer; var AEvent: TEvent);
   end;
 
   TMessage = object(TObject)
@@ -72,7 +80,7 @@ type
     function Deq: PMessage;
   end;
 
-  TApplication = object(TStatusObject)
+  TApplication = object(TEventObject)
   private
   public
     Closed: boolean;
@@ -226,6 +234,19 @@ end;
 
 procedure TMessageObject.ProcessMessage(var AMessage: PMessage);
 begin
+end;
+
+procedure TEventObject.InvokeSender(AEventProc: pointer; ASender: PObject;
+  var AEvent: TEvent);
+begin
+  AEvent.Sender := ASender;
+  if Assigned(AEventProc) then
+    TEventProc(AEventProc)(AEvent);
+end;
+
+procedure TEventObject.Invoke(AEventProc: pointer; var AEvent: TEvent);
+begin
+  InvokeSender(AEventProc, @self, AEvent);
 end;
 
 end.
