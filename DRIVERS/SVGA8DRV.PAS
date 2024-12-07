@@ -48,7 +48,6 @@ type
       var APX: integer);
     procedure VLinePattern(AHeight: integer; APattern: word; APX, APY: integer);
   public
-    function SupportsRegions: boolean; virtual;
     function GetScreenPointer(APX, APY: integer): PByte; virtual;
     procedure GetImage(APX, APY, AWidth, AHeight: longint; ABuffer: PByte); virtual;
     procedure GetImageStream(APX, APY, AWidth, AHeight: longint; AStream: PStream); virtual;
@@ -81,11 +80,6 @@ begin
   FAttributes := [];
   FWinFunc := nil;
   FGranularity := 0;
-end;
-
-function TSVga8Driver.SupportsRegions: boolean;
-begin
-  SupportsRegions := true;
 end;
 
 procedure TSVga8Mode.Assign(var ASource: TObject);

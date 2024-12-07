@@ -19,15 +19,9 @@ type
   PInversionPoint = ^TInversionPoint;
   PInversionPointList = ^TInversionPointList;
   PVector2 = ^TVector2;
-  PPointListProc = ^TPointListProc;
-  PRectListProc = ^TRectListProc;
-  PInversionPointListProc = ^TInversionPointListProc;
   PSetPixelProc = ^TSetPixelProc;
 
   TRegionMode = (rmInclude, rmExclude);
-  TPointListProc = procedure(APoint: PPoint);
-  TRectListProc = procedure(ARect: PRect);
-  TInversionPointListProc = procedure(AInversionPoint: PInversionPoint);
   TSetPixelProc = procedure(AX, AY: integer; AData: pointer);
 
   TPointList = object(TObjectList)
@@ -137,7 +131,7 @@ type
     procedure Intersect(var ARect: TRect);
     procedure GetIntersection(ARect: TRect; var AResult: TRect);
     procedure Init; virtual;
-    procedure GetInversionPoints(AList: PInversionPointList;
+    procedure GetInversionPoints(var AList: TInversionPointList;
       AMode: TRegionMode; AY, AStartX, AEndX: integer);
     procedure GetCoords(var APX, APY, ARight, ABottom: integer);
     procedure GetDims(var APX, APY, AWidth, AHeight: integer);
@@ -176,8 +170,8 @@ type
   public
     procedure Init; virtual;
     procedure Assign(var ASource: TObject); virtual;
-    function GetInversionPoints(AMode: TRegionMode;
-      AY, AStartX, AEndX: integer): PInversionPointList;
+    procedure GetInversionPoints(var AList: TInversionPointList;
+      AMode: TRegionMode; AY, AStartX, AEndX: integer);
     function Contains(AX, AY: integer): boolean;
     function IntersectsRect(var ARect: TRect): boolean;
     function HasRect(var ARect: TRect): boolean;
@@ -304,7 +298,6 @@ begin
   X := 0;
   Y := 0;
 end;
-
 
 procedure TRect.Assign(var ASource: TObject);
 var
@@ -522,7 +515,7 @@ begin
     Min(Right, ARect.Right), Min(Bottom, ARect.Bottom));
 end;
 
-procedure TRect.GetInversionPoints(AList: PInversionPointList;
+procedure TRect.GetInversionPoints(var AList: TInversionPointList;
   AMode: TRegionMode; AY, AStartX, AEndX: integer);
 var
   point: PInversionPoint;
@@ -540,11 +533,11 @@ begin
     exit;
   if AStartX < X then begin
     point := New(PInversionPoint, CreatePoint(on, X));
-    AList^.Add(point);
+    AList.Add(point);
   end;
   if AEndX > Right then begin
     point := New(PInversionPoint, CreatePoint(off, Right));
-    AList^.Add(point);
+    AList.Add(point);
   end;
 end;
 
@@ -781,19 +774,16 @@ begin
   end;
 end;
 
-function TRegion.GetInversionPoints(AMode: TRegionMode;
-  AY, AStartX, AEndX: integer): PInversionPointList;
+procedure TRegion.GetInversionPoints(var AList: TInversionPointList;
+  AMode: TRegionMode; AY, AStartX, AEndX: integer);
 var
-  result: PInversionPointList;
   index: integer;
   rect: PRect;
 begin
-  result := New(PInversionPointList, CreateSortedCapacity(InversionCompare, 2));
   for index := 0 to Count - 1 do begin
     rect := GetItem(index);
-    rect^.GetInversionPoints(result, AMode, AY, AStartX, AEndX);
+    rect^.GetInversionPoints(AList, AMode, AY, AStartX, AEndX);
   end;
-  GetInversionPoints := result;
 end;
 
 constructor TInversionPoint.CreatePoint(AOn: boolean; APosition: integer);
