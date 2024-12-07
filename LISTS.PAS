@@ -642,7 +642,7 @@ procedure TList.Insert(AIndex: integer; AItem: pointer);
 var
   ptr, next: PPointer;
 begin
-  if (AIndex < 0) or (AIndex > Count) then begin
+  if AIndex < 0 then begin
     Raise(ecIndexOutOfBounds);
     exit;
   end;
