@@ -196,8 +196,12 @@ begin
 end;
 
 procedure TIdentifiable.Assign(var ASource: TObject);
+var
+  source: PIdentifiable;
 begin
   inherited Assign(ASource);
+  source := PIdentifiable(@ASource);
+  SetId(source^.GetId);
 end;
 
 function TIdentifiable.GetId: string;
@@ -215,6 +219,7 @@ end;
 
 destructor TIdentifiable.Free;
 begin
+  TString.Free(Id);
   inherited Free;
 end;
 
