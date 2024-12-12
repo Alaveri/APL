@@ -13,7 +13,7 @@ uses
   Strings;
 
 const
-  ListBufferSize = $FFF8 div SizeOf(Pointer);
+  ListBufferSize = MaxVarSize div SizeOf(Pointer);
   DefaultListSize = 4;
 
 type

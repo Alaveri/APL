@@ -39,6 +39,7 @@ type
 
   TFontWidthArray = array[byte] of word;
   TFontFormat = (ffNone, ffMonoSpace, ffProportional, ffSystem, ffColored, ffVector);
+  TFontFormats = set of TFontFormat;
   TFillPattern = array[0..15] of word;
   TLinePattern = word;
 
@@ -300,6 +301,16 @@ const
   );
 
   CheckerLinePattern: TLinePattern = $AAAA;
+
+  FontFormatNames: array[TFontFormat] of string =
+  (
+    'None',
+    'Monospace',
+    'Proportional',
+    'System',
+    'Colored',
+    'Vector'
+  );
 
 var
   Graph: PGraphicsDriver;

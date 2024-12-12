@@ -67,7 +67,7 @@ type
     function GetXmsControlFunction: pointer;
     function XmsAlloc(ASize: word): word;
     procedure XmsDealloc(AHandle: word);
-    procedure MoveReference(AMoveRecord: PXmsMoveRecord);
+    procedure MoveReference(var AMoveRecord: TXmsMoveRecord);
     procedure MoveToConventional(AReference: PReference);
     procedure PurgeConventional(ASize: longint);
   public
@@ -126,8 +126,6 @@ type
 var
   Memory: TMemoryDriver;
   OutOfMemoryException: PException;
-  XmsControl: pointer;
-  MoveRecord: TXmsMoveRecord;
 
 implementation
 
@@ -136,6 +134,8 @@ uses
 
 var
   PreviousExitProc: PProc;
+  XmsControl: pointer;
+  MoveRecord: TXmsMoveRecord;
 
 const
   HiWord = 1;
@@ -310,23 +310,19 @@ begin
   CurrentReference := FCurrentReference;
 end;
 
-procedure TMemoryDriver.MoveReference(AMoveRecord: PXmsMoveRecord);
+procedure TMemoryDriver.MoveReference(var AMoveRecord: TXmsMoveRecord);
 var
   result: word;
   xmsError: byte;
 begin
   asm
-    push ds
-    push si
-    lds si, AMoveRecord
+    mov si, offset AMoveRecord
     mov ah, 0Bh
     call [XmsControl]
     mov [result], ax
     mov [xmsError], bl
-    pop si
-    pop ds
   end;
-  if result <> 1 then
+  if result <> 0 then
     Raise(ecXmsError);
 end;
 
@@ -360,9 +356,10 @@ begin
 
     FillChar(MoveRecord, SizeOf(TXmsMoveRecord), 0);
     MoveRecord.Length := current^.Size;
+    MoveRecord.SourceHandle := 0;
     MoveRecord.SourcePointer := current^.Ptr;
     MoveRecord.DestHandle := xmsHandle;
-    MoveReference(@MoveRecord);
+    MoveReference(MoveRecord);
 
     { If there was an exception thrown during the move, then error }
     if HasException then
@@ -393,7 +390,7 @@ begin
   MoveRecord.SourceHandle := AReference^.Handle;
   MoveRecord.DestPointer := ptr;
 
-  MoveReference(@MoveRecord);
+  MoveReference(MoveRecord);
   if HasException then begin
     FreeMem(ptr, AReference^.Size);
     exit;

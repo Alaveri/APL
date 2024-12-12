@@ -526,14 +526,11 @@ begin
   if HasException or (APY < drawRect.Y) or (APY > drawRect.Bottom) then
     exit;
   if APX < drawRect.X then begin
-    AWidth := AWidth - (drawRect.X - APX);
+    Dec(AWidth, drawRect.X - APX);
     APX := drawRect.X;
   end;
-  if APX + AWidth - 1 > drawRect.Right then begin
+  if APX + AWidth - 1 > drawRect.Right then
     AWidth := drawRect.Right - APX + 1;
-    if AWidth <= 0 then
-      exit;
-  end;
   if AWidth <= 0 then
     exit;
   screen := GetScreenPointer(APX, APY);
@@ -571,12 +568,13 @@ var
   screen: PByte;
   drawRect: TRect;
 begin
-  if HasException then
-    exit;
   GetDrawRect(drawRect);
-  if (APX < drawRect.X) or (APX > drawRect.Right) then
+  if HasException or (APX < drawRect.X) or (APX > drawRect.Right) then
     exit;
-  APY := Clamp(APY, drawRect.Y, drawRect.Bottom);
+  if APY < drawRect.Y then begin
+    Dec(AHeight, drawRect.Y - APY);
+    APY := drawRect.Y;
+  end;
   if APY + AHeight - 1 > drawRect.Bottom then
     AHeight := drawRect.Bottom - APY + 1;
   if AHeight <= 0 then
@@ -602,14 +600,11 @@ begin
   if HasException or (APY < drawRect.Y) or (APY > drawRect.Bottom) then
     exit;
   if APX < drawRect.X then begin
-    AWidth := AWidth - (drawRect.X - APX);
+    Dec(AWidth, drawRect.X - APX);
     APX := drawRect.X;
   end;
-  if APX + AWidth - 1 > drawRect.Right then begin
+  if APX + AWidth - 1 > drawRect.Right then
     AWidth := drawRect.Right - APX + 1;
-    if AWidth <= 0 then
-      exit;
-  end;
   if AWidth <= 0 then
     exit;
   screen := GetScreenPointer(APX, APY);
@@ -638,14 +633,15 @@ var
   screen: PByte;
   drawRect: TRect;
 begin
-  if HasException then
+  GetDrawRect(drawRect);
+  if HasException or (APX < drawRect.X) or (APX > drawRect.Right) then
     exit;
-  State^.Bounds.GetIntersection(State^.ViewPort, drawRect);
-  drawRect.Intersect(Mode^.Bounds);
-  if (APX < drawRect.X) or (APX > drawRect.Right) then
-    exit;
-  APY := Clamp(APY, drawRect.Y, drawRect.Bottom);
-  AHeight := MinL(drawRect.Height, AHeight);
+  if APY < drawRect.Y then begin
+    Dec(AHeight, drawRect.Y - APY);
+    APY := drawRect.Y;
+  end;
+  if APY + AHeight - 1 > drawRect.Bottom then
+    AHeight := drawRect.Bottom - APY + 1;
   if AHeight <= 0 then
     exit;
   screen := GetScreenPointer(APX, APY);

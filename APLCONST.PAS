@@ -45,7 +45,7 @@ type
 const
   HexDigits: string16 = '0123456789ABCDEF';
   PointerSize: longint = SizeOf(Pointer);
-  MaxVarSize = $FFF8;
+  MaxVarSize = $FFF0;
 
   ecNone = 0;
 
