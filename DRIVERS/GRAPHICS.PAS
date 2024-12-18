@@ -20,7 +20,7 @@ uses
 
 const
   FontMajorVersion = 1;
-  FontMinorVersion = 1;
+  FontMinorVersion = 2;
 
 type
   PGraphicsMode = ^TGraphicsMode;
@@ -38,7 +38,7 @@ type
   PLinePattern = ^TLinePattern;
 
   TFontWidthArray = array[byte] of word;
-  TFontFormat = (ffNone, ffMonoSpace, ffProportional, ffSystem, ffColored, ffVector);
+  TFontFormat = (ffMonoSpace, ffProportional, ffSystem, ffColored);
   TFontFormats = set of TFontFormat;
   TFillPattern = array[0..15] of word;
   TLinePattern = word;
@@ -55,8 +55,10 @@ type
     ModeIndex: word;
     BytesPerScanLine: word;
     FrameBuffer: pointer;
+    ScreenSize: longint;
     NumPages: byte;
     ModeId: integer;
+    HasOffScreen: boolean;
     procedure Assign(var ASource: TObject); virtual;
     procedure Init; virtual;
     destructor Free; virtual;
@@ -110,9 +112,7 @@ type
     Spacing: byte;
     BytesPerCharacter: byte;
     destructor Free; virtual;
-    constructor CreateSize(AMaxWidth, AHeight: byte);
-    constructor CreateLoadStream(AStream: PStream);
-    constructor CreateLoadFile(const AFilename: string);
+    constructor CreateSize(AMaxWidth, AHeight, ASpacing: byte);
     procedure Assign(var ASource: TObject); virtual;
     procedure Init; virtual;
     procedure SetPixel(AChar: char; APX, APY: integer); virtual;
@@ -120,6 +120,7 @@ type
     procedure SaveToStream(AStream: PStream); virtual;
     procedure LoadFromStream(AStream: PStream); virtual;
     procedure SetCharWidths; virtual;
+    procedure SetFormat(AFormat: TFontFormat); virtual;
     function Format: TFontFormat; virtual;
     function IsPixelSet(AChar: char; APX, APY: integer): boolean; virtual;
     function CharWidth(AChar: char): integer; virtual;
@@ -142,7 +143,7 @@ type
   private
   public
     CharWidths: TByteArray;
-    constructor CreateSize(AMaxWidth, AHeight: byte);
+    constructor CreateSize(AMaxWidth, AHeight, ASpacing: byte);
     procedure Init; virtual;
     procedure Assign(var ASource: TObject); virtual;
     procedure SetCharWidths; virtual;
@@ -161,7 +162,7 @@ type
   public
     StartChar: byte;
     EndChar: byte;
-    constructor CreateSize(AMaxWidth, AHeight: byte);
+    constructor CreateSize(AMaxWidth, AHeight, ASpacing: byte);
     procedure Init; virtual;
     procedure Assign(var ASource: TObject); virtual;
     destructor Free; virtual;
@@ -188,6 +189,7 @@ type
     Font: PFont;
     ViewPort: TRect;
     FrameBuffer: PByte;
+    OffScreenBuffer: PByte;
     BufferMode: boolean;
     FontColor: TStandardColor;
     FontShade: byte;
@@ -213,6 +215,7 @@ type
     function XPos: byte; virtual;
     function YPos: byte; virtual;
     function GetScreenPointer(APX, APY: integer): PByte; virtual;
+    function CreateGraphicsState: PGraphicsState; virtual;
     procedure BeginDrawBuffer(var ABuffer: PByte; var ABounds: TRect); virtual;
     procedure GetImage(APX, APY, AWidth, AHeight: longint; ABuffer: PByte); virtual;
     procedure GetImageRect(ARect: TRect; ABuffer: PByte); virtual;
@@ -236,6 +239,10 @@ type
     procedure Rectangle(ARect: TRect); virtual;
     procedure Fill(AX1, AY1, AWidth, AHeight: integer); virtual;
     procedure FillRect(ARect: TRect); virtual;
+    procedure FillPattern(ARect: TRect); virtual;
+    procedure HLinePattern(AWidth: integer; AScreen: PByte; APattern: word;
+      var APX: integer); virtual;
+    procedure VLinePattern(AHeight: integer; APattern: word; APX, APY: integer); virtual;
     procedure BezierQuad(AP1: TPoint; AP2: TPoint; AControl: TPoint; AResolution: integer);
     procedure BezierCubic(AP1: TPoint; AP2: TPoint; AControl1: TPoint;
       AControl2: TPoint; AResolution: integer);
@@ -266,6 +273,8 @@ type
     procedure Init; virtual;
     procedure WaitForVSync; virtual;
     procedure ResetMode; virtual;
+    procedure CopyToOffScreen(APX, APY, AWidth, AHeight: integer); virtual;
+    procedure CopyFromOffScreen(APX, APY, AWidth, AHeight: integer); virtual;
     destructor Free; virtual;
   end;
 
@@ -277,6 +286,13 @@ type
     function IndexOf(AItem: PFont): integer;
     procedure SetItem(AIndex: integer; AItem: PFont);
     procedure Insert(AIndex: integer; AItem: PFont);
+  end;
+
+  TFontManager = object(TStatusObject)
+  private
+  public
+    function CreateFromFile(const AFilename: string): PFont;
+    function CreateFromStream(AStream: PStream): PFont;
   end;
 
 const
@@ -304,16 +320,15 @@ const
 
   FontFormatNames: array[TFontFormat] of string =
   (
-    'None',
     'Monospace',
     'Proportional',
     'System',
-    'Colored',
-    'Vector'
+    'Colored'
   );
 
 var
   Graph: PGraphicsDriver;
+  FontManager: TFontManager;
 
 implementation
 
@@ -323,6 +338,11 @@ uses
 
 var
   PreviousExitProc: PProc;
+
+function TGraphicsDriver.CreateGraphicsState: PGraphicsState;
+begin
+  CreateGraphicsState := New(PGraphicsState, Create);
+end;
 
 procedure TGraphicsDriver.Init;
 var
@@ -337,7 +357,7 @@ begin
   FOldMode := oldMode;
   Modes.Create;
   Mode := nil;
-  State := New(PGraphicsState, Create);
+  State := CreateGraphicsState;
   StateStack.Create;
   MoveTo(0, 0);
   BufferRect.Create;
@@ -502,6 +522,16 @@ begin
   Abstract;
 end;
 
+procedure TGraphicsDriver.CopyToOffScreen(APX, APY, AWidth, AHeight: integer);
+begin
+  Abstract;
+end;
+
+procedure TGraphicsDriver.CopyFromOffScreen(APX, APY, AWidth, AHeight: integer);
+begin
+  Abstract;
+end;
+
 procedure TGraphicsDriver.FillRect(ARect: TRect);
 var
   index: integer;
@@ -518,14 +548,114 @@ begin
   State^.ForeColor := tempColor;
 end;
 
-procedure TGraphicsDriver.InverseHLine(APX, APY, AWidth: integer);
+procedure TGraphicsDriver.FillPattern(ARect: TRect);
+var
+  screen: PByte;
+  px, py, sy, width, index: integer;
 begin
-  Abstract;
+  width := ARect.Width;
+  for index := 0 to ARect.Height - 1 do begin
+    sy := ARect.Y + index;
+    screen := GetScreenPointer(ARect.X, sy);
+    px := ARect.X mod 16;
+    py := sy mod 16;
+    HLinePattern(width, screen, State^.FillPattern^[py], px);
+  end;
+end;
+
+procedure TGraphicsDriver.HLinePattern(AWidth: integer; AScreen: PByte; APattern: word;
+  var APX: integer);
+var
+  patternIndex: integer;
+  fore, back: byte;
+begin
+  fore := State^.ForeColor;
+  back := State^.BackColor;
+  for patternIndex := 0 to AWidth - 1 do begin
+    if APattern and (1 shl APX) > 0 then
+      AScreen^ := fore
+    else
+      AScreen^ := back;
+    Inc(AScreen);
+    Inc(APX);
+    APX := APX mod 16;
+  end;
+end;
+
+procedure TGraphicsDriver.VLinePattern(AHeight: integer; APattern: word; APX, APY: integer);
+var
+  patternIndex: integer;
+  fore, back: byte;
+  screen: PByte;
+  py: integer;
+begin
+  fore := State^.ForeColor;
+  back := State^.BackColor;
+  screen := GetScreenPointer(APX, APY);
+  for patternIndex := 0 to AHeight - 1 do begin
+    py := APY mod 16;
+    if APattern and (1 shl py) > 0 then
+      screen^ := fore
+    else
+      screen^ := back;
+    Inc(screen, Mode^.Width);
+    Inc(APY);
+  end;
+end;
+
+procedure TGraphicsDriver.InverseHLine(APX, APY, AWidth: integer);
+var
+  drawRect: TRect;
+  index: integer;
+  screen: PByte;
+begin
+  GetDrawRect(drawRect);
+  if HasException or (APY < drawRect.Y) or (APY > drawRect.Bottom) then
+    exit;
+  if APX < drawRect.X then begin
+    Dec(AWidth, drawRect.X - APX);
+    APX := drawRect.X;
+  end;
+  if APX + AWidth - 1 > drawRect.Right then
+    AWidth := drawRect.Right - APX + 1;
+  if AWidth <= 0 then
+    exit;
+  screen := GetScreenPointer(APX, APY);
+  if State^.BufferMode then begin
+    for index := 0 to AWidth - 1 do begin
+      screen^ := screen^ xor 15;
+      Inc(screen);
+    end;
+    exit;
+  end;
+  for index := 0 to AWidth - 1 do begin
+    screen^ := screen^ xor 15;
+    Inc(screen);
+  end;
 end;
 
 procedure TGraphicsDriver.InverseVLine(APX, APY, AHeight: integer);
+var
+  index: integer;
+  screen: PByte;
+  drawRect: TRect;
 begin
-  Abstract;
+  GetDrawRect(drawRect);
+  if HasException or (APX < drawRect.X) or (APX > drawRect.Right) then
+    exit;
+  if APY < drawRect.Y then begin
+    Dec(AHeight, drawRect.Y - APY);
+    APY := drawRect.Y;
+  end;
+  if APY + AHeight - 1 > drawRect.Bottom then
+    AHeight := drawRect.Bottom - APY + 1;
+  if AHeight <= 0 then
+    exit;
+  screen := GetScreenPointer(APX, APY);
+  for index := APY to APY + AHeight - 1 do begin
+    screen := GetScreenPointer(APX, index);
+    screen^ := screen^ xor 15;
+  end;
 end;
 
 procedure TGraphicsDriver.InverseRectangle(ARect: TRect);
@@ -657,21 +787,34 @@ procedure TGraphicsDriver.Circle(ACenterX, ACenterY, ARadius: integer);
 var
   t1, t2: integer;
   x, y: integer;
+  color: byte;
+  drawRect: TRect;
+  procedure SetPix(APX, APY: integer);
+  var
+    drawPtr: PByte;
+  begin
+    if not drawRect.Contains(APX, APY) then
+      exit;
+    drawPtr := GetScreenPointer(APX, APY);
+    drawPtr^ := ForeColor;
+  end;
 begin
-  t1 := ARadius div 16;
+  GetDrawRect(drawRect);
+  t1 := ARadius shr 4;
   x := ARadius;
   y := 0;
+  color := State^.ForeColor;
   repeat
-    SetPixel(ACenterX + x, ACenterY + y);
-    SetPixel(ACenterX - x, ACenterY + y);
-    SetPixel(ACenterX + x, ACenterY - y);
-    SetPixel(ACenterX - x, ACenterY - y);
-    SetPixel(ACenterX + y, ACenterY + x);
-    SetPixel(ACenterX - y, ACenterY + x);
-    SetPixel(ACenterX + y, ACenterY - x);
-    SetPixel(ACenterX - y, ACenterY - x);
+    SetPix(ACenterX + x, ACenterY + y);
+    SetPix(ACenterX - x, ACenterY + y);
+    SetPix(ACenterX + x, ACenterY - y);
+    SetPix(ACenterX - x, ACenterY - y);
+    SetPix(ACenterX + y, ACenterY + x);
+    SetPix(ACenterX - y, ACenterY + x);
+    SetPix(ACenterX + y, ACenterY - x);
+    SetPix(ACenterX - y, ACenterY - x);
     Inc(y);
-    t1 := t1 + y;
+    Inc(t1, y);
     t2 := t1 - x;
     if t2 >= 0 then begin
       t1 := t2;
@@ -679,6 +822,7 @@ begin
     end;
   until x < y;
 end;
+
 
 procedure TGraphicsDriver.DrawText(APX, APY: integer; AText: string);
 var
@@ -861,6 +1005,7 @@ begin
   MaxX := 0;
   MaxY := 0;
   Bpp := 0;
+  HasOffScreen := false;
   NumPages := 1;
   Bounds.Create;
   ModeIndex := 0;
@@ -981,16 +1126,17 @@ begin
   MaxWidth := 0;
   FFontData := nil;
   FFontDataSize := 0;
-  FFormat := ffNone;
+  FFormat := ffProportional;
   Spacing := 2;
   BytesPerCharacter := 2;
 end;
 
-constructor TFont.CreateSize(AMaxWidth, AHeight: byte);
+constructor TFont.CreateSize(AMaxWidth, AHeight, ASpacing: byte);
 begin
   inherited Create;
   MaxWidth := AMaxWidth;
   Height := AHeight;
+  Spacing := ASpacing;
 end;
 
 function TFont.CharWidth(AChar: char): integer;
@@ -1034,16 +1180,9 @@ begin
   Abstract;
 end;
 
-constructor TFont.CreateLoadStream(AStream: PStream);
+procedure TFont.SetFormat(AFormat: TFontFormat);
 begin
-  inherited Create;
-  LoadFromStream(AStream);
-end;
-
-constructor TFont.CreateLoadFile(const AFilename: string);
-begin
-  inherited Create;
-  LoadFromFile(AFilename);
+  FFormat := AFormat;
 end;
 
 function TFont.IsPixelSet(AChar: char; APX, APY: integer): boolean;
@@ -1176,9 +1315,9 @@ begin
   source := PMonospaceFont(@ASource);
 end;
 
-constructor TProportionalFont.CreateSize(AMaxWidth, AHeight: byte);
+constructor TProportionalFont.CreateSize(AMaxWidth, AHeight, ASpacing: byte);
 begin
-  inherited CreateSize(AMaxWidth, AHeight);
+  inherited CreateSize(AMaxWidth, AHeight, Spacing);
   FillChar(CharWidths, SizeOf(CharWidths), MaxWidth);
   FFontDataSize := AHeight * 512;
   GetMem(FFontData, FontDataSize);
@@ -1366,9 +1505,9 @@ begin
   stream.Free;
 end;
 
-constructor TColoredFont.CreateSize(AMaxWidth, AHeight: byte);
+constructor TColoredFont.CreateSize(AMaxWidth, AHeight, ASpacing: byte);
 begin
-  inherited CreateSize(AMaxWidth, AHeight);
+  inherited CreateSize(AMaxWidth, AHeight, ASpacing);
   FillChar(CharWidths, SizeOf(CharWidths), MaxWidth);
   FFontDataSize := Height * (StartChar - EndChar) * 2;
   GetMem(FFontData, FontDataSize);
@@ -1543,15 +1682,57 @@ begin
   inherited Insert(AIndex, AItem);
 end;
 
+function TFontManager.CreateFromStream(AStream: PStream): PFont;
+var
+  header: TFontHeader;
+  font: PFont;
+begin
+  AStream^.Read(@header, SizeOf(header));
+  if CheckReRaise(AStream) then
+    exit;
+  if (header.MajorVersion <= 1) and (header.MinorVersion <= 1) then begin
+    Dec(header.Format, 2);
+  end;
+  AStream^.Seek(0, soFromBeginning);
+  case header.Format of
+    ffMonospace: font := New(PMonospaceFont, Create);
+    ffProportional: font := New(PProportionalFont, Create);
+    ffColored: font := New(PColoredFont, Create);
+    ffSystem: font := New(PSystemFont, Create);
+  end;
+  if NilPtr(font, ecNotEnoughMemory) then
+    exit;
+  font^.LoadFromStream(AStream);
+  CheckReRaise(AStream);
+  CreateFromStream := font;
+end;
+
+function TFontManager.CreateFromFile(const AFilename: string): PFont;
+var
+  stream: TFileStream;
+  font: PFont;
+  header: TFontHeader;
+begin
+  stream.Create(AFilename, fmRead);
+  if stream.HasException then begin
+    stream.Free;
+    exit;
+  end;
+  CreateFromFile := CreateFromStream(@stream);
+  stream.Free;
+end;
+
 procedure Finalize; far;
 begin
   ExitProc := PreviousExitProc;
   FreeAndNil(Graph);
+  FontManager.Free;
   WriteLn('Graphics driver uninstalled.');
 end;
 
 begin
   Graph := nil;
+  FontManager.Create;
   PreviousExitProc := ExitProc;
   ExitProc := @Finalize;
 end.

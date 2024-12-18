@@ -26,8 +26,8 @@ type
     procedure RenderText(APX, APY, ALength: integer; AText: PChar); virtual;
     procedure Line(AX1, AY1, AX2, AY2: integer); virtual;
     procedure HLine(APX, APY, AWidth: integer); virtual;
-    procedure VLine(APX, APY, AHeight: integer); virtual;
-    procedure Circle(ACenterX, ACenterY, ARadius: integer); virtual;
+    procedure VLine(ApX, APY, AHeight: integer); virtual;
+    procedure FillRect(ARect: TRect); virtual;
     procedure DrawImage(APX, APY, AWidth, AHeight: integer; AImage: PByte); virtual;
     procedure DrawImageT(APX, APY, AWidth, AHeight: integer; AImage: PByte); virtual;
     procedure DrawImageStream(APX, APY, AWidth, AHeight: integer; AStream: PStream); virtual;
@@ -65,6 +65,7 @@ begin
     MaxY := 199;
     Bpp := 8;
     BytesPerScanLine := 320;
+    ScreenSize := 64000;
     HelpText := TString.New('Requires a VGA card.');
     FrameBuffer := Ptr($A000, $0000);
   end;
@@ -111,22 +112,72 @@ procedure TVga8Driver.RenderText(APX, APY, ALength: integer; AText: PChar);
 var
   drawRect: TRect;
   ch: char;
-  xIndex, maxY, sx, sy, minX, maxX: integer;
+  maxY, sx, sy, minX, maxX: integer;
   width: integer;
-  linePtr: PWord;
-  height: word;
+  shift, height: word;
   screen: PByte;
   charIndex, fore: byte;
-  count: word;
+  highBit: word;
+
+  procedure DrawCharLineB;
+  var
+    currentLine: byte;
+    linePtr: PByte;
+    xIndex: integer;
+  begin
+    linePtr := PByte(State^.Font^.FontData);
+    Inc(linePtr, Ord(ch) * height + (sy - APY));
+    currentLine := linePtr^;
+    Inc(linePtr);
+    shift := $80 shr minX;
+    for xIndex := minX to maxX do begin
+      if currentLine and shift > 0 then
+        screen^ := fore;
+      Inc(screen);
+      shift := shift shr 1;
+    end;
+    Inc(sy);
+  end;
+
+  procedure DrawCharLineW;
+  var
+    currentLine: word;
+    linePtr: PWord;
+    xIndex: integer;
+  begin
+    linePtr := State^.Font^.FontData;
+    Inc(linePtr, Ord(ch) * height + (sy - APY));
+    currentLine := linePtr^;
+    Inc(linePtr);
+    shift := $8000 shr minX;
+    for xIndex := minX to maxX do begin
+      if currentLine and shift > 0 then
+        screen^ := fore;
+      Inc(screen);
+      shift := shift shr 1;
+    end;
+    Inc(sy);
+  end;
+
+  procedure DrawCharLine;
+  begin
+    if State^.Font^.BytesPerCharacter = 1 then
+      DrawCharLineB
+    else
+      DrawCharLineW;
+  end;
 begin
-  State^.Bounds.GetIntersection(State^.ViewPort, drawRect);
-  drawRect.Intersect(Mode^.Bounds);
+  if HasException then
+    exit;
+  GetDrawRect(drawRect);
+  if drawRect.IsEmpty then
+    exit;
+  if APX > drawRect.Right then
+    exit;
+  if APY > drawRect.Bottom then
+    exit;
   height := State^.Font^.Height;
-  if HasException
-    or drawRect.IsEmpty
-    or (APX > drawRect.Right)
-    or (APY > drawRect.Bottom)
-    or (APY + height < drawRect.Y) then
+  if APY + height < drawRect.Y then
     exit;
   sx := APX;
   charIndex := 0;
@@ -142,40 +193,42 @@ begin
       Inc(sx, width);
       continue;
     end;
-    linePtr := State^.Font^.FontData;
     minX := Max(0, drawRect.X - sx);
     maxX := Min(width - 1, drawRect.Right - sx);
     sy := Max(drawRect.Y, APY);
-    Inc(linePtr, Ord(ch) * height + (sy - APY));
-    count := maxX - minX + 1;
-    screen := GetScreenPointer(sx + minX, sy);
     while sy <= maxY do begin
-      asm
-        push ds
-        les di, screen
-        lds si, linePtr
-        mov ax, ds:[si]
-        mov bx, 8000h
-        mov cx, minX
-        shr bx, cl
-        mov cx, count
-        mov dh, fore
-        @loop:
-          mov si, ax
-          and si, bx
-          jz @next
-          mov es:[di], dh
-          @next:
-          shr bx, 1
-          inc di
-        loop @loop
-        pop ds
-      end;
-      Inc(screen, 320);
-      Inc(linePtr);
-      Inc(sy);
+      screen := GetScreenPointer(sx + minX, sy);
+      DrawCharLine;
     end;
     Inc(sx, width);
+  end;
+end;
+
+procedure TVga8Driver.FillRect(ARect: TRect);
+var
+  screen: PByte;
+  drawRect: TRect;
+  width, index: integer;
+  color: byte;
+begin
+  if HasException then
+    exit;
+  GetDrawRect(drawRect);
+  drawRect.Intersect(Mode^.Bounds);
+  if drawRect.IsEmpty then
+    exit;
+  if not drawRect.IntersectsRect(ARect) then
+    exit;
+  ARect.Intersect(drawRect);
+  color := byte(State^.BackColor);
+  width := ARect.Width;
+  if Assigned(State^.FillPattern) then begin
+    FillPattern(ARect);
+    exit;
+  end;
+  for index := 0 to ARect.Height - 1 do begin
+    screen := GetScreenPointer(ARect.X, ARect.Y + index);
+    FillChar(screen^, width, color);
   end;
 end;
 
@@ -275,15 +328,25 @@ var
   lineWidth: integer;
   color: byte;
   drawRect: TRect;
+  px: integer;
 begin
   GetDrawRect(drawRect);
-  if HasException or not drawRect.ContainsY(APY) then
+  if HasException or (APY < drawRect.Y) or (APY > drawRect.Bottom) then
     exit;
-  APX := drawRect.ClampX(APX);
-  AWidth := MinL(drawRect.Width, AWidth);
+  if APX < drawRect.X then begin
+    Dec(AWidth, drawRect.X - APX);
+    APX := drawRect.X;
+  end;
+  if APX + AWidth - 1 > drawRect.Right then
+    AWidth := drawRect.Right - APX + 1;
   if AWidth <= 0 then
     exit;
   screen := GetScreenPointer(APX, APY);
+  if Assigned(State^.LinePattern) then begin
+    px := APX mod 16;
+    HLinePattern(AWidth, screen, State^.LinePattern^, px);
+    exit;
+  end;
   color := byte(State^.ForeColor);
   asm
     mov cx, AWidth
@@ -302,20 +365,26 @@ var
   color: byte;
   screenWidth: word;
 begin
-  if HasException then
-    exit;
   GetDrawRect(drawRect);
-  if not drawRect.ContainsX(APX) then
+  if HasException or (APX < drawRect.X) or (APX > drawRect.Right) then
     exit;
-  APY := drawRect.ClampY(APY);
-  AHeight := MinL(drawRect.Height, AHeight);
+  if APY < drawRect.Y then begin
+    Dec(AHeight, drawRect.Y - APY);
+    APY := drawRect.Y;
+  end;
+  if APY + AHeight - 1 > drawRect.Bottom then
+    AHeight := drawRect.Bottom - APY + 1;
   if AHeight <= 0 then
     exit;
+
+  if Assigned(State^.LinePattern) then begin
+    screen := GetScreenPointer(APX, APY);
+    VLinePattern(AHeight, State^.LinePattern^, APX, APY);
+    exit;
+  end;
   screen := GetScreenPointer(APX, APY);
   color := ForeColor;
   screenWidth := Mode^.BytesPerScanLine;
-  if State^.BufferMode then
-    screenWidth := State^.ViewPort.Width;
   asm
     mov ax, screenWidth
     mov cx, AHeight
@@ -328,47 +397,6 @@ begin
   end;
 end;
 
-procedure TVga8Driver.Circle(ACenterX, ACenterY, ARadius: integer);
-var
-  t1, t2: integer;
-  x, y: integer;
-  color: byte;
-  drawRect: TRect;
-  procedure SetPix(APX, APY: integer);
-  var
-    drawPtr: PByte;
-  begin
-    if not drawRect.Contains(APX, APY) then
-      exit;
-    drawPtr := GetScreenPointer(APX, APY);
-    drawPtr^ := ForeColor;
-  end;
-begin
-  State^.Bounds.GetIntersection(State^.ViewPort, drawRect);
-  drawRect.Intersect(Mode^.Bounds);
-  t1 := ARadius shr 4;
-  x := ARadius;
-  y := 0;
-  color := State^.ForeColor;
-  repeat
-    SetPix(ACenterX + x, ACenterY + y);
-    SetPix(ACenterX - x, ACenterY + y);
-    SetPix(ACenterX + x, ACenterY - y);
-    SetPix(ACenterX - x, ACenterY - y);
-    SetPix(ACenterX + y, ACenterY + x);
-    SetPix(ACenterX - y, ACenterY + x);
-    SetPix(ACenterX + y, ACenterY - x);
-    SetPix(ACenterX - y, ACenterY - x);
-    Inc(y);
-    Inc(t1, y);
-    t2 := t1 - x;
-    if t2 >= 0 then begin
-      t1 := t2;
-      Dec(x);
-    end;
-  until x < y;
-end;
-
 procedure TVga8Driver.DrawImage(APX, APY, AWidth, AHeight: integer; AImage: PByte);
 var
   screen: PByte;
@@ -376,12 +404,13 @@ var
   index: integer;
   screenWidth: word;
 begin
+  if HasException then
+    exit;
   GetImageDrawRects(APX, APY, AWidth, AHeight, imageRect, drawRect);
   if drawRect.IsEmpty then
     exit;
   screenWidth := Mode^.BytesPerScanline;
-  screen := Mode^.FrameBuffer;
-  Inc(screen, drawRect.Y * screenWidth + drawRect.X);
+  screen := GetScreenPointer(drawRect.X, drawRect.Y);
   Inc(AImage, word(imageRect.Y) * AWidth + imageRect.X);
   index := drawRect.Height;
   asm
@@ -409,7 +438,7 @@ end;
 procedure TVga8Driver.DrawImageT(APX, APY, AWidth, AHeight: integer; AImage: PByte);
 var
   imageRect, drawRect: TRect;
-  screen, image: PByte;
+  screen: PByte;
   screenWidth: word;
   tcolor: byte;
 begin
@@ -419,13 +448,12 @@ begin
   if drawRect.IsEmpty then
     exit;
   screen := GetScreenPointer(drawRect.X, drawRect.Y);
-  image := AImage;
-  Inc(image, imageRect.Y * imageRect.Width + imageRect.X);
+  Inc(AImage, imageRect.Y * imageRect.Width + imageRect.X);
   screenWidth := Mode^.BytesPerScanline;
   tcolor := TransparentColor;
   asm
     push ds
-    lds si, image
+    lds si, AImage
     les di, screen
     mov cx, drawRect.Height
     mov bx, imageRect.Width

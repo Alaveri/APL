@@ -129,10 +129,12 @@ end;
 
 procedure TGraphics8Driver.InverseHLine(APX, APY, AWidth: integer);
 begin
+  inherited InverseHLine(APX, APY, AWidth);
 end;
 
 procedure TGraphics8Driver.InverseVLine(APX, APY, AHeight: integer);
 begin
+  inherited InverseVLine(APX, APY, AHeight);
 end;
 
 procedure TGraphics8Driver.InverseRectangle(ARect: TRect);

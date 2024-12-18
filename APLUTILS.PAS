@@ -60,6 +60,8 @@ function ChangeDirectory(const ADirectory: string): boolean;
 function StringsEqualInsensitive(const AString1, AString2: string): boolean;
 function HasWildcard(const AFilename: string): boolean;
 function IsDirectory(const AFilename: string): boolean;
+function IsWhitespace(const AString: string): boolean;
+function AppDir: string;
 
 var
   WhiteSpaceChars: set of char;
@@ -655,6 +657,24 @@ begin
   if error <> 0 then
     result := ADefault;
   StrToInt := result;
+end;
+
+function IsWhitespace(const AString: string): boolean;
+var
+  index: integer;
+begin
+  IsWhiteSpace := true;
+  for index := 1 to Length(AString) do begin
+    if not (AString[index] in WhiteSpaceChars) then begin
+      IsWhiteSpace := false;
+      exit;
+    end;
+  end;
+end;
+
+function AppDir: string;
+begin
+  AppDir := ExtractDirectory(ParamStr(0));
 end;
 
 procedure Finalize; far;

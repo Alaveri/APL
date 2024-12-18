@@ -102,13 +102,15 @@ type
   public
     DisposeObjects: boolean;
     procedure Init; virtual;
+
     function Add(AItem: PObject): integer;
     function GetItem(AIndex: integer): PObject;
     function IndexOf(AItem: PObject): integer;
     procedure SetItem(AIndex: integer; AItem: PObject);
     procedure Insert(AIndex: integer; AItem: PObject);
-    procedure Remove(AIndex: integer); virtual;
     procedure RemoveItem(AItem: PObject);
+
+    procedure Remove(AIndex: integer); virtual;
     procedure Delete(AIndex: integer); virtual;
     procedure Clear; virtual;
     destructor Free; virtual;

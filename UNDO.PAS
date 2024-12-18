@@ -5,6 +5,7 @@ interface
 
 uses
   AplObj,
+  AplTypes,
   Lists;
 
 type
@@ -17,10 +18,10 @@ type
   private
   public
     ActionType: word;
-    OnUndo: PUndoEventProc;
-    OnRedo: PUndoEventProc;
+    OnUndo: PEventProc;
+    OnRedo: PEventProc;
     constructor Create(AActionType: word; ACode: word);
-    constructor CreateEvents(AActionType: word; ACode: word; AOnUndo, AOnRedo: PUndoEventProc);
+    constructor CreateEvents(AActionType: word; ACode: word; AOnUndo, AOnRedo: PEventProc);
     procedure Init; virtual;
   end;
 
@@ -211,7 +212,7 @@ begin
   ActionType := AActionType;
 end;
 
-constructor TUndoAction.CreateEvents(AActionType: word; ACode: word; AOnUndo, AOnRedo: PUndoEventProc);
+constructor TUndoAction.CreateEvents(AActionType: word; ACode: word; AOnUndo, AOnRedo: PEventProc);
 begin
   Create(AActionType, ACode);
   OnUndo := AOnUndo;

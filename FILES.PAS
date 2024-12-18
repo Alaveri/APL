@@ -19,6 +19,8 @@ type
   PFile = ^TFile;
   PFileList = ^TFileList;
   PFileListProc = ^TFileListProc;
+  PFileFilter = ^TFileFilter;
+  PFileFilterList = ^TFileFilterList;
 
   TFileAttribute = (
     faReadOnly,
@@ -31,6 +33,7 @@ type
 
   TFileAttributes = set of TFileAttribute;
   TFileListProc = procedure(AItem: PFile);
+
   TFile = object(TObject)
   private
   public
@@ -44,6 +47,31 @@ type
 
   TDirSort = (dsFilename, dsSize, dsTime);
   TDirSortDirection = (dsAsc, dsDesc);
+
+  TFileFilter = object(TIdentifiable)
+  private
+  public
+    Filter: PChar;
+    Description: PChar;
+    constructor CreateFilter(const ADescription, AFilter: string);
+    procedure Init; virtual;
+    procedure Assign(var ASource: TObject); virtual;
+    function GetFilter: string;
+    function GetDescription: string;
+  end;
+
+  TFileFilterList = object(TIdentifiableList)
+  private
+  public
+    constructor Create;
+    procedure Init; virtual;
+    function Add(AItem: PIdentifiable): integer;
+    function GetItem(AIndex: integer): PIdentifiable;
+    function IndexOf(AItem: PIdentifiable): integer;
+    procedure SetItem(AIndex: integer; AItem: PIdentifiable);
+    procedure Insert(AIndex: integer; AItem: PIdentifiable);
+    procedure RemoveItem(AItem: PIdentifiable);
+  end;
 
   TDirectoryContents = object(TFile)
   private
@@ -402,6 +430,86 @@ begin
       exit;
     end;
   end;
+end;
+
+procedure TFileFilter.Init;
+begin
+  inherited Init;
+  Filter := nil;
+  Description := nil;
+end;
+
+constructor TFileFilter.CreateFilter(const ADescription, AFilter: string);
+begin
+  inherited Create;
+  Filter := TString.New(AFilter);
+  Description := TString.New(ADescription);
+end;
+
+procedure TFileFilter.Assign(var ASource: TObject);
+var
+  source: PFileFilter;
+begin
+  inherited Assign(ASource);
+  source := PFileFilter(@ASource);
+  TString.Reassign(Filter, source^.Filter);
+  TString.Reassign(Description, source^.Description);
+end;
+
+function TFileFilter.GetFilter: string;
+begin
+  GetFilter := StrPas(Filter);
+end;
+
+function TFileFilter.GetDescription: string;
+begin
+  GetDescription := StrPas(Description);
+end;
+
+function FileFilterDescCompare(AItem1, AItem2: pointer): integer; far;
+begin
+  FileFilterDescCompare := StrIComp(PFileFilter(AItem1)^.Description,
+    PFileFilter(AItem2)^.Description);
+end;
+
+constructor TFileFilterList.Create;
+begin
+  CreateSorted(FileFilterDescCompare)
+end;
+
+procedure TFileFilterList.Init;
+begin
+  inherited Init;
+end;
+
+function TFileFilterList.Add(AItem: PIdentifiable): integer;
+begin
+  Add := inherited Add(AItem);
+end;
+
+function TFileFilterList.GetItem(AIndex: integer): PIdentifiable;
+begin
+  GetItem := PFileFilter(inherited GetItem(AIndex));
+end;
+
+function TFileFilterList.IndexOf(AItem: PIdentifiable): integer;
+begin
+  IndexOf := inherited IndexOf(AItem);
+end;
+
+procedure TFileFilterList.SetItem(AIndex: integer; AItem: PIdentifiable);
+begin
+  inherited SetItem(AIndex, AItem);
+end;
+
+procedure TFileFilterList.Insert(AIndex: integer; AItem: PIdentifiable);
+begin
+  inherited Insert(AIndex, AItem);
+end;
+
+procedure TFileFilterList.RemoveItem(AItem: PIdentifiable);
+begin
+  inherited RemoveItem(AItem);
 end;
 
 procedure Finalize; far;
