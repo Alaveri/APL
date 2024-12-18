@@ -54,8 +54,11 @@ type
     Filter: PChar;
     Description: PChar;
     constructor CreateFilter(const ADescription, AFilter: string);
+    destructor Free; virtual;
     procedure Init; virtual;
     procedure Assign(var ASource: TObject); virtual;
+    procedure SetFilter(const AFilter: string);
+    procedure SetDescription(const ADescription: string);
     function GetFilter: string;
     function GetDescription: string;
   end;
@@ -146,8 +149,8 @@ begin
   file2 := PFile(AItem2);
   if SortDirection = dsDesc then
     SwapPointer(pointer(file1), pointer(file2));
-  filename1 := StrPas(file1^.Name);
-  filename2 := StrPas(file2^.Name);
+  filename1 := TString.GetString(file1^.Name);
+  filename2 := TString.GetString(file2^.Name);
   isDir1 := false;
   isDir2 := false;
   if SortDirsFirst then begin
@@ -186,8 +189,8 @@ begin
   file2 := PFile(AItem2);
   if SortDirection = dsDesc then
     SwapPointer(pointer(file1), pointer(file2));
-  filename1 := StrPas(file1^.Name);
-  filename2 := StrPas(file2^.Name);
+  filename1 := TString.GetString(file1^.Name);
+  filename2 := TString.GetString(file2^.Name);
   isDir1 := false;
   isDir2 := false;
   if SortDirsFirst then begin
@@ -226,8 +229,8 @@ begin
   file2 := PFile(AItem2);
   if SortDirection = dsDesc then
     SwapPointer(pointer(file1), pointer(file2));
-  filename1 := StrPas(file1^.Name);
-  filename2 := StrPas(file2^.Name);
+  filename1 := TString.GetString(file1^.Name);
+  filename2 := TString.GetString(file2^.Name);
   isDir1 := false;
   isDir2 := false;
   if SortDirsFirst then begin
@@ -425,7 +428,7 @@ begin
   for index := 0 to Count - 1 do begin
     aFile := GetItem(index);
     if not (faDirectory in aFile^.Attr)
-      and StringsEqualInsensitive(StrPas(aFile^.Name), AFilename) then begin
+      and StringsEqualInsensitive(TString.GetString(aFile^.Name), AFilename) then begin
       result := aFile;
       exit;
     end;
@@ -458,12 +461,29 @@ end;
 
 function TFileFilter.GetFilter: string;
 begin
-  GetFilter := StrPas(Filter);
+  GetFilter := TString.GetString(Filter);
 end;
 
 function TFileFilter.GetDescription: string;
 begin
-  GetDescription := StrPas(Description);
+  GetDescription := TString.GetString(Description);
+end;
+
+procedure TFileFilter.SetFilter(const AFilter: string);
+begin
+  TString.AssignString(Filter, AFilter);
+end;
+
+procedure TFileFilter.SetDescription(const ADescription: string);
+begin
+  TString.AssignString(Description, ADescription);
+end;
+
+destructor TFileFilter.Free;
+begin
+  TString.Free(Filter);
+  TString.Free(Description);
+  inherited Free;
 end;
 
 function FileFilterDescCompare(AItem1, AItem2: pointer): integer; far;

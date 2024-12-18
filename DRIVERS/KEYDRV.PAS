@@ -540,7 +540,7 @@ end;
 
 function TKeyboardShortcut.GetShortcut: string;
 begin
-  GetShortcut := StrPas(ShortCut);
+  GetShortcut := TString.GetString(ShortCut);
 end;
 
 function KeyboardShortcutCompare(AItem1, AItem2: pointer): integer; far;

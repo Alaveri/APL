@@ -209,7 +209,7 @@ begin
   if not Assigned(Id) then
     GetId := ''
   else
-    GetId := StrPas(Id);
+    GetId := TString.GetString(Id);
 end;
 
 procedure TIdentifiable.SetId(const AId: string);
@@ -683,7 +683,7 @@ end;
 
 function TStringBuilder.ToString: string;
 begin
-  ToString := StrPas(FBuffer);
+  ToString := TString.GetString(FBuffer);
 end;
 
 function TStringBuilder.AsPChar: PChar;

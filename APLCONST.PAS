@@ -238,7 +238,7 @@ end;
 
 function TError.GetErrorMessage: string;
 begin
-  GetErrorMessage := StrPas(ErrorMessage);
+  GetErrorMessage := TString.GetString(ErrorMessage);
 end;
 
 function ErrorCodeCompare(AItem1, AItem2: pointer): integer; far;

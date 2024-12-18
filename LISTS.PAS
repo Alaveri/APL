@@ -883,7 +883,7 @@ var
   result: PChar;
 begin
   result := GetItem(AIndex);
-  GetString := StrPas(result);
+  GetString := TString.GetString(result);
 end;
 
 function TStringList.AddString(const AString: string): integer;
@@ -952,7 +952,7 @@ begin
     exit;
   for index := 0 to Count - 1 do begin
     item := GetItem(index);
-    if LowerCase(AId) = LowerCase(StrPas(item^.Id)) then begin
+    if LowerCase(AId) = LowerCase(TString.GetString(item^.Id)) then begin
       IndexOfId := index;
       break;
     end;

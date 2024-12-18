@@ -203,7 +203,7 @@ end;
 
 procedure TTextDriver.DrawTextLarge(AXPos, AYPos: integer; AText: PChar);
 begin
-  RenderText(AXPos, AYPos, StrPas(AText));
+  RenderText(AXPos, AYPos, TString.GetString(AText));
 end;
 
 procedure TTextDriver.RenderText(AXPos, AYPos: byte; const AText: string);
