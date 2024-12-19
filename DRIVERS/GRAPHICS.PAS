@@ -56,9 +56,8 @@ type
     BytesPerScanLine: word;
     FrameBuffer: pointer;
     ScreenSize: longint;
-    NumPages: byte;
+    NumPages: word;
     ModeId: integer;
-    HasOffScreen: boolean;
     procedure Assign(var ASource: TObject); virtual;
     procedure Init; virtual;
     destructor Free; virtual;
@@ -196,6 +195,7 @@ type
     Bounds: TRect;
     FillPattern: PFillPattern;
     LinePattern: PLinePattern;
+    DrawPage, DisplayPage: word;
     procedure Init; virtual;
     procedure Assign(var ASource: TObject); virtual;
   end;
@@ -216,6 +216,8 @@ type
     function YPos: byte; virtual;
     function GetScreenPointer(APX, APY: integer): PByte; virtual;
     function CreateGraphicsState: PGraphicsState; virtual;
+    procedure SetDisplayPage(APage: word); virtual;
+    procedure SetDrawPage(APage: word); virtual;
     procedure BeginDrawBuffer(var ABuffer: PByte; var ABounds: TRect); virtual;
     procedure GetImage(APX, APY, AWidth, AHeight: longint; ABuffer: PByte); virtual;
     procedure GetImageRect(ARect: TRect; ABuffer: PByte); virtual;
@@ -273,8 +275,8 @@ type
     procedure Init; virtual;
     procedure WaitForVSync; virtual;
     procedure ResetMode; virtual;
-    procedure CopyToOffScreen(APX, APY, AWidth, AHeight: integer); virtual;
-    procedure CopyFromOffScreen(APX, APY, AWidth, AHeight: integer); virtual;
+    procedure CopyToOffScreen(var ASource, ADest: TRect); virtual;
+    procedure CopyFromOffScreen(var ASource, ADest: TRect); virtual;
     destructor Free; virtual;
   end;
 
@@ -522,12 +524,13 @@ begin
   Abstract;
 end;
 
-procedure TGraphicsDriver.CopyToOffScreen(APX, APY, AWidth, AHeight: integer);
+procedure TGraphicsDriver.CopyToOffScreen(var ASource, ADest: TRect);
 begin
   Abstract;
 end;
 
-procedure TGraphicsDriver.CopyFromOffScreen(APX, APY, AWidth, AHeight: integer);
+procedure TGraphicsDriver.CopyFromOffScreen(var ASource, ADest: TRect);
+
 begin
   Abstract;
 end;
@@ -938,6 +941,16 @@ begin
   StateStack.Push(newState);
 end;
 
+procedure TGraphicsDriver.SetDisplayPage(APage: word);
+begin
+  State^.DisplayPage := APage;
+end;
+
+procedure TGraphicsDriver.SetDrawPage(APage: word);
+begin
+  State^.DrawPage := APage;
+end;
+
 procedure TGraphicsDriver.BeginDrawBuffer(var ABuffer: PByte; var ABounds: TRect);
 var
   size: word;
@@ -971,6 +984,8 @@ begin
   if not Assigned(oldState) then
     exit;
   State^.Assign(oldState^);
+  SetDrawPage(State^.DrawPage);
+  SetDisplayPage(State^.DisplayPage);
   FreeAndNil(oldState);
 end;
 
@@ -1005,7 +1020,6 @@ begin
   MaxX := 0;
   MaxY := 0;
   Bpp := 0;
-  HasOffScreen := false;
   NumPages := 1;
   Bounds.Create;
   ModeIndex := 0;
@@ -1616,6 +1630,8 @@ end;
 procedure TGraphicsState.Init;
 begin
   inherited Init;
+  DisplayPage := 0;
+  DrawPage := 0;
   ForeColor := 0;
   BackColor := 0;
   Bpp := 0;
@@ -1650,6 +1666,8 @@ begin
   BufferMode := state^.BufferMode;
   FillPattern := state^.FillPattern;
   LinePattern := state^.LinePattern;
+  DisplayPage := state^.DisplayPage;
+  DrawPage := state^.DrawPage;
 end;
 
 function TFontList.GetItem(AIndex: integer): PFont;

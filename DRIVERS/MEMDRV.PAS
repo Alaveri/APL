@@ -32,11 +32,14 @@ type
     procedure Insert(AIndex: integer; AItem: PReference);
   end;
 
+  TReferenceType = (rtConventional, rtXms, rtEms, rtFile);
+
   TReference = record
     Size: word;
-    case Xms: boolean of
-      true: (Handle: word; Unused: word);
-      false: (Ptr: pointer);
+    case ReferenceType: TReferenceType of
+      rtXms, rtEms: (Handle: word; Unused: word);
+      rtConventional: (Ptr: pointer);
+      rtFile: (Offset: longint);
   end;
 
   TXmsMoveRecord = record
@@ -190,7 +193,7 @@ begin
   Rewrite(debugFile);
   for index := 0 to FReferences^.Count - 1 do begin
     reference := FReferences^.GetItem(index);
-    if not reference^.Xms then
+    if not (reference^.ReferenceType = rtXms) then
       continue;
     WriteLn(debugFile, IntToStr(reference^.Handle));
   end;
@@ -344,7 +347,7 @@ begin
   while (index < FReferences^.Count) and (System.MaxAvail < ASize) do begin
     current := FReferences^.GetItem(index);
     Inc(index);
-    if current^.Xms then
+    if current^.ReferenceType = rtXms then
       continue;
     xmsHandle := XmsAlloc(current^.Size);
 
@@ -366,7 +369,7 @@ begin
       exit;
     FreeMem(current^.Ptr, current^.Size);
     current^.Ptr := nil;
-    current^.Xms := true;
+    current^.ReferenceType := rtXms;
     current^.Handle := xmsHandle;
   end;
 end;
@@ -398,7 +401,7 @@ begin
 
   XmsDealloc(AReference^.Handle);
   AReference^.Ptr := ptr;
-  AReference^.Xms := false;
+  AReference^.ReferenceType := rtConventional;
   FCurrentReference := AReference;
 end;
 
@@ -422,7 +425,7 @@ begin
   if FCurrentReference = AReference then
     exit;
   FCurrentReference := AReference;
-  if not AReference^.Xms then
+  if not (AReference^.ReferenceType = rtXms) then
     exit;
   MoveToConventional(AReference);
 end;
@@ -489,7 +492,7 @@ begin
   end;
   reference^.Size := ASize;
   reference^.Ptr := ABuffer;
-  reference^.Xms := false;
+  reference^.ReferenceType := rtConventional;
   FReferences^.Add(reference);
   CreateReference := reference;
 end;
@@ -520,7 +523,7 @@ begin
     end;
     reference^.Ptr := ptr;
     reference^.Size := ASize;
-    reference^.Xms := false;
+    reference^.ReferenceType := rtConventional
   end
   else if FXmsSupported and (ASize <= XmsMaxAvail) then begin
     reference^.Handle := XmsAlloc(ASize);
@@ -531,7 +534,7 @@ begin
       exit;
     end;
     reference^.Size := ASize;
-    reference^.Xms := true;
+    reference^.ReferenceType := rtXms;
   end
   else begin
     Raise(ecNotEnoughMemory);
@@ -552,7 +555,7 @@ begin
   if not Assigned(AReference) then
     exit;
   index := FReferences^.IndexOf(AReference);
-  if AReference^.Xms then
+  if AReference^.ReferenceType = rtXms then
     MoveToConventional(AReference);
   Dispose(AReference);
   if index < 0 then
@@ -570,7 +573,7 @@ begin
   if not Assigned(AReference) then
     exit;
   index := FReferences^.IndexOf(AReference);
-  if AReference^.Xms then
+  if AReference^.ReferenceType = rtXms then
     XmsDealloc(AReference^.Handle)
   else
     FreeMem(AReference^.Ptr, AReference^.Size);

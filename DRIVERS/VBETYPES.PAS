@@ -15,6 +15,12 @@ const
   {10h-FFh Reserved, to be defined by OEM}
 
 type
+  PVbeInfo = ^TVbeInfo;
+  PVbeModeInfo1 = ^TVbeModeInfo1;
+  PVbeModeInfo2 = ^TVbeModeInfo2;
+  PVbeModeInfo3 = ^TVbeModeInfo3;
+  PVbeMode = ^TVbeMode;
+
   TVbeCapability =
   (
     {set = DAC switchable, 8 bits per primary color; not set = DAC not
