@@ -73,9 +73,10 @@ type
     function Last: pointer;
     function FirstOrDefault(ADefault: pointer): pointer;
     function LastOrDefault(ADefault: pointer): pointer;
-    function FirstThat(AFunc: TPredicate): pointer;
-    function LastThat(AFunc: TPredicate): pointer;
+    function FirstThat(AFunc: TPredicate; var AValue): pointer;
+    function LastThat(AFunc: TPredicate; var AValue): pointer;
     function MoveIndex(AFromIndex, AToIndex: integer): boolean;
+    function Where(AFunc: TPredicate; var AValue): PList;
     procedure ForEach(AProc: PListProc); virtual;
     procedure SetComparer(AComparer: TComparer); virtual;
     procedure Swap(AIndex1, AIndex2: integer); virtual;
@@ -380,6 +381,21 @@ begin
     FirstOrDefault := GetItem(0);
 end;
 
+function TList.Where(AFunc: TPredicate; var AValue): PList;
+var
+  index: integer;
+  item: pointer;
+  result: PList;
+begin
+  result := New(PList, Create);
+  for index := 0 to Count - 1 do begin
+    item := GetItem(index);
+    if TPredicate(AFunc)(item, AValue) then
+      result^.Add(item);
+  end;
+  Where := Result;
+end;
+
 function TList.LastOrDefault(ADefault: pointer): pointer;
 begin
   if Count = 0 then
@@ -583,7 +599,7 @@ begin
   until index > Count - 1;
 end;
 
-function TList.FirstThat(AFunc: TPredicate): pointer;
+function TList.FirstThat(AFunc: TPredicate; var AValue): pointer;
 var
   index: integer;
   item: pointer;
@@ -593,14 +609,14 @@ begin
     exit;
   for index := 0 to Count - 1 do begin
     item := GetItem(index);
-    if TPredicate(AFunc)(item) then begin
+    if TPredicate(AFunc)(item, AValue) then begin
       FirstThat := item;
       break;
     end;
   end;
 end;
 
-function TList.LastThat(AFunc: TPredicate): pointer;
+function TList.LastThat(AFunc: TPredicate; var AValue): pointer;
 var
   index: integer;
   item: pointer;
@@ -610,7 +626,7 @@ begin
     exit;
   for index := Count - 1 downto 0 do begin
     item := GetItem(index);
-    if TPredicate(AFunc)(item) then begin
+    if TPredicate(AFunc)(item, AValue) then begin
       LastThat := item;
       break;
     end;

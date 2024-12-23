@@ -112,7 +112,7 @@ type
     NumberOfBanks: byte; {Total number of banks in this mode.}
     MemoryModel: byte; {See MemoryModel constants above}
     BankSize: byte; {Bank size in number of KBytes.}
-    NumberOfImagePages: byte; {Number of offscreen pages}
+    NumberOfImagePages: byte; {Number of pages that will fit in video memory}
     Reserved0: byte;
     RedMask: byte; {Size of direct color red mask in bits}
     RedPosition: byte; {Bit position of lsb of red mask}
@@ -127,8 +127,8 @@ type
 
   TVbeModeInfo2 = record
     PhysBasePtr: pointer; {Physical address of the linear frame buffer}
-    Reserved2: longint; {Always 0}
-    Reserved3: word; {Always 0}
+    OffScreenMemOffset: longint; {pointer to start of off screen memory}
+    OffScreenMemSize: word; {amount of off screen memory in 1k units}
   end;
 
   TVbeModeInfo3 = record

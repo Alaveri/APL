@@ -186,7 +186,10 @@ begin
   while charIndex < ALength  do begin
     ch := AText[charIndex];
     Inc(charIndex);
-    width := State^.Font^.TextWidth(ch);
+    if State^.OverrideFontWidth > 0 then
+      width := State^.OverrideFontWidth
+    else
+      width := State^.Font^.TextWidth(ch);
     if sx > drawRect.Right then
       exit;
     if sx + width < drawRect.X then begin

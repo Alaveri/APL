@@ -16,7 +16,7 @@ type
   PStringBuilder = ^TStringBuilder;
 
   TComparer = function(AItem1, AItem2: pointer): integer;
-  TPredicate = function(AItem: pointer): boolean;
+  TPredicate = function(AItem: pointer; var AValue): boolean;
   TCustomErrorMessageProc = function(AErrorCode: word; var AFound: boolean): string;
   TObjectStatus = integer;
   TExceptionCode = word;
@@ -129,10 +129,14 @@ type
     function Capacity: word;
   end;
 
+  TNothing = object
+  end;
+
 procedure FreeAndNil(var AObject); far;
 
 var
   OutOfMemoryException: PException;
+  Nothing: TNothing;
 
 implementation
 

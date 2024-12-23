@@ -56,7 +56,8 @@ type
     BytesPerScanLine: word;
     FrameBuffer: pointer;
     ScreenSize: longint;
-    NumPages: word;
+    PageCount: word;
+    MaxPage: word;
     ModeId: integer;
     procedure Assign(var ASource: TObject); virtual;
     procedure Init; virtual;
@@ -188,14 +189,12 @@ type
     Font: PFont;
     ViewPort: TRect;
     FrameBuffer: PByte;
-    OffScreenBuffer: PByte;
     BufferMode: boolean;
-    FontColor: TStandardColor;
-    FontShade: byte;
     Bounds: TRect;
     FillPattern: PFillPattern;
     LinePattern: PLinePattern;
     DrawPage, DisplayPage: word;
+    OverrideFontWidth: byte;
     procedure Init; virtual;
     procedure Assign(var ASource: TObject); virtual;
   end;
@@ -209,6 +208,7 @@ type
     Modes: TGraphicsModeList;
     Mode: PGraphicsMode;
     BufferRect: TRect;
+    OffScreenPage: word;
     function GetPixel(APX, APY: integer): byte; virtual;
     function ForeColor: longint; virtual;
     function BackColor: longint; virtual;
@@ -357,6 +357,7 @@ begin
     mov oldMode, al
   end;
   FOldMode := oldMode;
+  OffScreenPage := 0;
   Modes.Create;
   Mode := nil;
   State := CreateGraphicsState;
@@ -936,19 +937,21 @@ procedure TGraphicsDriver.PushState;
 var
   newState: PGraphicsState;
 begin
-  newState := New(PGraphicsState, Create);
+  newState := CreateGraphicsState;
   newState^.Assign(State^);
   StateStack.Push(newState);
 end;
 
 procedure TGraphicsDriver.SetDisplayPage(APage: word);
 begin
-  State^.DisplayPage := APage;
+  if Mode^.PageCount > 1 then
+    State^.DisplayPage := APage;
 end;
 
 procedure TGraphicsDriver.SetDrawPage(APage: word);
 begin
-  State^.DrawPage := APage;
+  if Mode^.PageCount > 1 then
+    State^.DrawPage := APage;
 end;
 
 procedure TGraphicsDriver.BeginDrawBuffer(var ABuffer: PByte; var ABounds: TRect);
@@ -1020,7 +1023,7 @@ begin
   MaxX := 0;
   MaxY := 0;
   Bpp := 0;
-  NumPages := 1;
+  PageCount := 1;
   Bounds.Create;
   ModeIndex := 0;
   BytesPerScanLine := 0;
@@ -1028,6 +1031,7 @@ begin
   Description := nil;
   FrameBuffer := nil;
   HelpText := nil;
+  MaxPage := 1;
 end;
 
 destructor TGraphicsMode.Free;
@@ -1045,7 +1049,7 @@ begin
   mode := PGraphicsMode(@ASource);
   Width := mode^.Width;
   Height := mode^.Height;
-  NumPages := mode^.NumPages;
+  PageCount := mode^.PageCount;
   MaxX := mode^.MaxX;
   MaxY := mode^.MaxY;
   Bounds.SetRect(mode^.Bounds);
@@ -1641,11 +1645,11 @@ begin
   ViewPort.Create;
   BufferMode := false;
   FrameBuffer := nil;
-  FontColor := scWhite;
-  FontShade := 0;
+
   Bounds.Create;
   FillPattern := nil;
   LinePattern := nil;
+  OverrideFontWidth := 0;
 end;
 
 procedure TGraphicsState.Assign(var ASource: TObject);
@@ -1668,6 +1672,7 @@ begin
   LinePattern := state^.LinePattern;
   DisplayPage := state^.DisplayPage;
   DrawPage := state^.DrawPage;
+  OverrideFontWidth := state^.OverrideFontWidth;
 end;
 
 function TFontList.GetItem(AIndex: integer): PFont;
