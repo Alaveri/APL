@@ -151,7 +151,7 @@ const
     ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF)
   );
 
-  DefaultNSCursor: TMouseCursorImage =
+  DefaultEWCursor: TMouseCursorImage =
   (
     ($FF, $FF, $FF, $FF, $FF, $0F, $FF, $FF, $FF, $0F, $FF, $FF, $FF, $FF, $FF),
     ($FF, $FF, $FF, $FF, $0F, $0F, $FF, $FF, $FF, $0F, $0F, $FF, $FF, $FF, $FF),
@@ -170,7 +170,7 @@ const
     ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF)
   );
 
-  DefaultEWCursor: TMouseCursorImage =
+  DefaultNSCursor: TMouseCursorImage =
   (
     ($FF, $FF, $FF, $FF, $FF, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
     ($FF, $FF, $FF, $FF, $0F, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
@@ -261,10 +261,10 @@ begin
   MouseCursors^.Add(cursor);
   cursor := New(PMouseCursor, Create('NS', 15, 15, @DefaultNSCursor));
   cursor^.OffsetX := 6;
-  cursor^.OffsetY := 8;
+  cursor^.OffsetY := 7;
   MouseCursors^.Add(cursor);
   cursor := New(PMouseCursor, Create('EW', 15, 15, @DefaultEWCursor));
-  cursor^.OffsetX := 8;
+  cursor^.OffsetX := 7;
   cursor^.OffsetY := 6;
   MouseCursors^.Add(cursor);
   MouseCursor := MouseCursors^.GetItemById('Default');

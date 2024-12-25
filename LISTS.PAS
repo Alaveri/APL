@@ -26,7 +26,6 @@ type
   PSortFunc = ^TSortFunc;
   PComparer = ^TComparer;
   PListBuffer = ^TListBuffer;
-  PListNode = ^TListNode;
   PListProc = ^TListProc;
   PIdentifiableList = ^TIdentifiableList;
   PIdentifiableListProc = ^TIdentifiableListProc;
@@ -91,11 +90,6 @@ type
     procedure DeletePtr(AItem: pointer); virtual;
     procedure DeleteItem(AItem: pointer);
     procedure Clear; virtual;
-  end;
-
-  TListNode = record
-    Item: pointer;
-    Next: PListNode;
   end;
 
   TObjectList = object(TList)

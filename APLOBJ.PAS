@@ -129,6 +129,8 @@ type
     function Capacity: word;
   end;
 
+  { Represents a variable of 0 size that can be used as a dummy value for var
+    parameters that require a variable where none is needed. }
   TNothing = object
   end;
 

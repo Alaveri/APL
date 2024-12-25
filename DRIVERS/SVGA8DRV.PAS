@@ -60,7 +60,7 @@ type
     FMaxOffset: word;
     FVbeInfo: TVbeInfo;
     procedure SetBank(ABank: word);
-    procedure CopyRect(var ASource, ADest: TRect; ASourcePage, ADestPage: word);
+    procedure CopyRect(const ASource, ADest: TRect; ASourcePage, ADestPage: word);
     function SetBankByCoord(APX, APY, APage: integer): longint;
     function GetOffset(APX, APY: integer): longint;
     function GetBankOffset(APX, APY: integer): longint;
@@ -87,8 +87,8 @@ type
     procedure DrawImageT(APX, APY, AWidth, AHeight: integer; AImage: PByte); virtual;
     procedure DrawImageStream(APX, APY, AWidth, AHeight: integer; AStream: PStream); virtual;
     procedure DrawImageStreamT(APX, APY, AWidth, AHeight: integer; AStream: PStream); virtual;
-    procedure CopyToOffScreen(var ASource, ADest: TRect); virtual;
-    procedure CopyFromOffScreen(var ASource, ADest: TRect); virtual;
+    procedure CopyToOffScreen(const ASource, ADest: TRect); virtual;
+    procedure CopyFromOffScreen(const ASource, ADest: TRect); virtual;
     procedure SetDisplayPage(APage: word); virtual;
     procedure SetDrawPage(APage: word); virtual;
     procedure WaitForVSync; virtual;
@@ -916,11 +916,12 @@ begin
   inherited SetDrawPage(APage);
 end;
 
-procedure TSVga8Driver.CopyRect(var ASource, ADest: TRect; ASourcePage, ADestPage: word);
+procedure TSVga8Driver.CopyRect(const ASource, ADest: TRect; ASourcePage, ADestPage: word);
 var
   sx, dx, sy, dy: word;
   buffer, ptr: PByte;
-  source, dest: PByte;
+  sourcePtr, destPtr: PByte;
+  source, dest: TRect;
   soffset, doffset: longint;
   lineWidth, partial: word;
   index: integer;
@@ -929,55 +930,57 @@ begin
     exit;
   if Mode^.PageCount < 2 then
     exit;
-  ASource.Intersect(Mode^.Bounds);
-  ADest.Intersect(Mode^.Bounds);
-  ASource.Width := Min(ASource.Width, ADest.Width);
-  ASource.Height := Min(ASource.Height, ADest.Height);
-  ADest.Width := ASource.Width;
-  ADest.Height := ASource.Height;
-  if ASource.IsEmpty then
+  source.CreateRect(ASource);
+  dest.CreateRect(ADest);
+  source.Intersect(Mode^.Bounds);
+  dest.Intersect(Mode^.Bounds);
+  source.Width := Min(source.Width, dest.Width);
+  source.Height := Min(source.Height, dest.Height);
+  dest.Width := source.Width;
+  dest.Height := source.Height;
+  if source.IsEmpty then
     exit;
 
-  sx := ASource.X;
-  sy := ASource.Y;
-  dx := ADest.X;
-  dy := ADest.Y;
+  sx := source.X;
+  sy := source.Y;
+  dx := dest.X;
+  dy := dest.Y;
 
-  lineWidth := ASource.Width * Mode^.Bpp div 8;
+  lineWidth := source.Width * Mode^.Bpp div 8;
   GetMem(buffer, lineWidth);
   if NilPtr(buffer, ecNotEnoughMemory) then
     exit;
 
   PushState;
 
-  for index := sy to ASource.Bottom do begin
+  for index := sy to source.Bottom do begin
     SetDrawPage(ASourcePage);
-    source := InternalGetScreenPointer(sx, sy, true, soffset);
+    sourcePtr := InternalGetScreenPointer(sx, sy, true, soffset);
     ptr := buffer;
     if soffset + lineWidth > FMaxOffset then begin
       partial := FMaxOffset - soffset + 1;
-      Move(source^, ptr^, partial);
+      Move(sourcePtr^, ptr^, partial);
       SetBank(SvgaState^.FCurrentBank + 1);
       Inc(ptr, partial);
-      source := Mode^.FrameBuffer;
-      Move(source^, ptr^, lineWidth - partial);
+      sourcePtr := Mode^.FrameBuffer;
+      Move(sourcePtr^, ptr^, lineWidth - partial);
     end
     else
-      Move(source^, buffer^, lineWidth);
+      Move(sourcePtr^, buffer^, lineWidth);
 
     SetDrawPage(ADestPage);
-    dest := InternalGetScreenPointer(dx, dy, true, doffset);
+    destPtr := InternalGetScreenPointer(dx, dy, true, doffset);
     ptr := buffer;
     if doffset + lineWidth > FMaxOffset then begin
       partial := FMaxOffset - doffset + 1;
-      Move(buffer^, dest^, partial);
+      Move(buffer^, destPtr^, partial);
       SetBank(SvgaState^.FCurrentBank + 1);
       Inc(ptr, partial);
-      dest := Mode^.FrameBuffer;
-      Move(ptr^, dest^, lineWidth - partial);
+      destPTr := Mode^.FrameBuffer;
+      Move(ptr^, destPtr^, lineWidth - partial);
     end
     else
-      Move(ptr^, dest^, lineWidth);
+      Move(ptr^, destPtr^, lineWidth);
     Inc(dy);
     Inc(sy);
   end;
@@ -986,13 +989,13 @@ begin
   PopState;
 end;
 
-procedure TSVga8Driver.CopyFromOffScreen(var ASource, ADest: TRect);
+procedure TSVga8Driver.CopyFromOffScreen(const ASource, ADest: TRect);
 begin
   CopyRect(ASource, ADest, OffscreenPage, 0);
 end;
 
 
-procedure TSVga8Driver.CopyToOffScreen(var ASource, ADest: TRect);
+procedure TSVga8Driver.CopyToOffScreen(const ASource, ADest: TRect);
 begin
   CopyRect(ASource, ADest, 0, OffscreenPage);
 end;
@@ -1070,15 +1073,13 @@ begin
     Raise(AStream^.Exception^.Code);
 end;
 
-procedure TSVga8Driver.WaitForVSync;
-begin
-  asm
-    mov dx, 3DAh
-    @loop:
-    in al, dx
-    test al, 8h
-    jz @loop
-  end;
+procedure TSVga8Driver.WaitForVSync; assembler;
+asm
+  mov dx, 3DAh
+  @loop:
+  in al, dx
+  test al, 8h
+  jz @loop
 end;
 
 function TSvga8Driver.SvgaState: PSvga8State;

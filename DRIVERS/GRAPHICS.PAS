@@ -275,8 +275,8 @@ type
     procedure Init; virtual;
     procedure WaitForVSync; virtual;
     procedure ResetMode; virtual;
-    procedure CopyToOffScreen(var ASource, ADest: TRect); virtual;
-    procedure CopyFromOffScreen(var ASource, ADest: TRect); virtual;
+    procedure CopyToOffScreen(const ASource, ADest: TRect); virtual;
+    procedure CopyFromOffScreen(const ASource, ADest: TRect); virtual;
     destructor Free; virtual;
   end;
 
@@ -525,12 +525,12 @@ begin
   Abstract;
 end;
 
-procedure TGraphicsDriver.CopyToOffScreen(var ASource, ADest: TRect);
+procedure TGraphicsDriver.CopyToOffScreen(const ASource, ADest: TRect);
 begin
   Abstract;
 end;
 
-procedure TGraphicsDriver.CopyFromOffScreen(var ASource, ADest: TRect);
+procedure TGraphicsDriver.CopyFromOffScreen(const ASource, ADest: TRect);
 
 begin
   Abstract;
