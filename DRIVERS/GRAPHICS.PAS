@@ -440,6 +440,8 @@ procedure TGraphicsDriver.ResetMode;
 var
   oldMode: byte;
 begin
+  if not Assigned(Mode) then
+    exit;
   oldMode := FOldMode;
   asm
     mov ah, 0
@@ -1415,8 +1417,8 @@ begin
     AverageWidth := MaxWidth
   else
     AverageWidth := Round(avgCount / avgTotal);
-  CharWidths[32] := AverageWidth div 2;
-  CharWidths[0] := CharWidths[32];
+  if CharWidths[32] <= 1 then
+    CharWidths[32] := AverageWidth div 2;
 end;
 
 procedure TFont.SaveToStream(AStream: PStream);
@@ -1750,7 +1752,6 @@ begin
   ExitProc := PreviousExitProc;
   FreeAndNil(Graph);
   FontManager.Free;
-  WriteLn('Graphics driver uninstalled.');
 end;
 
 begin

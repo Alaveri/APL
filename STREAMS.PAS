@@ -358,7 +358,6 @@ begin
   len := ReadWord;
   if HasException then
     exit;
-  len := ReadWord;
   result := TString.Alloc(len);
   if NilPtr(result, ecNotEnoughMemory) then
     exit;

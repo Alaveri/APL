@@ -27,11 +27,11 @@ type
     function EndString(AString: PChar): PChar;
     function EndCopy(ASource: PChar): PChar;
     function GetString(ASource: PChar): string;
-    function Reassign(ADest, ASource: PChar): PChar;
     function IndexOf(ASource: PChar; AChar: char): integer;
     function Length(AString: PChar): word;
     procedure Free(var AString: PChar);
     procedure AssignString(var ADest: PChar; ASource: string);
+    procedure Assign(var ADest: PChar; ASource: PChar);
   end;
 
 var
@@ -149,10 +149,10 @@ begin
   Copy := dest;
 end;
 
-function TStringUtil.Reassign(ADest, ASource: PChar): PChar;
+procedure TStringUtil.Assign(var ADest: PChar; ASource: PChar);
 begin
   Free(ADest);
-  Reassign := Copy(ASource);
+  ADest := Copy(ASource);
 end;
 
 function TStringUtil.CompareLength(AStr1, AStr2: PChar; AMaxLength: word; ACompareOptions: TStringCompareOptions): integer;

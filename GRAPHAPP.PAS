@@ -195,6 +195,9 @@ var
 
 implementation
 
+uses
+  AplConst;
+
 constructor TGraphApp.Create(ADriverId: TGraphDrivers);
 begin
   inherited Create;

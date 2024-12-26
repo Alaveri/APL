@@ -455,8 +455,8 @@ var
 begin
   inherited Assign(ASource);
   source := PFileFilter(@ASource);
-  TString.Reassign(Filter, source^.Filter);
-  TString.Reassign(Description, source^.Description);
+  TString.Assign(Filter, source^.Filter);
+  TString.Assign(Description, source^.Description);
 end;
 
 function TFileFilter.GetFilter: string;
