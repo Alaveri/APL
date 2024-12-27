@@ -29,6 +29,11 @@ function ClampR(AValue, AMin, AMax: real): real; far;
 function ClampS(AValue, AMin, AMax: single): single; far;
 function ClampD(AValue, AMin, AMax: double): double; far;
 function LowestW(AValues: PWordArray; ACount: word): word; far;
+function RangeContains(AValue, AMin, AMax: integer): boolean; far;
+function RangeContainsW(AValue, AMin, AMax: word): boolean; far;
+function RangeContainsB(AValue, AMin, AMax: byte): boolean; far;
+function RangeContainsS(AValue, AMin, AMax: shortint): boolean; far;
+function RangeContainsL(AValue, AMin, AMax: longint): boolean; far;
 function HighestW(AValues: PWordArray; ACount: word): word; far;
 function SumW(AValues: PWordArray; ACount: word): longint; far;
 function GreatestDivisorL(ANum1, ANum2: longint): longint; far;
@@ -334,6 +339,31 @@ begin
     end;
     ANum2 := ANum2 mod ANum1;
   end;
+end;
+
+function RangeContains(AValue, AMin, AMax: integer): boolean;
+begin
+  RangeContains := (AValue >= AMin) and (AValue <= AMax);
+end;
+
+function RangeContainsW(AValue, AMin, AMax: word): boolean;
+begin
+  RangeContainsW := (AValue >= AMin) and (AValue <= AMax);
+end;
+
+function RangeContainsB(AValue, AMin, AMax: byte): boolean;
+begin
+  RangeContainsB := (AValue >= AMin) and (AValue <= AMax);
+end;
+
+function RangeContainsS(AValue, AMin, AMax: shortint): boolean;
+begin
+  RangeContainsS := (AValue >= AMin) and (AValue <= AMax);
+end;
+
+function RangeContainsL(AValue, AMin, AMax: longint): boolean;
+begin
+  RangeContainsL := (AValue >= AMin) and (AValue <= AMax);
 end;
 
 end.

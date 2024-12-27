@@ -112,72 +112,21 @@ procedure TVga8Driver.RenderText(APX, APY, ALength: integer; AText: PChar);
 var
   drawRect: TRect;
   ch: char;
-  maxY, sx, sy, minX, maxX: integer;
-  width: integer;
-  shift, height: word;
-  screen: PByte;
-  charIndex, fore: byte;
-  highBit: word;
-
-  procedure DrawCharLineB;
-  var
-    currentLine: byte;
-    linePtr: PByte;
-    xIndex: integer;
-  begin
-    linePtr := PByte(State^.Font^.FontData);
-    Inc(linePtr, Ord(ch) * height + (sy - APY));
-    currentLine := linePtr^;
-    Inc(linePtr);
-    shift := $80 shr minX;
-    for xIndex := minX to maxX do begin
-      if currentLine and shift > 0 then
-        screen^ := fore;
-      Inc(screen);
-      shift := shift shr 1;
-    end;
-    Inc(sy);
-  end;
-
-  procedure DrawCharLineW;
-  var
-    currentLine: word;
-    linePtr: PWord;
-    xIndex: integer;
-  begin
-    linePtr := State^.Font^.FontData;
-    Inc(linePtr, Ord(ch) * height + (sy - APY));
-    currentLine := linePtr^;
-    Inc(linePtr);
-    shift := $8000 shr minX;
-    for xIndex := minX to maxX do begin
-      if currentLine and shift > 0 then
-        screen^ := fore;
-      Inc(screen);
-      shift := shift shr 1;
-    end;
-    Inc(sy);
-  end;
-
-  procedure DrawCharLine;
-  begin
-    if State^.Font^.BytesPerCharacter = 1 then
-      DrawCharLineB
-    else
-      DrawCharLineW;
-  end;
+  sx, sy, minX, maxX, maxY, xIndex, charIndex, width, height: integer;
+  currentLine, shift, initialShift: word;
+  linePtr, screen: PByte;
+  fore: byte;
+  offset: longint;
+  font: PFont;
 begin
   if HasException then
     exit;
   GetDrawRect(drawRect);
-  if drawRect.IsEmpty then
-    exit;
-  if APX > drawRect.Right then
-    exit;
-  if APY > drawRect.Bottom then
-    exit;
   height := State^.Font^.Height;
-  if APY + height < drawRect.Y then
+  font := State^.Font;
+  if drawRect.IsEmpty
+    or (APX > drawRect.Right)
+    or not RangeContains(APY, drawRect.Y - height, drawRect.Bottom) then
     exit;
   sx := APX;
   charIndex := 0;
@@ -186,10 +135,7 @@ begin
   while charIndex < ALength  do begin
     ch := AText[charIndex];
     Inc(charIndex);
-    if State^.OverrideFontWidth > 0 then
-      width := State^.OverrideFontWidth
-    else
-      width := State^.Font^.TextWidth(ch);
+    width := CharWidth(ch);
     if sx > drawRect.Right then
       exit;
     if sx + width < drawRect.X then begin
@@ -199,9 +145,24 @@ begin
     minX := Max(0, drawRect.X - sx);
     maxX := Min(width - 1, drawRect.Right - sx);
     sy := Max(drawRect.Y, APY);
+    initialShift := 1 shl (font^.BytesPerCharLine * 8 - 1);
     while sy <= maxY do begin
       screen := GetScreenPointer(sx + minX, sy);
-      DrawCharLine;
+      linePtr := font^.FontData;
+      Inc(linePtr, font^.BytesPerCharLine * Ord(ch) * height + (sy - APY));
+      if font^.BytesPerCharLine > 1 then
+        currentLine := PWord(linePtr)^
+      else
+        currentLine := linePtr^;
+      Inc(linePtr, font^.BytesPerCharLine);
+      shift := initialShift shr minX;
+      for xIndex := minX to maxX do begin
+        if currentLine and shift > 0 then
+          screen^ := fore;
+        Inc(screen);
+        shift := shift shr 1;
+      end;
+      Inc(sy);
     end;
     Inc(sx, width);
   end;

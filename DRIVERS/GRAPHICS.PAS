@@ -1,3 +1,5 @@
+{$A+,B-,D+,E+,F+,G-,I+,L+,N-,O+,P-,Q+,R+,S+,T-,V+,X+,Y+}
+{$M 16384,0,655360}
 {$I COMPILER.INC}
 unit Graphics;
 
@@ -87,22 +89,17 @@ type
     Format: TFontFormat;
     Unused: byte;
     CompressionLevel: TCompressionLevel;
-    BytesPerCharacter: byte;
+    BytesPerCharLine: byte;
     Reserved: array[0..250] of byte;
   end;
 
   TFont = object(TPersistent)
   private
-    FFontData: PWord;
+    FFontData: PByte;
     FFontDataSize: word;
     FFormat: TFontFormat;
-    function IsPixelSetB(AChar: char; APX, APY: integer): boolean;
-    function IsPixelSetW(AChar: char; APX, APY: integer): boolean;
-    procedure SetPixelW(AChar: char; APX, APY: integer); virtual;
-    procedure SetPixelB(AChar: char; APX, APY: integer); virtual;
-    procedure ClearPixelW(AChar: char; APX, APY: integer); virtual;
-    procedure ClearPixelB(AChar: char; APX, APY: integer); virtual;
-  public
+    procedure AdjustSize(var AHeader: TFontHeader; ASize: word);
+    public
     Version: real;
     TransparentColor: longint;
     Transparent: boolean;
@@ -110,7 +107,7 @@ type
     MaxWidth: byte;
     AverageWidth: integer;
     Spacing: byte;
-    BytesPerCharacter: byte;
+    BytesPerCharLine: byte;
     destructor Free; virtual;
     constructor CreateSize(AMaxWidth, AHeight, ASpacing: byte);
     procedure Assign(var ASource: TObject); virtual;
@@ -127,16 +124,20 @@ type
     function TextWidthAny(AText: PChar; ALength: word): longint; virtual;
     function TextWidth(const AText: string): longint; virtual;
     function TextWidthLarge(AText: PChar): longint; virtual;
-    function FontData: PWord; virtual;
+    function FontData: PByte; virtual;
     function FontDataSize: word; virtual;
   end;
 
   TMonospaceFont = object(TFont)
   private
   public
+    constructor CreateSize(AWidth, AHeight, ASpacing: byte);
     procedure Init; virtual;
     procedure Assign(var ASource: TObject); virtual;
     destructor Free; virtual;
+    procedure SetCharWidths; virtual;
+    function TextWidthAny(AText: PChar; ALength: word): longint; virtual;
+    function CharWidth(AChar: char): integer; virtual;
   end;
 
   TProportionalFont = object(TFont)
@@ -216,6 +217,7 @@ type
     function YPos: byte; virtual;
     function GetScreenPointer(APX, APY: integer): PByte; virtual;
     function CreateGraphicsState: PGraphicsState; virtual;
+    function CharWidth(AChar: char): integer; virtual;
     procedure SetDisplayPage(APage: word); virtual;
     procedure SetDrawPage(APage: word); virtual;
     procedure BeginDrawBuffer(var ABuffer: PByte; var ABounds: TRect); virtual;
@@ -344,6 +346,14 @@ var
 function TGraphicsDriver.CreateGraphicsState: PGraphicsState;
 begin
   CreateGraphicsState := New(PGraphicsState, Create);
+end;
+
+function TGraphicsDriver.CharWidth(AChar: char): integer;
+begin
+  if State^.OverrideFontWidth > 0 then
+    CharWidth := State^.OverrideFontWidth
+  else
+    CharWidth := State^.Font^.TextWidth(AChar);
 end;
 
 procedure TGraphicsDriver.Init;
@@ -1148,7 +1158,7 @@ begin
   FFontDataSize := 0;
   FFormat := ffProportional;
   Spacing := 2;
-  BytesPerCharacter := 2;
+  BytesPerCharLine := 2;
 end;
 
 constructor TFont.CreateSize(AMaxWidth, AHeight, ASpacing: byte);
@@ -1185,7 +1195,7 @@ begin
   TextWidthLarge := TextWidthAny(AText, StrLen(AText));
 end;
 
-function TFont.FontData: PWord;
+function TFont.FontData: PByte;
 begin
   FontData := FFontData;
 end;
@@ -1205,121 +1215,106 @@ begin
   FFormat := AFormat;
 end;
 
-function TFont.IsPixelSet(AChar: char; APX, APY: integer): boolean;
-begin
-  if BytesPerCharacter = 1 then
-    IsPixelSet := IsPixelSetB(AChar, APX, APY)
-  else
-    IsPixelSet := IsPixelSetW(AChar, APX, APY);
-end;
-
 function TFont.Format: TFontFormat;
 begin
   Format := FFormat;
 end;
 
-function TFont.IsPixelSetW(AChar: char; APX, APY: integer): boolean;
-var
-  ptr: PWord;
-  px, currentLine: word;
-begin
-  ptr := FontData;
-  Inc(ptr, Ord(AChar) * Height + APY);
-  currentLine := ptr^;
-  px := word(1) shl (15 - APX);
-  IsPixelSetW := currentLine and px > 0;
-end;
-
-function TFont.IsPixelSetB(AChar: char; APX, APY: integer): boolean;
+function TFont.IsPixelSet(AChar: char; APX, APY: integer): boolean;
 var
   ptr: PByte;
-  px, currentLine: byte;
+  px, currentLine: word;
+  shift: word;
 begin
-  ptr := PByte(FontData);
-  Inc(ptr, Ord(AChar) * Height + APY);
-  currentLine := ptr^;
-  px := byte(1) shl (7 - APX);
-  IsPixelSetB := currentLine and px > 0;
+  ptr := FontData;
+  shift := BytesPerCharLine * 8 - 1 - APX;
+  Inc(ptr, BytesPerCharLine * (Ord(AChar) * Height + APY));
+  if BytesPerCharLine > 1 then
+    currentLine := PWord(ptr)^
+  else
+    currentLine := ptr^;
+  px := 1 shl shift;
+  IsPixelSet := currentLine and px > 0;
 end;
 
 procedure TFont.SetPixel(AChar: char; APX, APY: integer);
-begin
-  if BytesPerCharacter = 1 then
-    SetPixelB(AChar, APX, APY)
-  else
-    SetPixelW(AChar, APX, APY);
-end;
-
-procedure TFont.SetPixelW(AChar: char; APX, APY: integer);
-var
-  ptr: PWord;
-  px, currentLine: word;
-begin
-  ptr := FontData;
-  Inc(ptr, Ord(AChar) * Height + APY);
-  currentLine := ptr^;
-  px := word(1) shl (15 - APX);
-  if currentLine and px > 0 then
-    exit;
-  ptr^ := currentLine or px;
-end;
-
-procedure TFont.SetPixelB(AChar: char; APX, APY: integer);
 var
   ptr: PByte;
-  px, currentLine: byte;
+  shift: word;
+  px, currentLine: word;
 begin
-  ptr := PByte(FontData);
-  Inc(ptr, Ord(AChar) * Height + APY);
-  currentLine := ptr^;
-  px := byte(1) shl (7 - APX);
+  ptr := FFontData;
+  shift := BytesPerCharLine * 8 - 1 - APX;
+  Inc(ptr, BytesPerCharLine * (Ord(AChar) * Height + APY));
+  if BytesPerCharLine > 1 then
+    currentLine := PWord(ptr)^
+  else
+    currentLine := ptr^;
+  px := 1 shl shift;
   if currentLine and px > 0 then
     exit;
-  ptr^ := currentLine or px;
+  if BytesPerCharLine > 1 then
+    PWord(ptr)^ := currentLine or px
+  else
+    ptr^ := currentLine or px;
 end;
 
 procedure TFont.ClearPixel(AChar: char; APX, APY: integer);
-begin
-  if BytesPerCharacter = 1 then
-    ClearPixelB(AChar, APX, APY)
-  else
-    ClearPixelW(AChar, APX, APY);
-end;
-
-procedure TFont.ClearPixelW(AChar: char; APX, APY: integer);
 var
-  ptr: PWord;
+  ptr: PByte;
+  shift: word;
   px, currentLine: word;
 begin
   ptr := FontData;
-  Inc(ptr, Ord(AChar) * Height + APY);
-  currentLine := ptr^;
-  px := word(1) shl (15 - APX);
+  shift := BytesPerCharLine * 8 - 1 - APX;
+  Inc(ptr, BytesPerCharLine * (Ord(AChar) * Height + APY));
+  if BytesPerCharLine > 1 then
+    currentLine := PWord(ptr)^
+  else
+    currentLine := ptr^;
+  px := 1 shl shift;
   if currentLine and px = 0 then
     exit;
-  ptr^ := currentLine and not px;
+  if BytesPerCharLine > 1 then
+    PWord(ptr)^ := currentLine and not px
+  else
+    ptr^ := currentLine and not px;
 end;
 
-procedure TFont.ClearPixelB(AChar: char; APX, APY: integer);
+constructor TMonospaceFont.CreateSize(AWidth, AHeight, ASpacing: byte);
 var
-  ptr: PByte;
-  px, currentLine: byte;
+  size: word;
 begin
-  ptr := PByte(FontData);
-  Inc(ptr, Ord(AChar) * Height + APY);
-  currentLine := ptr^;
-  px := word(1) shl (7 - APX);
-  if currentLine and px = 0 then
-    exit;
-  ptr^ := currentLine and not px;
+  inherited CreateSize(AWidth, AHeight, 0);
+  size := 256;
+  BytesPerCharLine := 1;
+  if AWidth > 8 then begin
+    size := 512;
+    BytesPerCharLine := 2;
+  end;
+  FFontDataSize := AHeight * size;
+  GetMem(FFontData, FFontDataSize);
+  FillChar(FFontData^, FFontDataSize, 0);
 end;
 
 procedure TMonospaceFont.Init;
 begin
   inherited Init;
-  MaxWidth := 8;
-  AverageWidth := 8;
   FFormat := ffMonospace;
+end;
+
+function TMonospaceFont.CharWidth(AChar: char): integer;
+begin
+  CharWidth := MaxWidth;
+end;
+
+function TMonospaceFont.TextWidthAny(AText: PChar; ALength: word): longint;
+begin
+  TextWidthAny := ALength * (MaxWidth + Spacing);
+end;
+
+procedure TMonospaceFont.SetCharWidths;
+begin
 end;
 
 destructor TMonospaceFont.Free;
@@ -1336,12 +1331,20 @@ begin
 end;
 
 constructor TProportionalFont.CreateSize(AMaxWidth, AHeight, ASpacing: byte);
+var
+  size: word;
 begin
-  inherited CreateSize(AMaxWidth, AHeight, Spacing);
+  inherited CreateSize(AMaxWidth, AHeight, ASpacing);
   FillChar(CharWidths, SizeOf(CharWidths), MaxWidth);
-  FFontDataSize := AHeight * 512;
-  GetMem(FFontData, FontDataSize);
-  FillChar(FFontData^, FontDataSize, 0);
+  size := 256;
+  BytesPerCharLine := 1;
+  if AMaxWidth > 8 then begin
+    size := 512;
+    BytesPerCharLine := 2;
+  end;
+  FFontDataSize := AHeight * size;
+  GetMem(FFontData, FFontDataSize);
+  FillChar(FFontData^, FFontDataSize, 0);
 end;
 
 procedure TProportionalFont.Init;
@@ -1368,6 +1371,7 @@ begin
   ptr := AText;
   for index := 1 to ALength do begin
     Inc(total, CharWidths[Ord(ptr^)]);
+    Inc(total, Spacing);
     Inc(ptr);
   end;
   TextWidthAny := total;
@@ -1389,34 +1393,35 @@ end;
 
 procedure TProportionalFont.SetCharWidths;
 var
-  charIndex, xIndex, yIndex: integer;
-  linePtr: PWord;
-  avgCount: integer;
-  avgTotal: integer;
-  width: word;
+  avgCount, avgTotal, charIndex, xIndex, yIndex: integer;
+  linePtr: PByte;
+  line: word;
+  width, shift: word;
 begin
   avgCount := 0;
   avgTotal := 0;
+  shift := 1 shl (BytesPerCharLine * 8 - 1);
   for charIndex := 0 to High(byte) do begin
     width := 0;
     linePtr := FFontData;
-    Inc(linePtr, charIndex * Height);
+    Inc(linePtr, charIndex * Height * BytesPerCharLine);
     for yIndex := 0 to Height - 1 do begin
+      if BytesPerCharLine > 1 then
+        line := PWord(linePtr)^
+      else
+        line := linePtr^;
       for xIndex := 0 to MaxWidth - 1 do begin
-        if (linePtr^ and ($8000 shr xIndex)) > 0 then
-          width := MaxW(xIndex + 1, width);
+        if (line and (shift shr xIndex)) > 0 then
+          width := MaxW(xIndex, width);
       end;
-      Inc(linePtr);
+      Inc(linePtr, BytesPerCharLine);
     end;
     Inc(AvgTotal);
-    Inc(AvgCount, width + Spacing);
-    Inc(width, Spacing);
+    Inc(AvgCount, width);
+    Inc(width);
     CharWidths[charIndex] := width;
   end;
-  if AvgTotal = 0 then
-    AverageWidth := MaxWidth
-  else
-    AverageWidth := Round(avgCount / avgTotal);
+  AverageWidth := Round(avgCount / avgTotal);
   if CharWidths[32] <= 1 then
     CharWidths[32] := AverageWidth div 2;
 end;
@@ -1438,7 +1443,7 @@ begin
   header.CompressionLevel := clHigh;
   header.Spacing := Spacing;
   header.Format := format;
-  header.BytesPerCharacter := BytesPerCharacter;
+  header.BytesPerCharLine := BytesPerCharLine;
   SetCharWidths;
   stream.Create(FFontDataSize);
   stream.Write(PByte(FFontData), FFontDataSize);
@@ -1460,6 +1465,36 @@ begin
   stream.Free;
 end;
 
+procedure TFont.AdjustSize(var AHeader: TFontHeader; ASize: word);
+var
+  buffer: PByte;
+  dataPtr, bufferPtr: PByte;
+  charIndex, yIndex: integer;
+  dataBytes: integer;
+begin
+  GetMem(buffer, ASize);
+  FillChar(buffer^, ASize, 0);
+  if not Assigned(FFontData) then begin
+    Raise(ecNotEnoughMemory);
+    exit;
+  end;
+  dataBytes := AHeader.DataSize div 256 div AHeader.Height;
+  BytesPerCharLine := ASize div 256 div AHeader.Height;
+  dataPtr := PByte(FFontData);
+  Inc(dataPtr);
+  bufferPtr := buffer;
+  for charIndex := 0 to 255 do begin
+    for yIndex := 0 to AHeader.Height - 1 do begin
+      Move(dataPtr^, bufferPtr^, BytesPerCharLine);
+      Inc(dataPtr, DataBytes);
+      Inc(bufferPtr, BytesPerCharLine);
+    end;
+  end;
+  FreeMem(FFontData, FFontDataSize);
+  FFontDataSize := ASize;
+  FFontData := buffer;
+end;
+
 procedure TFont.LoadFromStream(AStream: PStream);
 var
   header: TFontHeader;
@@ -1468,6 +1503,7 @@ var
   index: integer;
   lineIndex: integer;
   ptr: PByte;
+  size: word;
 begin
   AStream^.Read(@header, SizeOf(header));
   if AStream^.HasException then begin
@@ -1480,16 +1516,19 @@ begin
   end;
   if Assigned(FFontData) then
     FreeMem(FFontData, FontDataSize);
+
+  SetId(header.Name);
+  BytesPerCharLine := header.BytesPerCharLine;
+  if BytesPerCharLine = 0
+    then BytesPerCharLine := 2;
+
+  size := (header.MaxWidth div 9 + 1) * header.Height * 256;
   GetMem(FFontData, header.DataSize);
   if not Assigned(FFontData) then begin
     Raise(ecNotEnoughMemory);
     exit;
   end;
   FFontDataSize := header.DataSize;
-  SetId(header.Name);
-  BytesPerCharacter := header.BytesPerCharacter;
-  if BytesPerCharacter = 0
-    then BytesPerCharacter := 2;
   stream.Create(header.DataSize);
   if stream.HasException then begin
     FreeMem(FFontData, header.DataSize);
@@ -1512,6 +1551,8 @@ begin
         if stream.HasException then
           Raise(stream.Exception^.Code)
         else begin
+          if size < header.DataSize then
+            AdjustSize(header, size);
           Height := header.Height;
           Spacing := header.Spacing;
           MaxWidth := header.MaxWidth;
@@ -1611,7 +1652,7 @@ begin
   FFontDataSize := 256 * Height;
   GetMem(FFontData, FFontDataSize);
   Move(fontPtr^, FFontData^, FFontDataSize);
-  BytesPerCharacter := 1;
+  BytesPerCharLine := 1;
 end;
 
 destructor TSystemFont.Free;
