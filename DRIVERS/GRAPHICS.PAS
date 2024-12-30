@@ -194,6 +194,7 @@ type
     Bounds: TRect;
     FillPattern: PFillPattern;
     LinePattern: PLinePattern;
+    Inverse: boolean;
     DrawPage, DisplayPage: word;
     OverrideFontWidth: byte;
     procedure Init; virtual;
@@ -244,9 +245,8 @@ type
     procedure Fill(AX1, AY1, AWidth, AHeight: integer); virtual;
     procedure FillRect(ARect: TRect); virtual;
     procedure FillPattern(ARect: TRect); virtual;
-    procedure HLinePattern(AWidth: integer; AScreen: PByte; APattern: word;
-      var APX: integer); virtual;
-    procedure VLinePattern(AHeight: integer; APattern: word; APX, APY: integer); virtual;
+    procedure HLinePattern(APattern: word; APX, APY, AWidth: integer); virtual;
+    procedure VLinePattern(APattern: word; APX, APY, AHeight: integer); virtual;
     procedure BezierQuad(AP1: TPoint; AP2: TPoint; AControl: TPoint; AResolution: integer);
     procedure BezierCubic(AP1: TPoint; AP2: TPoint; AControl1: TPoint;
       AControl2: TPoint; AResolution: integer);
@@ -575,30 +575,16 @@ begin
     screen := GetScreenPointer(ARect.X, sy);
     px := ARect.X mod 16;
     py := sy mod 16;
-    HLinePattern(width, screen, State^.FillPattern^[py], px);
+    HLinePattern(State^.FillPattern^[py], px, py, width);
   end;
 end;
 
-procedure TGraphicsDriver.HLinePattern(AWidth: integer; AScreen: PByte; APattern: word;
-  var APX: integer);
-var
-  patternIndex: integer;
-  fore, back: byte;
+procedure TGraphicsDriver.HLinePattern(APattern: word; APX, APY, AWidth: integer);
 begin
-  fore := State^.ForeColor;
-  back := State^.BackColor;
-  for patternIndex := 0 to AWidth - 1 do begin
-    if APattern and (1 shl APX) > 0 then
-      AScreen^ := fore
-    else
-      AScreen^ := back;
-    Inc(AScreen);
-    Inc(APX);
-    APX := APX mod 16;
-  end;
+  Abstract;
 end;
 
-procedure TGraphicsDriver.VLinePattern(AHeight: integer; APattern: word; APX, APY: integer);
+procedure TGraphicsDriver.VLinePattern(APattern: word; APX, APY, AHeight: integer);
 var
   patternIndex: integer;
   fore, back: byte;
@@ -1688,7 +1674,7 @@ begin
   ViewPort.Create;
   BufferMode := false;
   FrameBuffer := nil;
-
+  Inverse := false;
   Bounds.Create;
   FillPattern := nil;
   LinePattern := nil;
@@ -1716,6 +1702,7 @@ begin
   DisplayPage := state^.DisplayPage;
   DrawPage := state^.DrawPage;
   OverrideFontWidth := state^.OverrideFontWidth;
+  Inverse := state^.Inverse;
 end;
 
 function TFontList.GetItem(AIndex: integer): PFont;

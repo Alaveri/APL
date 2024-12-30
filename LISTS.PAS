@@ -23,6 +23,7 @@ type
   PObjectStack = ^TObjectStack;
   PQueue = ^TQueue;
   PStringList = ^TStringList;
+  PLongIntList = ^TLongIntList;
   PSortFunc = ^TSortFunc;
   PComparer = ^TComparer;
   PListBuffer = ^TListBuffer;
@@ -169,6 +170,18 @@ type
     procedure SetItem(AIndex: integer; AItem: PIdentifiable);
     procedure Insert(AIndex: integer; AItem: PIdentifiable);
   end;
+
+  TLongIntList = object(TList)
+  private
+  public
+    function Add(AItem: longint): integer;
+    function GetItem(AIndex: integer): longint;
+    function IndexOf(AItem: longint): integer;
+    procedure SetItem(AIndex: integer; AItem: longint);
+    procedure Insert(AIndex: integer; AItem: longint);
+    procedure RemoveItem(AItem: longint);
+  end;
+
 
   TStringComparer = object(TObject)
   private
@@ -987,6 +1000,36 @@ end;
 procedure TIdentifiableList.Insert(AIndex: integer; AItem: PIdentifiable);
 begin
   inherited Insert(AIndex, AItem);
+end;
+
+function TLongIntList.Add(AItem: longint): integer;
+begin
+  Add := AddPtr(pointer(AItem));
+end;
+
+function TLongIntList.GetItem(AIndex: integer): longint;
+begin
+  GetItem := longint(inherited GetItem(AIndex));
+end;
+
+function TLongIntList.IndexOf(AItem: longint): integer;
+begin
+  IndexOf := inherited IndexOfPtr(pointer(AItem));
+end;
+
+procedure TLongIntList.SetItem(AIndex: integer; AItem: longint);
+begin
+  inherited SetItem(AIndex, pointer(AItem));
+end;
+
+procedure TLongIntList.Insert(AIndex: integer; AItem: longint);
+begin
+  inherited Insert(AIndex, pointer(AItem));
+end;
+
+procedure TLongIntList.RemoveItem(AItem: longint);
+begin
+  inherited DeletePtr(pointer(AItem));
 end;
 
 begin

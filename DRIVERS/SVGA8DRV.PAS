@@ -81,7 +81,8 @@ type
     procedure VLine(ApX, APY, AHeight: integer); virtual;
     procedure FillRect(ARect: TRect); virtual;
     procedure FillPattern(ARect: TRect); virtual;
-    procedure VLinePattern(AHeight: integer; APattern: word; APX, APY: integer); virtual;
+    procedure HLinePattern(APattern: TLinePattern; APX, APY, AWidth: integer); virtual;
+    procedure VLinePattern(APattern: word; APX, APY, AHeight: integer); virtual;
     procedure InverseHLine(APX, APY, AWidth: integer); virtual;
     procedure DrawImage(APX, APY, AWidth, AHeight: integer; AImage: PByte); virtual;
     procedure DrawImageT(APX, APY, AWidth, AHeight: integer; AImage: PByte); virtual;
@@ -497,24 +498,32 @@ end;
 procedure TSVga8Driver.FillPattern(ARect: TRect);
 var
   screen: PByte;
-  px, py, sy, width, partialWidth, index: integer;
+  py, width, partialWidth, index: integer;
   offset: longint;
+  drawRect: TRect;
 begin
+  if HasException then
+    exit;
+  State^.Bounds.GetIntersection(State^.ViewPort, drawRect);
+  drawRect.Intersect(Mode^.Bounds);
+  if drawRect.IsEmpty then
+    exit;
+  if not drawRect.IntersectsRect(ARect) then
+    exit;
+  ARect.Intersect(drawRect);
   width := ARect.Width;
-  for index := 0 to ARect.Height - 1 do begin
-    sy := ARect.Y + index;
-    screen := InternalGetScreenPointer(ARect.X, sy, true, offset);
-    px := ARect.X mod 16;
-    py := sy mod 16;
+  for index := ARect.Y to ARect.Y + ARect.Height - 1 do begin
+    screen := InternalGetScreenPointer(ARect.X, index, true, offset);
+    py := index mod 16;
     if width + offset > FMaxOffset then begin
       partialWidth := FMaxOffset - offset + 1;
-      HLinePattern(partialWidth, screen, State^.FillPattern^[py], px);
+      HLinePattern(State^.FillPattern^[py], ARect.X, index, partialWidth);
       SetBank(SvgaState^.FCurrentBank + 1);
       screen := Mode^.FrameBuffer;
-      HLinePattern(width - partialWidth, screen, State^.FillPattern^[py], px);
+      HLinePattern(State^.FillPattern^[py], ARect.X, index, width - partialWidth);
     end
     else
-      HLinePattern(width, screen, State^.FillPattern^[py], px);
+      HLinePattern(State^.FillPattern^[py], ARect.X, index, width);
   end;
 end;
 
@@ -555,23 +564,39 @@ begin
   end;
 end;
 
-procedure TSVga8Driver.VLinePattern(AHeight: integer; APattern: word; APX, APY: integer);
+procedure TSvga8Driver.VLinePattern(APattern: word; APX, APY, AHeight: integer);
 var
   patternIndex: integer;
   fore, back: byte;
   screen: PByte;
   py: integer;
   offset: longint;
+  drawRect: TRect;
 begin
+  GetDrawRect(drawRect);
   fore := State^.ForeColor;
   back := State^.BackColor;
+  if HasException or (APX < drawRect.X) or (APX > drawRect.Right) then
+    exit;
+  if APY < drawRect.Y then begin
+    Dec(AHeight, drawRect.Y - APY);
+    APY := drawRect.Y;
+  end;
+  if APY + AHeight - 1 > drawRect.Bottom then
+    AHeight := drawRect.Bottom - APY + 1;
+  if AHeight <= 0 then
+    exit;
   screen := InternalGetScreenPointer(APX, APY, true, offset);
   for patternIndex := 0 to AHeight - 1 do begin
     py := APY mod 16;
-    if APattern and (1 shl py) > 0 then
-      screen^ := fore
-    else
-      screen^ := back;
+    if APattern and (1 shl py) > 0 then begin
+      if State^.Inverse then
+        screen^ := screen^ xor 15
+      else if fore <> TransparentColor then
+        screen^ := fore;
+    end
+    else if back <> TransparentColor then
+     screen^ := back;
     Inc(screen, Mode^.Width);
     Inc(offset, Mode^.Width);
     Inc(APY);
@@ -582,15 +607,17 @@ begin
   end;
 end;
 
-procedure TSVga8Driver.HLine(APX, APY, AWidth: integer);
+procedure TSVga8Driver.HLinePattern(APattern: TLinePattern; APX, APY, AWidth: integer);
 var
-  screen: PByte;
-  partialWidth, lineWidth: integer;
-  color: byte;
+  patternIndex: integer;
   drawRect: TRect;
+  fore, back: byte;
+  screen: PByte;
   px: integer;
   offset: longint;
 begin
+  fore := State^.ForeColor;
+  back := State^.BackColor;
   GetDrawRect(drawRect);
   if HasException or (APY < drawRect.Y) or (APY > drawRect.Bottom) then
     exit;
@@ -603,11 +630,49 @@ begin
   if AWidth <= 0 then
     exit;
   screen := InternalGetScreenPointer(APX, APY, true, offset);
+  for patternIndex := APX to APX + AWidth - 1 do begin
+    px := patternIndex mod 16;
+    if APattern and (1 shl px) > 0 then begin
+      if State^.Inverse then
+        screen^ := screen^ xor 15
+      else if fore <> TransparentColor then
+        screen^ := fore;
+    end
+    else if back <> TransparentColor then
+    screen^ := back;
+    Inc(screen);
+    Inc(offset);
+    if offset > FMaxOffset then begin
+      screen := InternalGetScreenPointer(patternIndex, APY, true, offset);
+      Inc(offset);
+    end;
+  end;
+end;
+
+procedure TSVga8Driver.HLine(APX, APY, AWidth: integer);
+var
+  screen: PByte;
+  partialWidth, lineWidth: integer;
+  color: byte;
+  drawRect: TRect;
+  offset: longint;
+begin
   if Assigned(State^.LinePattern) then begin
-    px := APX mod 16;
-    HLinePattern(AWidth, screen, State^.LinePattern^, px);
+    HLinePattern(State^.LinePattern^, APX, APY, AWidth);
     exit;
   end;
+  GetDrawRect(drawRect);
+  if HasException or (APY < drawRect.Y) or (APY > drawRect.Bottom) then
+    exit;
+  if APX < drawRect.X then begin
+    Dec(AWidth, drawRect.X - APX);
+    APX := drawRect.X;
+  end;
+  if APX + AWidth - 1 > drawRect.Right then
+    AWidth := drawRect.Right - APX + 1;
+  if AWidth <= 0 then
+    exit;
+  screen := InternalGetScreenPointer(APX, APY, true, offset);
   color := byte(State^.ForeColor);
   if AWidth + offset > FMaxOffset then begin
     partialWidth := FMaxOffset - offset + 1;
@@ -637,6 +702,10 @@ var
   screen: PByte;
   drawRect: TRect;
 begin
+  if Assigned(State^.LinePattern) then begin
+    VLinePattern(State^.LinePattern^, APX, APY, AHeight);
+    exit;
+  end;
   GetDrawRect(drawRect);
   if HasException or (APX < drawRect.X) or (APX > drawRect.Right) then
     exit;
@@ -648,11 +717,6 @@ begin
     AHeight := drawRect.Bottom - APY + 1;
   if AHeight <= 0 then
     exit;
-  if Assigned(State^.LinePattern) then begin
-    screen := GetScreenPointer(APX, APY);
-    VLinePattern(AHeight, State^.LinePattern^, APX, APY);
-    exit;
-  end;
   for index := APY to APY + AHeight - 1 do begin
     screen := GetScreenPointer(APX, index);
     screen^ := ForeColor;
@@ -949,7 +1013,6 @@ procedure TSVga8Driver.CopyFromOffScreen(const ASource, ADest: TRect);
 begin
   CopyRect(ASource, ADest, OffscreenPage, 0);
 end;
-
 
 procedure TSVga8Driver.CopyToOffScreen(const ASource, ADest: TRect);
 begin

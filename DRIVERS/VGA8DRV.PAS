@@ -292,7 +292,7 @@ var
   lineWidth: integer;
   color: byte;
   drawRect: TRect;
-  px: integer;
+  px, py: integer;
 begin
   GetDrawRect(drawRect);
   if HasException or (APY < drawRect.Y) or (APY > drawRect.Bottom) then
@@ -308,7 +308,8 @@ begin
   screen := GetScreenPointer(APX, APY);
   if Assigned(State^.LinePattern) then begin
     px := APX mod 16;
-    HLinePattern(AWidth, screen, State^.LinePattern^, px);
+    py := APY;
+    HLinePattern(State^.LinePattern^, px, py, AWidth);
     exit;
   end;
   color := byte(State^.ForeColor);
