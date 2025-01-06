@@ -183,6 +183,7 @@ begin
     ch := AText[charIndex];
     Inc(charIndex);
     width := CharWidth(ch);
+    width := CharWidth(ch);
     if sx > drawRect.Right then
       exit;
     if sx + width < drawRect.X then begin
