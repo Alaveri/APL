@@ -23,9 +23,8 @@ type
   PKeyEvent = ^TKeyEvent;
   PMouseEvent = ^TMouseEvent;
   PEventProc = ^TEventProc;
-  PMouseEventProc = ^TMouseEventProc;
-  PKeyEventProc = ^TKeyEventProc;
   PMouseState = ^TMouseState;
+  PProgressEvent = ^TProgressEvent;
 
   short = shortint;
   long = longint;
@@ -42,6 +41,23 @@ type
   (
     bsLeft,
     bsRight
+  );
+
+  TModalResult =
+  (
+    mrNone,
+    mrYes,
+    mrOk,
+    mrAll,
+    mrYesToAll,
+    mrNo,
+    mrNoToAll,
+    mrContinue,
+    mrRetry,
+    mrAbort,
+    mrIgnore,
+    mrHelp,
+    mrCancel
   );
 
   TButtonStates = set of TButtonState;
@@ -67,7 +83,17 @@ type
   private
   public
     Handled: boolean;
+    Sender: PObject;
     procedure Init; virtual;
+    procedure Assign(var ASource: TObject); virtual;
+    procedure Clear; virtual;
+  end;
+
+  TProgressEvent = object(TEvent)
+  private
+  public
+    Max: longint;
+    Current: longint;
     procedure Assign(var ASource: TObject); virtual;
     procedure Clear; virtual;
   end;
@@ -76,7 +102,6 @@ type
   private
   public
     Key: word;
-    procedure Init; virtual;
     procedure Assign(var ASource: TObject); virtual;
     procedure Clear; virtual;
   end;
@@ -88,24 +113,11 @@ type
     Y: integer;
     NewMouseState: TMouseState;
     OldMouseState: TMouseState;
-    procedure Init; virtual;
     procedure Assign(var ASource: TObject); virtual;
     procedure Clear; virtual;
   end;
 
-  TModalResult =
-  (
-    mrNone,
-    mrYes,
-    mrNo,
-    mrOk,
-    mrCancel,
-    mrHelp
-  );
-
-  TEventProc = procedure(ASender: PObject; var AEvent: TEvent);
-  TMouseEventProc = procedure(ASender: PObject; var AEvent: TMouseEvent);
-  TKeyEventProc = procedure(ASender: PObject; var AEvent: TKeyEvent);
+  TEventProc = procedure(var AEvent: TEvent);
 
 var
   NumberSeparator: char;
@@ -116,7 +128,7 @@ implementation
 procedure TEvent.Init;
 begin
   inherited Init;
-  Handled := false;
+  Clear;
 end;
 
 procedure TEvent.Assign(var ASource: TObject);
@@ -125,20 +137,23 @@ var
 begin
   inherited Assign(ASource);
   source := PEvent(@ASource);
+  Sender := source^.Sender;
   Handled := source^.Handled;
 end;
 
 procedure TEvent.Clear;
 begin
   Handled := false;
+  Sender := nil;
 end;
 
-procedure TMouseEvent.Init;
+procedure TMouseEvent.Clear;
 begin
-  inherited Init;
+  inherited Clear;
   NewMouseState.Create;
   OldMouseState.Create;
-  Clear;
+  X := 0;
+  Y := 0;
 end;
 
 procedure TMouseEvent.Assign(var ASource: TObject);
@@ -151,21 +166,6 @@ begin
   OldMouseState.Assign(source^.OldMouseState);
   X := source^.X;
   Y := source^.Y;
-end;
-
-procedure TMouseEvent.Clear;
-begin
-  inherited Clear;
-  OldMouseState.Clear;
-  NewMouseState.Clear;
-  X := 0;
-  Y := 0;
-end;
-
-procedure TKeyEvent.Init;
-begin
-  inherited Init;
-  Key := 0;
 end;
 
 procedure TKeyEvent.Assign(var ASource: TObject);
@@ -227,6 +227,23 @@ end;
 function TMouseState.Moved(const AState: TMouseState): boolean;
 begin
   Moved := (X <> AState.X) or (Y <> AState.Y);
+end;
+
+procedure TProgressEvent.Assign(var ASource: TObject);
+var
+  source: PProgressEvent;
+begin
+  inherited Assign(ASource);
+  source := PProgressEvent(@ASource);
+  Max := source^.Max;
+  Current := source^.Current;
+end;
+
+procedure TProgressEvent.Clear;
+begin
+  inherited Clear;
+  Max := 0;
+  Current := 0;
 end;
 
 end.

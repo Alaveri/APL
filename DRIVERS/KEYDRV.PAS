@@ -7,6 +7,7 @@ uses
   AplObj,
   AplTypes,
   AplUtils,
+  Lists,
   DateTime;
 
 const
@@ -40,32 +41,59 @@ const
   kyAltN = ExtKeyFlag + 49;
   kyAltM = ExtKeyFlag + 50;
 
-  kyQ = 16;
-  kyW = 17;
-  kyE = 18;
-  kyR = 19;
-  kyT = 20;
-  kyY = 21;
-  kyU = 22;
-  kyI = 23;
-  kyO = 24;
-  kyP = 25;
-  kyA = 30;
-  kyS = 31;
-  kyD = 32;
-  kyF = 33;
-  kyG = 34;
-  kyH = 35;
-  kyJ = 36;
-  kyK = 37;
-  kyL = 38;
-  kyZ = 44;
-  kyX = 45;
-  kyC = 46;
-  kyV = 47;
-  kyB = 48;
-  kyN = 49;
-  kyM = 50;
+  kyA = 97;
+  kyB = 98;
+  kyC = 99;
+  kyD = 100;
+  kyE = 101;
+  kyF = 102;
+  kyG = 103;
+  kyH = 104;
+  kyI = 105;
+  kyJ = 106;
+  kyK = 107;
+  kyL = 108;
+  kyM = 109;
+  kyN = 110;
+  kyO = 111;
+  kyP = 112;
+  kyQ = 113;
+  kyR = 114;
+  kyS = 115;
+  kyT = 116;
+  kyU = 117;
+  kyV = 118;
+  kyW = 119;
+  kyX = 120;
+  kyY = 121;
+  kyZ = 122;
+
+  kyShiftA = 65;
+  kyShiftB = 66;
+  kyShiftC = 67;
+  kyShiftD = 68;
+  kyShiftE = 69;
+  kyShiftF = 70;
+  kyShiftG = 71;
+  kyShiftH = 72;
+  kyShiftI = 73;
+  kyShiftJ = 74;
+  kyShiftK = 75;
+  kyShiftL = 76;
+  kyShiftM = 77;
+  kyShiftN = 78;
+  kyShiftO = 79;
+  kyShiftP = 80;
+  kyShiftQ = 81;
+  kyShiftR = 82;
+  kyShiftS = 83;
+  kyShiftT = 84;
+  kyShiftU = 85;
+  kyShiftV = 86;
+  kyShiftW = 87;
+  kyShiftX = 88;
+  kyShiftY = 89;
+  kyShiftZ = 90;
 
   kyShiftAltQ = ExtShiftFlag + kyAltQ;
   kyShiftAltW = ExtShiftFlag + kyAltW;
@@ -233,6 +261,8 @@ const
 type
   PKeyboardDriver = ^TKeyboardDriver;
   PKeyInterruptProc = ^TKeyInterruptProc;
+  PKeyboardShortcut = ^TKeyboardShortcut;
+  PKeyboardShortcutList = ^TKeyboardShortcutList;
 
   TKeyInterruptProc = procedure(AScanCode: byte; AKeyDown: boolean);
 
@@ -261,17 +291,48 @@ type
     function KeyToShortcut(AKey: word): string;
     function CharToAltChar(AChar: char): word;
     function UpCase(AKey: word): word;
+    procedure GetFlags(var AFlags: TKeyboardFlags);
     procedure CursorOn;
     procedure CursorOff;
     procedure Init; virtual;
     destructor Free; virtual;
   end;
 
+  TKeyboardShortcut = object(TObject)
+  private
+  public
+    Key: word;
+    Shortcut: PChar;
+    constructor Create(AKey: word; AShortcut: string);
+    constructor CreateKey(AKey: word);
+    destructor Free; virtual;
+    procedure Init; virtual;
+    function GetShortcut: string;
+  end;
+
+  TKeyboardShortcutList = object(TObjectList)
+    constructor Create;
+    procedure Init; virtual;
+    function Add(AItem: PKeyboardShortcut): integer;
+    function GetItem(AIndex: integer): PKeyboardShortcut;
+    function GetShortcutByKey(AKey: word): PKeyboardShortcut;
+    function IndexOf(AItem: PKeyboardShortcut): integer;
+    procedure SetItem(AIndex: integer; AItem: PKeyboardShortcut);
+    procedure Insert(AIndex: integer; AItem: PKeyboardShortcut);
+    procedure RemoveItem(AItem: PKeyboardShortcut);
+    procedure AddShortcut(AKey: word; AShortcut: string);
+  end;
+
 var
   Keyboard: TKeyboardDriver;
-  ShiftStateFlags: TKeyboardFlags absolute $0000:$0057;
+  KeyboardShortcuts: PKeyboardShortcutList;
 
 implementation
+
+uses
+  AplConst,
+  AplStr,
+  Strings;
 
 var
   KeyboardHead: byte absolute $0000:$041A;
@@ -281,164 +342,12 @@ var
 function TKeyboardDriver.KeyToShortcut(AKey: word): string;
 var
   result: string;
+  var shortcut: PKeyboardShortcut;
 begin
-  case AKey of
-    0: result := '';
-    kyAltQ: result := 'Alt+Q';
-    kyAltW: result := 'Alt+W';
-    kyAltE: result := 'Alt+E';
-    kyAltR: result := 'Alt+R';
-    kyAltT: result := 'Alt+T';
-    kyAltY: result := 'Alt+Y';
-    kyAltU: result := 'Alt+U';
-    kyAltI: result := 'Alt+I';
-    kyAltO: result := 'Alt+O';
-    kyAltP: result := 'Alt+P';
-    kyAltA: result := 'Alt+A';
-    kyAltS: result := 'Alt+S';
-    kyAltD: result := 'Alt+D';
-    kyAltF: result := 'Alt+F';
-    kyAltG: result := 'Alt+G';
-    kyAltH: result := 'Alt+H';
-    kyAltJ: result := 'Alt+J';
-    kyAltK: result := 'Alt+K';
-    kyAltL: result := 'Alt+L';
-    kyAltZ: result := 'Alt+Z';
-    kyAltX: result := 'Alt+X';
-    kyAltC: result := 'Alt+C';
-    kyAltV: result := 'Alt+V';
-    kyAltB: result := 'Alt+B';
-    kyAltN: result := 'Alt+N';
-    kyAltM: result := 'Alt+M';
-    kyF1: result := 'F1';
-    kyF2: result := 'F2';
-    kyF3: result := 'F3';
-    kyF4: result := 'F4';
-    kyF5: result := 'F5';
-    kyF6: result := 'F6';
-    kyF7: result := 'F7';
-    kyF8: result := 'F8';
-    kyF9: result := 'F9';
-    kyF10: result := 'F10';
-    kyAltF1: result := 'Alt+F1';
-    kyAltF2: result := 'Alt+F2';
-    kyAltF3: result := 'Alt+F3';
-    kyAltF4: result := 'Alt+F4';
-    kyAltF5: result := 'Alt+F5';
-    kyAltF6: result := 'Alt+F6';
-    kyAltF7: result := 'Alt+F7';
-    kyAltF8: result := 'Alt+F8';
-    kyAltF9: result := 'Alt+F9';
-    kyAltF10: result := 'Alt+F10';
-    kyCtrlF1: result := 'Ctrl+F1';
-    kyCtrlF2: result := 'Ctrl+F2';
-    kyCtrlF3: result := 'Ctrl+F3';
-    kyCtrlF4: result := 'Ctrl+F4';
-    kyCtrlF5: result := 'Ctrl+F5';
-    kyCtrlF6: result := 'Ctrl+F6';
-    kyCtrlF7: result := 'Ctrl+F7';
-    kyCtrlF8: result := 'Ctrl+F8';
-    kyCtrlF9: result := 'Ctrl+F9';
-    kyCtrlF10: result := 'F10';
-    kyAltF1: result := 'Alt+F1';
-    kyAltF2: result := 'Alt+F2';
-    kyAltF3: result := 'Alt+F3';
-    kyAltF4: result := 'Alt+F4';
-    kyAltF5: result := 'Alt+F5';
-    kyAltF6: result := 'Alt+F6';
-    kyAltF7: result := 'Alt+F7';
-    kyAltF8: result := 'Alt+F8';
-    kyAltF9: result := 'Alt+F9';
-    kyAltF10: result := 'Alt+F10';
-    kyShiftF1: result := 'Shift+F1';
-    kyShiftF2: result := 'Shift+F2';
-    kyShiftF3: result := 'Shift+F3';
-    kyShiftF4: result := 'Shift+F4';
-    kyShiftF5: result := 'Shift+F5';
-    kyShiftF6: result := 'Shift+F6';
-    kyShiftF7: result := 'Shift+F7';
-    kyShiftF8: result := 'Shift+F8';
-    kyShiftF9: result := 'Shift+F9';
-    kyShiftF10: result := 'Shift+F10';
-    kyAlt1: result := 'Alt+1';
-    kyAlt2: result := 'Alt+2';
-    kyAlt3: result := 'Alt+3';
-    kyAlt4: result := 'Alt+4';
-    kyAlt5: result := 'Alt+5';
-    kyAlt6: result := 'Alt+6';
-    kyAlt7: result := 'Alt+7';
-    kyAlt8: result := 'Alt+8';
-    kyAlt9: result := 'Alt+9';
-    kyAlt0: result := 'Alt+0';
-    kyAltDash: result := 'Alt+Dash';
-    kyAltEqual: result := 'Alt+Equal';
-    kyInsert: result := 'Ins';
-    kyDel: result := 'Del';
-    kyLeft: result := 'Left';
-    kyRight: result := 'Right';
-    kyUp: result := 'Up';
-    kyDown: result := 'Down';
-    kyPageUp: result := 'PgUp';
-    kyPageDown: result := 'PgDn';
-    kyHome: result := 'Home';
-    kyEnd: result := 'End';
-    kyCtrlA: result := 'Ctrl+A';
-    kyCtrlB: result := 'Ctrl+B';
-    kyCtrlC: result := 'Ctrl+C';
-    kyCtrlD: result := 'Ctrl+D';
-    kyCtrlE: result := 'Ctrl+E';
-    kyCtrlF: result := 'Ctrl+F';
-    kyCtrlG: result := 'Ctrl+G';
-    kyCtrlH: result := 'Ctrl+H';
-    kyCtrlI: result := 'Ctrl+I';
-    kyCtrlJ: result := 'Ctrl+J';
-    kyCtrlK: result := 'Ctrl+K';
-    kyCtrlL: result := 'Ctrl+L';
-    kyCtrlM: result := 'Ctrl+M';
-    kyCtrlN: result := 'Ctrl+N';
-    kyCtrlO: result := 'Ctrl+O';
-    kyCtrlP: result := 'Ctrl+P';
-    kyCtrlQ: result := 'Ctrl+Q';
-    kyCtrlR: result := 'Ctrl+R';
-    kyCtrlS: result := 'Ctrl+S';
-    kyCtrlT: result := 'Ctrl+T';
-    kyCtrlU: result := 'Ctrl+U';
-    kyCtrlV: result := 'Ctrl+V';
-    kyCtrlW: result := 'Ctrl+W';
-    kyCtrlX: result := 'Ctrl+X';
-    kyCtrlY: result := 'Ctrl+Y';
-    kyCtrlZ: result := 'Ctrl+Z';
-    kyCtrlRight: result := 'Ctrl '#26;
-    kyCtrlLeft: result := 'Ctrl '#27;
-    kyEsc: result := 'Esc';
-    kyShiftAltA: result := 'Shift+Alt+A';
-    kyShiftAltB: result := 'Shift+Alt+B';
-    kyShiftAltC: result := 'Shift+Alt+C';
-    kyShiftAltD: result := 'Shift+Alt+D';
-    kyShiftAltE: result := 'Shift+Alt+E';
-    kyShiftAltF: result := 'Shift+Alt+F';
-    kyShiftAltG: result := 'Shift+Alt+G';
-    kyShiftAltH: result := 'Shift+Alt+H';
-    kyShiftAltI: result := 'Shift+Alt+I';
-    kyShiftAltJ: result := 'Shift+Alt+J';
-    kyShiftAltK: result := 'Shift+Alt+K';
-    kyShiftAltL: result := 'Shift+Alt+L';
-    kyShiftAltM: result := 'Shift+Alt+M';
-    kyShiftAltN: result := 'Shift+Alt+N';
-    kyShiftAltO: result := 'Shift+Alt+O';
-    kyShiftAltP: result := 'Shift+Alt+P';
-    kyShiftAltQ: result := 'Shift+Alt+Q';
-    kyShiftAltR: result := 'Shift+Alt+R';
-    kyShiftAltS: result := 'Shift+Alt+S';
-    kyShiftAltT: result := 'Shift+Alt+T';
-    kyShiftAltU: result := 'Shift+Alt+U';
-    kyShiftAltV: result := 'Shift+Alt+V';
-    kyShiftAltW: result := 'Shift+Alt+W';
-    kyShiftAltX: result := 'Shift+Alt+X';
-    kyShiftAltY: result := 'Shift+Alt+Y';
-    kyShiftAltZ: result := 'Shift+Alt+Z';
-  end;
-  KeyToShortcut := result;
+  KeyToShortcut := '';
+  shortcut := KeyboardShortcuts^.GetShortcutByKey(AKey);
+  if Assigned(shortcut) then
+    KeyToShortcut := shortcut^.GetShortcut;
 end;
 
 function TKeyboardDriver.KeyPressed: boolean;
@@ -482,6 +391,18 @@ begin
   end;
 end;
 
+procedure TKeyboardDriver.GetFlags(var AFlags: TKeyboardFlags);
+var
+  flags: TKeyboardFlags;
+begin
+  asm
+    mov ah, 2
+    int 16h
+    mov [flags], al
+  end;
+  AFlags := flags;
+end;
+
 function TKeyboardDriver.GetKey : word;
 var
   character: byte;
@@ -489,7 +410,6 @@ var
   key: word;
   flags: TKeyboardFlags;
 begin
-  flags := ShiftStateFlags;
   GetKey := 0;
   if not KeyPressed then
     exit;
@@ -498,14 +418,17 @@ begin
     int 16h
     mov [character], al
     mov [scanCode], ah
+    mov ah, 2
+    int 16h
+    mov [flags], al
   end;
   if character = 0 then begin
     key := ExtKeyFlag + scanCode;
-    if (kfLeftShift in ShiftStateFlags) or (kfRightShift in ShiftStateFlags) then
+    if (kfLeftShift in flags) or (kfRightShift in flags) then
       Inc(key, ExtShiftFlag);
   end
   else begin
-    if ((kfLeftShift in ShiftStateFlags) or (kfRightShift in ShiftStateFlags))
+    if ((kfLeftShift in flags) or (kfRightShift in flags))
       and (scanCode in [71..75, 77..83]) then begin
       key := ExtShiftFlag + ExtKeyFlag + scanCode;
     end
@@ -588,16 +511,314 @@ begin
   inherited Free;
 end;
 
+constructor TKeyboardShortcut.Create(AKey: word; AShortcut: string);
+begin
+  inherited Create;
+  Key := AKey;
+  ShortCut := TString.New(AShortcut);
+end;
+
+constructor TKeyboardShortcut.CreateKey(AKey: word);
+begin
+  inherited Create;
+  Key := AKey;
+  ShortCut := nil;
+end;
+
+procedure TKeyboardShortcut.Init;
+begin
+  inherited Init;
+  Key := 0;
+  ShortCut := nil;
+end;
+
+destructor TKeyboardShortcut.Free;
+begin
+  TString.Free(ShortCut);
+  inherited Free;
+end;
+
+function TKeyboardShortcut.GetShortcut: string;
+begin
+  GetShortcut := TString.GetString(ShortCut);
+end;
+
+function KeyboardShortcutCompare(AItem1, AItem2: pointer): integer; far;
+begin
+  KeyboardShortcutCompare := integer(PKeyboardShortcut(AItem1)^.Key) - PKeyboardShortcut(AItem2)^.Key;
+end;
+
+constructor TKeyboardShortcutList.Create;
+begin
+  inherited CreateSorted(KeyboardShortcutCompare);
+  AddShortcut(kyAltQ, 'Alt+Q');
+  AddShortcut(kyAltW, 'Alt+W');
+  AddShortcut(kyAltE, 'Alt+E');
+  AddShortcut(kyAltR, 'Alt+R');
+  AddShortcut(kyAltT, 'Alt+T');
+  AddShortcut(kyAltY, 'Alt+Y');
+  AddShortcut(kyAltU, 'Alt+U');
+  AddShortcut(kyAltI, 'Alt+I');
+  AddShortcut(kyAltO, 'Alt+O');
+  AddShortcut(kyAltP, 'Alt+P');
+  AddShortcut(kyAltA, 'Alt+A');
+  AddShortcut(kyAltS, 'Alt+S');
+  AddShortcut(kyAltD, 'Alt+D');
+  AddShortcut(kyAltF, 'Alt+F');
+  AddShortcut(kyAltG, 'Alt+G');
+  AddShortcut(kyAltH, 'Alt+H');
+  AddShortcut(kyAltJ, 'Alt+J');
+  AddShortcut(kyAltK, 'Alt+K');
+  AddShortcut(kyAltL, 'Alt+L');
+  AddShortcut(kyAltZ, 'Alt+Z');
+  AddShortcut(kyAltX, 'Alt+X');
+  AddShortcut(kyAltC, 'Alt+C');
+  AddShortcut(kyAltV, 'Alt+V');
+  AddShortcut(kyAltB, 'Alt+B');
+  AddShortcut(kyAltN, 'Alt+N');
+  AddShortcut(kyAltM, 'Alt+M');
+  AddShortcut(kyA, 'A');
+  AddShortcut(kyB, 'B');
+  AddShortcut(kyC, 'C');
+  AddShortcut(kyD, 'D');
+  AddShortcut(kyE, 'E');
+  AddShortcut(kyF, 'F');
+  AddShortcut(kyG, 'G');
+  AddShortcut(kyH, 'H');
+  AddShortcut(kyI, 'I');
+  AddShortcut(kyJ, 'J');
+  AddShortcut(kyK, 'K');
+  AddShortcut(kyL, 'L');
+  AddShortcut(kyM, 'M');
+  AddShortcut(kyN, 'N');
+  AddShortcut(kyO, 'O');
+  AddShortcut(kyP, 'P');
+  AddShortcut(kyQ, 'Q');
+  AddShortcut(kyR, 'R');
+  AddShortcut(kyS, 'S');
+  AddShortcut(kyT, 'T');
+  AddShortcut(kyU, 'U');
+  AddShortcut(kyV, 'V');
+  AddShortcut(kyW, 'W');
+  AddShortcut(kyX, 'X');
+  AddShortcut(kyY, 'Y');
+  AddShortcut(kyZ, 'Z');
+  AddShortcut(kyShiftAltQ, 'Shift+Alt+Q');
+  AddShortcut(kyShiftAltW, 'Shift+Alt+W');
+  AddShortcut(kyShiftAltE, 'Shift+Alt+E');
+  AddShortcut(kyShiftAltR, 'Shift+Alt+R');
+  AddShortcut(kyShiftAltT, 'Shift+Alt+T');
+  AddShortcut(kyShiftAltY, 'Shift+Alt+Y');
+  AddShortcut(kyShiftAltU, 'Shift+Alt+U');
+  AddShortcut(kyShiftAltI, 'Shift+Alt+I');
+  AddShortcut(kyShiftAltO, 'Shift+Alt+O');
+  AddShortcut(kyShiftAltP, 'Shift+Alt+P');
+  AddShortcut(kyShiftAltA, 'Shift+Alt+A');
+  AddShortcut(kyShiftAltS, 'Shift+Alt+S');
+  AddShortcut(kyShiftAltD, 'Shift+Alt+D');
+  AddShortcut(kyShiftAltF, 'Shift+Alt+F');
+  AddShortcut(kyShiftAltG, 'Shift+Alt+G');
+  AddShortcut(kyShiftAltH, 'Shift+Alt+H');
+  AddShortcut(kyShiftAltJ, 'Shift+Alt+J');
+  AddShortcut(kyShiftAltK, 'Shift+Alt+K');
+  AddShortcut(kyShiftAltL, 'Shift+Alt+L');
+  AddShortcut(kyShiftAltZ, 'Shift+Alt+Z');
+  AddShortcut(kyShiftAltX, 'Shift+Alt+X');
+  AddShortcut(kyShiftAltC, 'Shift+Alt+C');
+  AddShortcut(kyShiftAltV, 'Shift+Alt+V');
+  AddShortcut(kyShiftAltB, 'Shift+Alt+B');
+  AddShortcut(kyShiftAltN, 'Shift+Alt+N');
+  AddShortcut(kyShiftAltM, 'Shift+Alt+M');
+  AddShortcut(kyF1, 'F1');
+  AddShortcut(kyF2, 'F2');
+  AddShortcut(kyF3, 'F3');
+  AddShortcut(kyF4, 'F4');
+  AddShortcut(kyF5, 'F5');
+  AddShortcut(kyF6, 'F6');
+  AddShortcut(kyF7, 'F7');
+  AddShortcut(kyF8, 'F8');
+  AddShortcut(kyF9, 'F9');
+  AddShortcut(kyF10, 'F10');
+  AddShortcut(kyAltF1, 'Alt+F1');
+  AddShortcut(kyAltF2, 'Alt+F2');
+  AddShortcut(kyAltF3, 'Alt+F3');
+  AddShortcut(kyAltF4, 'Alt+F4');
+  AddShortcut(kyAltF5, 'Alt+F5');
+  AddShortcut(kyAltF6, 'Alt+F6');
+  AddShortcut(kyAltF7, 'Alt+F7');
+  AddShortcut(kyAltF8, 'Alt+F8');
+  AddShortcut(kyAltF9, 'Alt+F9');
+  AddShortcut(kyAltF10, 'Alt+F10');
+  AddShortcut(kyShiftF1, 'Shift+F1');
+  AddShortcut(kyShiftF2, 'Shift+F2');
+  AddShortcut(kyShiftF3, 'Shift+F3');
+  AddShortcut(kyShiftF4, 'Shift+F4');
+  AddShortcut(kyShiftF5, 'Shift+F5');
+  AddShortcut(kyShiftF6, 'Shift+F6');
+  AddShortcut(kyShiftF7, 'Shift+F7');
+  AddShortcut(kyShiftF8, 'Shift+F8');
+  AddShortcut(kyShiftF9, 'Shift+F9');
+  AddShortcut(kyShiftF10, 'Shift+F10');
+  AddShortcut(kyCtrlF1, 'Ctrl+F1');
+  AddShortcut(kyCtrlF2, 'Ctrl+F2');
+  AddShortcut(kyCtrlF3, 'Ctrl+F3');
+  AddShortcut(kyCtrlF4, 'Ctrl+F4');
+  AddShortcut(kyCtrlF5, 'Ctrl+F5');
+  AddShortcut(kyCtrlF6, 'Ctrl+F6');
+  AddShortcut(kyCtrlF7, 'Ctrl+F7');
+  AddShortcut(kyCtrlF8, 'Ctrl+F8');
+  AddShortcut(kyCtrlF9, 'Ctrl+F9');
+  AddShortcut(kyCtrlF10, 'Ctrl+F10');
+  AddShortcut(kyAlt1, 'Alt+1');
+  AddShortcut(kyAlt2, 'Alt+2');
+  AddShortcut(kyAlt3, 'Alt+3');
+  AddShortcut(kyAlt4, 'Alt+4');
+  AddShortcut(kyAlt5, 'Alt+5');
+  AddShortcut(kyAlt6, 'Alt+6');
+  AddShortcut(kyAlt7, 'Alt+7');
+  AddShortcut(kyAlt8, 'Alt+8');
+  AddShortcut(kyAlt9, 'Alt+9');
+  AddShortcut(kyAlt0, 'Alt+0');
+  AddShortcut(kyShiftAlt1, 'Shift+Alt+1');
+  AddShortcut(kyShiftAlt2, 'Shift+Alt+2');
+  AddShortcut(kyShiftAlt3, 'Shift+Alt+3');
+  AddShortcut(kyShiftAlt4, 'Shift+Alt+4');
+  AddShortcut(kyShiftAlt5, 'Shift+Alt+5');
+  AddShortcut(kyShiftAlt6, 'Shift+Alt+6');
+  AddShortcut(kyShiftAlt7, 'Shift+Alt+7');
+  AddShortcut(kyShiftAlt8, 'Shift+Alt+8');
+  AddShortcut(kyShiftAlt9, 'Shift+Alt+9');
+  AddShortcut(kyShiftAlt0, 'Shift+Alt+0');
+  AddShortcut(kyAltDash, 'Alt+-');
+  AddShortcut(kyAltEqual, 'Alt+=');
+  AddShortcut(kyInsert, 'Ins');
+  AddShortcut(kyDel, 'Del');
+  AddShortcut(kyLeft, 'Left');
+  AddShortcut(kyRight, 'Right');
+  AddShortcut(kyUp, 'Up');
+  AddShortcut(kyDown, 'Down');
+  AddShortcut(kyPageUp, 'PgUp');
+  AddShortcut(kyPageDown, 'PgDn');
+  AddShortcut(kyHome, 'Home');
+  AddShortcut(kyEnd, 'End');
+  AddShortcut(kyCtrlLeft, 'Ctrl+Left');
+  AddShortcut(kyCtrlRight, 'Ctrl+Right');
+  AddShortcut(kyCtrlPageUp, 'Ctrl+PgUp');
+  AddShortcut(kyCtrlPageDown, 'Ctrl+PgDn');
+  AddShortcut(kyCtrlHome, 'Ctrl+Home');
+  AddShortcut(kyCtrlEnd, 'Ctrl+End');
+  AddShortcut(kyShiftDel, 'Shift+Del');
+  AddShortcut(kyShiftLeft, 'Shift+Left');
+  AddShortcut(kyShiftRight, 'Shift+Right');
+  AddShortcut(kyShiftUp, 'Shift+Up');
+  AddShortcut(kyShiftDown, 'Shift+Down');
+  AddShortcut(kyShiftPageUp, 'Shift+PgUp');
+  AddShortcut(kyShiftPageDown, 'Shift+PgDn');
+  AddShortcut(kyShiftHome, 'Shift+Home');
+  AddShortcut(kyShiftEnd, 'Shift+End');
+  AddShortcut(kyShiftIns, 'Shift+Ins');
+  AddShortcut(kyShiftCtrlLeft, 'Shift+Ctrl+Left');
+  AddShortcut(kyShiftCtrlRight, 'Shift+Ctrl+Right');
+  AddShortcut(kyShiftCtrlPageUp, 'Shift+Ctrl+PgUp');
+  AddShortcut(kyShiftCtrlPageDown, 'Shift+Ctrl+PgDn');
+  AddShortcut(kyShiftCtrlHome, 'Shift+Ctrl+Home');
+  AddShortcut(kyShiftCtrlEnd, 'Shift+Ctrl+End');
+  AddShortcut(kyCtrlA, 'Ctrl+A');
+  AddShortcut(kyCtrlB, 'Ctrl+B');
+  AddShortcut(kyCtrlC, 'Ctrl+C');
+  AddShortcut(kyCtrlD, 'Ctrl+D');
+  AddShortcut(kyCtrlE, 'Ctrl+E');
+  AddShortcut(kyCtrlF, 'Ctrl+F');
+  AddShortcut(kyCtrlG, 'Ctrl+G');
+  AddShortcut(kyCtrlH, 'Ctrl+H');
+  AddShortcut(kyCtrlI, 'Ctrl+I');
+  AddShortcut(kyCtrlJ, 'Ctrl+J');
+  AddShortcut(kyCtrlK, 'Ctrl+K');
+  AddShortcut(kyCtrlL, 'Ctrl+L');
+  AddShortcut(kyCtrlM, 'Ctrl+M');
+  AddShortcut(kyCtrlN, 'Ctrl+N');
+  AddShortcut(kyCtrlO, 'Ctrl+O');
+  AddShortcut(kyCtrlP, 'Ctrl+P');
+  AddShortcut(kyCtrlQ, 'Ctrl+Q');
+  AddShortcut(kyCtrlR, 'Ctrl+R');
+  AddShortcut(kyCtrlS, 'Ctrl+S');
+  AddShortcut(kyCtrlT, 'Ctrl+T');
+  AddShortcut(kyCtrlU, 'Ctrl+U');
+  AddShortcut(kyCtrlV, 'Ctrl+V');
+  AddShortcut(kyCtrlW, 'Ctrl+W');
+  AddShortcut(kyCtrlX, 'Ctrl+X');
+  AddShortcut(kyCtrlY, 'Ctrl+Y');
+  AddShortcut(kyCtrlZ, 'Ctrl+Z');
+  AddShortcut(kyEsc, 'Esc');
+  AddShortcut(kyEnter, 'Enter');
+  AddShortcut(kyBackSpace, 'Backspace');
+  AddShortcut(kyTab, 'Tab');
+  AddShortcut(kyShiftTab, 'Shift+Tab');
+end;
+
+procedure TKeyboardShortcutList.Init;
+begin
+  inherited Init;
+end;
+
+function TKeyboardShortcutList.Add(AItem: PKeyboardShortcut): integer;
+begin
+  inherited Add(AItem);
+end;
+
+function TKeyboardShortcutList.GetItem(AIndex: integer): PKeyboardShortcut;
+begin
+  GetItem := PKeyboardShortcut(inherited GetItem(AIndex));
+end;
+
+function TKeyboardShortcutList.IndexOf(AItem: PKeyboardShortcut): integer;
+begin
+  IndexOf := inherited IndexOf(AItem);
+end;
+
+procedure TKeyboardShortcutList.SetItem(AIndex: integer; AItem: PKeyboardShortcut);
+begin
+  inherited SetItem(AIndex, AItem);
+end;
+
+procedure TKeyboardShortcutList.Insert(AIndex: integer; AItem: PKeyboardShortcut);
+begin
+  inherited Insert(AIndex, AItem);
+end;
+
+procedure TKeyboardShortcutList.RemoveItem(AItem: PKeyboardShortcut);
+begin
+  inherited RemoveItem(AItem);
+end;
+
+procedure TKeyboardShortcutList.AddShortcut(AKey: word; AShortcut: string);
+begin
+  Add(New(PKeyboardShortcut, Create(AKey, AShortcut)));
+end;
+
+function TKeyboardShortcutList.GetShortcutByKey(AKey: word): PKeyboardShortcut;
+var
+  index: integer;
+  searchValue: TKeyboardShortcut;
+begin
+  GetShortcutByKey := nil;
+  searchValue.CreateKey(AKey);
+  index := BinarySearch(@searchValue);
+  searchValue.Free;
+  if index >= 0 then
+    GetShortcutByKey := GetItem(index);
+end;
+
 procedure Finalize; far;
 begin
   ExitProc := PreviousExitProc;
   Keyboard.Free;
-  WriteLn('Keyboard driver uninstalled.');
+  FreeAndNil(KeyboardShortcuts);
 end;
 
 begin
   Keyboard.Create;
-  WriteLn('Keyboard driver installed.');
+  KeyboardShortcuts := New(PKeyboardShortcutList, Create);
   PreviousExitProc := ExitProc;
   ExitProc := @Finalize;
 end.

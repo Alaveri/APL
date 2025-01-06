@@ -13,7 +13,7 @@ uses
   Drawing,
   AplStr,
   TextType,
-  AplText,
+  TextDrv,
   Dos,
   Strings;
 
@@ -25,9 +25,6 @@ type
   public
     procedure RenderText(AXPos, AYPos: byte; const AText: string); virtual;
     procedure WriteText(AXPos, AYPos: byte; AText: PChar; ALength: word); virtual;
-    procedure SetForeColor(AColor: byte); virtual;
-    procedure SetBackColor(AColor: byte); virtual;
-    procedure SetBlink(ABlink: boolean); virtual;
     procedure Init; virtual;
     procedure SetMode(AMode: PTextMode); virtual;
     procedure FillRect(ARect: TRect; AChar: char); virtual;
@@ -36,12 +33,25 @@ type
     procedure CursorOn; virtual;
     procedure CursorOff; virtual;
     procedure ClrScr; virtual;
-    procedure SetAttribute(AXPos, AYPos: byte; AAttribute: byte); virtual;
     procedure ClearLine; virtual;
     procedure DrawImageRect(var ARect: TRect; AImage: PByte); virtual;
     procedure DrawImageStreamRect(var ARect: TRect; AStream: PStream); virtual;
     procedure GetImageRect(var ARect: TRect; AImage: PByte); virtual;
     procedure GetImageStreamRect(var ARect: TRect; AStream: PStream); virtual;
+    procedure SetScreenForeColor(APX, APY: byte; AColor: byte); virtual;
+    procedure SetScreenBackColor(APX, APY: byte; AColor: byte); virtual;
+    procedure SetBlink(ABlink: boolean); virtual;
+    procedure SetScreenBlink(AXPos, AYPos: byte; ABlink: boolean); virtual;
+    procedure SetScreenAttributes(APX, APY: byte; AAttributes: byte); virtual;
+    procedure GetTextChar(APX, APY: byte; var AChar: TTextChar); virtual;
+    procedure SetTextChar(APX, APY: byte; AChar: TTextChar); virtual;
+    procedure SetChar(APX, APY: byte; AChar: char); virtual;
+    function GetScreenBackColor(APX, APY: byte): byte; virtual;
+    function GetScreenForeColor(APX, APY: byte): byte; virtual;
+    function GetAttributes(AForeColor, ABackColor: byte; ABlink: boolean): byte; virtual;
+    function GetScreenAttributes(AXPos, AYPos: byte): byte; virtual;
+    function GetChar(APX, APY: byte): char; virtual;
+    function GetScreenBlink(APX, APY: byte): boolean; virtual;
     destructor Free; virtual;
   end;
 
@@ -139,16 +149,6 @@ begin
     if AXPos > right then
       break;
   end;
-  SetXY(AXPos, AYPos);
-end;
-
-procedure TDirectTextDriver.SetAttribute(AXPos, AYPos: byte; AAttribute: byte);
-var
-  screenPtr: PByte;
-begin
-  screenPtr := CurrentScreen;
-  Inc(screenPtr, 2 * (AYPos * Mode^.Width + AXPos) + 1);
-  screenPtr^ := AAttribute;
 end;
 
 procedure TDirectTextDriver.WriteText(AXPos, AYPos: byte; AText: PChar; ALength: word);
@@ -159,10 +159,10 @@ var
   ch, attr: char;
   x1, x2: byte;
 begin
-  XPos := Clamp(AXPos, Mode^.Bounds.X, Mode^.Bounds.Right);
-  YPos := Clamp(AYPos, Mode^.Bounds.Y, Mode^.Bounds.Bottom);
+  State^.CursorX := Clamp(AXPos, Mode^.Bounds.X, Mode^.Bounds.Right);
+  State^.CursorY := Clamp(AYPos, Mode^.Bounds.Y, Mode^.Bounds.Bottom);
   screenPtr := PChar(CurrentScreen);
-  Inc(screenPtr, 2 * (YPos * Mode^.Width + XPos));
+  Inc(screenPtr, 2 * (State^.CursorY * Mode^.Width + State^.CursorX));
   attr := Chr(State^.Attributes);
   index := 0;
   while index < ALength do begin
@@ -172,19 +172,20 @@ begin
     Inc(screenPtr);
     screenPtr^ := attr;
     Inc(screenPtr);
-    Inc(XPos);
-    if XPos > Mode^.Bounds.Right then begin
-      XPos := Mode^.Bounds.X;
-      Inc(YPos);
-      if YPos > Mode^.Bounds.Bottom then begin
+    Inc(State^.CursorX);
+    if State^.CursorX > Mode^.Bounds.Right then begin
+      State^.CursorX := Mode^.Bounds.X;
+      Inc(State^.CursorY);
+      if State^.CursorY > Mode^.Bounds.Bottom then begin
         ScrollText;
-        YPos := Mode^.Bounds.Bottom;
+        State^.CursorY := Mode^.Bounds.Bottom;
       end;
       screenPtr := PChar(CurrentScreen);
-      Inc(screenPtr, 2 * (YPos * Mode^.Width + XPos));
+      Inc(screenPtr, 2 * (State^.CursorY * Mode^.Width + State^.CursorX));
     end;
   end;
-  SetAttribute(XPos, YPos, GetTextAttributes(State^.ForeColor, State^.BackColor, State^.Blink));
+  SetScreenAttributes(State^.CursorX, State^.CursorY,
+    GetAttributes(State^.ForeColor, State^.BackColor, State^.Blink));
 end;
 
 procedure TDirectTextDriver.ClearLine;
@@ -193,29 +194,11 @@ var
   index: integer;
 begin
   screenPtr := CurrentScreen;
-  Inc(screenPtr, 2 * (YPos * Mode^.Width + Mode^.Bounds.X));
+  Inc(screenPtr, 2 * (State^.CursorY * Mode^.Width + Mode^.Bounds.X));
   for index := Mode^.Bounds.X to Mode^.Bounds.Right do begin
     screenPtr^ := 32;
     Inc(screenPtr, 2);
   end;
-end;
-
-procedure TDirectTextDriver.SetBlink(ABlink: boolean);
-begin
-  inherited SetBlink(ABlink);
-  State^.Attributes := GetTextAttributes(State^.ForeColor, State^.BackColor, ABlink);
-end;
-
-procedure TDirectTextDriver.SetForeColor(AColor: byte);
-begin
-  inherited SetForeColor(AColor);
-  State^.Attributes := GetTextAttributes(AColor, State^.BackColor, State^.Blink);
-end;
-
-procedure TDirectTextDriver.SetBackColor(AColor: byte);
-begin
-  inherited SetBackColor(AColor);
-  State^.Attributes := GetTextAttributes(State^.ForeColor, AColor, State^.Blink);
 end;
 
 procedure TDirectTextDriver.CursorOn;
@@ -246,6 +229,124 @@ begin
   end;
 end;
 
+function TDirectTextDriver.GetAttributes(AForeColor, ABackColor: byte; ABlink: boolean): byte;
+begin
+  GetAttributes := AForeColor or (ABackColor shl 4) or (byte(ABlink) shl 7);
+end;
+
+procedure TDirectTextDriver.SetScreenForeColor(APX, APY: byte; AColor: byte);
+var
+  screenPtr: PByte;
+begin
+  screenPtr := CurrentScreen;
+  Inc(screenPtr, 2 * (APY * Mode^.Width + APX) + 1);
+  screenPtr^ := ScreenPtr^ and $F0 or AColor;
+end;
+
+procedure TDirectTextDriver.SetScreenBackColor(APX, APY: byte; AColor: byte);
+var
+  screenPtr: PByte;
+begin
+  screenPtr := CurrentScreen;
+  Inc(screenPtr, 2 * (APY * Mode^.Width + APX) + 1);
+  screenPtr^ := ((AColor and $0F) shl 4 ) or (screenPtr^ and $8F);
+end;
+
+procedure TDirectTextDriver.SetScreenBlink(AXPos, AYPos: byte; ABlink: boolean);
+var
+  screenPtr: PByte;
+begin
+  screenPtr := CurrentScreen;
+  Inc(screenPtr, 2 * (AYPos * Mode^.Width + AXPos) + 1);
+  screenPtr^ := (screenPtr^ and $7F) or (byte(ABlink) shl 7);
+end;
+
+procedure TDirectTextDriver.SetScreenAttributes(APX, APY: byte; AAttributes: byte);
+var
+  screenPtr: PByte;
+begin
+  screenPtr := CurrentScreen;
+  Inc(screenPtr, 2 * (APY * Mode^.Width + APX) + 1);
+  screenPtr^ := AAttributes;
+end;
+
+function TDirectTextDriver.GetScreenAttributes(AXPos, AYPos: byte): byte;
+var
+  screenPtr: PByte;
+begin
+  screenPtr := CurrentScreen;
+  Inc(screenPtr, 2 * (AYPos * Mode^.Width + AXPos) + 1);
+  GetScreenAttributes := screenPtr^;
+end;
+
+function TDirectTextDriver.GetScreenForeColor(APX, APY: byte): byte;
+var
+  screenPtr: PByte;
+begin
+  screenPtr := CurrentScreen;
+  Inc(screenPtr, 2 * (APY * Mode^.Width + APX) + 1);
+  GetScreenForeColor := screenPtr^ and $0F;
+end;
+
+function TDirectTextDriver.GetScreenBackColor(APX, APY: byte): byte;
+var
+  screenPtr: PByte;
+begin
+  screenPtr := CurrentScreen;
+  Inc(screenPtr, 2 * (APY * Mode^.Width + APX) + 1);
+  GetScreenBackColor := (screenPtr^ shr 4) and $07;
+end;
+
+function TDirectTextDriver.GetScreenBlink(APX, APY: byte): boolean;
+var
+  screenPtr: PByte;
+begin
+  screenPtr := CurrentScreen;
+  Inc(screenPtr, 2 * (APY * Mode^.Width + APX) + 1);
+  GetScreenBlink := (screenPtr^ and $80) <> 0;
+end;
+
+procedure TDirectTextDriver.SetChar(APX, APY: byte; AChar: char);
+var
+  screenPtr: PByte;
+begin
+  screenPtr := CurrentScreen;
+  Inc(screenPtr, 2 * (APY * Mode^.Width + APX));
+  screenPtr^ := byte(AChar);
+end;
+
+procedure TDirectTextDriver.SetBlink(ABlink: boolean);
+begin
+  State^.Blink := ABlink;
+end;
+
+function TDirectTextDriver.GetChar(APX, APY: byte): char;
+var
+  screenPtr: PByte;
+begin
+  screenPtr := CurrentScreen;
+  Inc(screenPtr, 2 * (APY * Mode^.Width + APX));
+  GetChar := Chr(screenPtr^);
+end;
+
+procedure TDirectTextDriver.SetTextChar(APX, APY: byte; AChar: TTextChar);
+var
+  screenPtr: PTextChar;
+begin
+  screenPtr := PTextChar(CurrentScreen);
+  Inc(screenPtr, APY * Mode^.Width + APX);
+  screenPtr^ := AChar;
+end;
+
+procedure TDirectTextDriver.GetTextChar(APX, APY: byte; var AChar: TTextChar);
+var
+  screenPtr: PTextChar;
+begin
+  screenPtr := PTextChar(CurrentScreen);
+  Inc(screenPtr, APY * Mode^.Width + APX);
+  AChar := screenPtr^;
+end;
+
 procedure TDirectTextDriver.Init;
 var
   newMode: PTextMode;
@@ -258,7 +359,6 @@ begin
     Modes.Add(newMode);
   end;
 end;
-
 
 procedure TDirectTextDriver.ClrScr;
 begin
@@ -328,7 +428,7 @@ begin
   Inc(screenPtr, 2 * (drawRect.Y * Mode^.Width + drawRect.X));
   for index := drawRect.Y to drawRect.Bottom do begin
     AStream^.Read(screenPtr, drawRect.Width * 2);
-    if CheckReraise(AStream) then
+    if CheckReRaise(AStream) then
       exit;
     Inc(screenPtr, Mode^.Width * 2);
   end;
@@ -367,7 +467,7 @@ begin
   Inc(screenPtr, 2 * (drawRect.Y * Mode^.Width + drawRect.X));
   for index := drawRect.Y to drawRect.Bottom do begin
     AStream^.Write(screenPtr, drawRect.Width * 2);
-    if CheckReraise(AStream) then
+    if CheckReRaise(AStream) then
       exit;
     Inc(screenPtr, Mode^.Width * 2);
   end;

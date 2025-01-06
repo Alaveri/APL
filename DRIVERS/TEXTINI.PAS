@@ -14,7 +14,7 @@ procedure InitTextDriver(ADriverId: TTextDrivers);
 implementation
 
 uses
-  AplText;
+  TextDrv;
 
 procedure InitTextDriver(ADriverId: TTextDrivers);
 begin

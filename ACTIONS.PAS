@@ -14,32 +14,27 @@ uses
 
 type
   PAction = ^TAction;
-  PActionUpdateProc = ^TActionUpdateProc;
   PActionList = ^TActionList;
-  PActionExecuteProc = ^TActionExecuteProc;
-  PActionListProc = ^TActionListProc;
-
-  TActionUpdateProc = procedure(ASender: PObject; AAction: PAction; AActionId: integer);
-  TActionExecuteProc = procedure(ASender: PObject; AAction: PAction);
-  TActionListProc = procedure(ASender: PObject; AAction: PAction);
+  PActionExecuteEventProc = ^TActionExecuteEventProc;
+  PActionEvent = ^TActionEvent;
 
   TAction = object(TObject)
   private
   public
-    ActionId: integer;
+    ActionId: word;
     Text: PChar;
     HelpText: PChar;
     ShortcutDisplayName: PChar;
     Shortcut: word;
     ParentList: PActionList;
     Enabled: boolean;
-    OnExecute: PActionExecuteProc;
+    OnExecute: PActionExecuteEventProc;
     ModalResult: TModalResult;
-    Owner: PObject;
-    OnUpdate: PActionUpdateProc;
-    constructor Create(AActionId: integer; AText: string; AShortcut: word);
+    OnUpdate: PEventProc;
+    constructor Create(AActionId: word; AText: string; AShortcut: word);
     constructor CreateEmpty;
     procedure SetHelpText(AHelpText: string); virtual;
+    procedure Execute(ASender: PObject); virtual;
     procedure SetText(AText: string); virtual;
     destructor Free; virtual;
     procedure Init; virtual;
@@ -51,9 +46,21 @@ type
     function GetItem(AIndex: integer): PAction;
     function GetActionById(AActionId: integer): PAction;
     function Add(AItem: pointer): integer; virtual;
+    procedure Execute(ASender: PObject; AActionId: integer);
     procedure Init; virtual;
     destructor Free; virtual;
   end;
+
+  TActionEvent = object(TEvent)
+  private
+  public
+    Action: PAction;
+    function ActionId: integer;
+    procedure Assign(var ASource: TObject); virtual;
+    procedure Clear; virtual;
+  end;
+
+  TActionExecuteEventProc = procedure(var AEvent: TActionEvent);
 
 implementation
 
@@ -61,7 +68,7 @@ uses
   Strings,
   Dos;
 
-constructor TAction.Create(AActionId: integer; AText: string; AShortcut: word);
+constructor TAction.Create(AActionId: word; AText: string; AShortcut: word);
 begin
   inherited Create;
   Text := TString.New(AText);
@@ -82,11 +89,22 @@ begin
   ShortcutDisplayName := nil;
   Shortcut := 0;
   ParentList := nil;
-  ActionId := -1;
+  ActionId := 0;
   Enabled := true;
   OnExecute := nil;
   ModalResult := mrNone;
-  Owner := nil;
+end;
+
+procedure TAction.Execute(ASender: PObject);
+var
+  event: TActionEvent;
+begin
+  if not Assigned(OnExecute) then
+    exit;
+  event.Create;
+  event.Action := @self;
+  event.Sender := ASender;
+  TEventProc(OnExecute)(event);
 end;
 
 destructor TAction.Free;
@@ -145,6 +163,15 @@ begin
   end;
 end;
 
+procedure TActionList.Execute(ASender: PObject; AActionId: integer);
+var
+  action: PAction;
+begin
+  action := GetActionById(AActionId);
+  if Assigned(action) then
+    action^.Execute(ASender);
+end;
+
 procedure TActionList.Init;
 begin
   inherited Init;
@@ -153,6 +180,28 @@ end;
 destructor TActionList.Free;
 begin
   inherited Free;
+end;
+
+procedure TActionEvent.Clear;
+begin
+  inherited Clear;
+  Action := nil;
+end;
+
+procedure TActionEvent.Assign(var ASource: TObject);
+var
+  source: PActionEvent;
+begin
+  inherited Assign(ASource);
+  source := PActionEvent(@ASource);
+  Action := source^.Action;
+end;
+
+function TActionEvent.ActionId: integer;
+begin
+  ActionId := -1;
+  if Assigned(Action) then
+    ActionId := Action^.ActionId;
 end;
 
 end.

@@ -12,7 +12,7 @@ uses
   KeyDrv,
   AplUtils,
   TextType,
-  AplText,
+  TextDrv,
   TextIni;
 
 type
@@ -43,7 +43,7 @@ begin
   TextIni.InitTextDriver(ADriver);
   if NilPtr(Text, ecNotEnoughMemory) then
     exit;
-  CheckReraise(Text);
+  CheckReRaise(Text);
 end;
 
 procedure TTextApplication.SetMode(AMode: TTextModes);
@@ -54,7 +54,7 @@ begin
   if NilPtr(mode, ecTextModeNotFound) then
     exit;
   Text^.SetMode(mode);
-  if CheckReraise(Text) then
+  if CheckReRaise(Text) then
     exit;
 end;
 

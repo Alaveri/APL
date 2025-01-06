@@ -27,7 +27,7 @@ type
     clHigh
   );
 
-  TCompressProgressProc = procedure(ASender: PCompressor; AMax, ACurrent: longint);
+  TCompressProgressProc = procedure(var AEvent: TProgressEvent);
 
   TCompressor = object(TStatusObject)
   private
@@ -50,6 +50,7 @@ type
     ProgressIncrement: word;
     ReadTotal, WriteTotal: longint;
     AddTotalToStream: boolean;
+    CompressionLevel: TCompressionLevel;
     constructor CreateBufferSize(AReadBufferSize, AWriteBufferSize: word);
     constructor Create;
     function CompressStream(ASource, ADest: PStream; ALength: longint): longint; virtual;
@@ -127,6 +128,7 @@ begin
   FWritePtr := nil;
   Source := nil;
   Dest := nil;
+  CompressionLevel := clHigh;
   FReadBitCounter := 0;
   FWriteBitCounter := 0;
   FReadBitBuffer := 0;
@@ -152,7 +154,7 @@ begin
       Raise(ecWritePastStreamEnd);
       exit;
     end;
-    if CheckReraise(Dest) then
+    if CheckReRaise(Dest) then
       exit;
     FWritePos := 0;
     FWritePtr := FWriteBuffer;
@@ -168,6 +170,7 @@ procedure TCompressor.EndWriteBits;
 var
   aByte: byte;
   written: word;
+  event: TProgressEvent;
 begin
   if HasException then
     exit;
@@ -180,8 +183,13 @@ begin
     FWriteBitCounter := 0;
   end;
   FlushWriteBuffer;
-  if Assigned(OnProgress) and (ReadTotal mod ProgressIncrement = 0) then
-    TCompressProgressProc(OnProgress)(@self, Source^.Size, ReadTotal);
+  if Assigned(OnProgress) and (ReadTotal mod ProgressIncrement = 0) then begin
+    event.Create;
+    event.Max := Source^.Size;
+    event.Current := ReadTotal;
+    event.Sender := @self;
+    TCompressProgressProc(OnProgress)(event);
+  end;
 end;
 
 function TCompressor.ReadByte: byte;
@@ -194,7 +202,7 @@ begin
       Raise(ecReadPastStreamEnd);
       exit;
     end;
-    if CheckReraise(Source) then
+    if CheckReRaise(Source) then
       exit;
     FReadPos := 0;
     FReadPtr := FReadBuffer;
@@ -236,10 +244,17 @@ begin
 end;
 
 procedure TCompressor.UpdateProgress(const AMax, ACurrent: longint);
+var
+  event: TProgressEvent;
 begin
   if (ACurrent >= AMax) or (FProgressCounter >= ProgressIncrement) then begin
-    if Assigned(OnProgress) then
-      TCompressProgressProc(OnProgress)(@self, AMax, ACurrent);
+    if Assigned(OnProgress) then begin
+      event.Create;
+      event.Max := AMax;
+      event.Current := ACurrent;
+      event.Sender := @self;
+      TCompressProgressProc(OnProgress)(event);
+    end;
     FProgressCounter := 0;
     exit;
   end;
@@ -317,6 +332,7 @@ end;
 
 procedure TCompressor.SetCompressionLevel(ALevel: TCompressionLevel);
 begin
+  CompressionLevel := ALevel;
 end;
 
 function TNonCompressor.CompressStream(ASource, ADest: PStream; ALength: longint): longint;

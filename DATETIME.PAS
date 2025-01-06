@@ -9,16 +9,19 @@ uses
   Dos;
 
 const
-  DateTimeFormat = 'M/DD/YYYY HH:mm:ss am';
+  DateTimeFormat = 'M/DD/YYYY H:mm ap';
+  DateTimeFormatD = 'M-DD-YYYY HH:mm ap';
+  DmyDateTimeFormat = 'D/M/YYYY H:mm ap';
+  DmyDateTimeFormatD = 'D-M-YYYY H:mm ap';
   LongDateFormat = 'M/DD/YYYY';
   ShortDateFormat = 'M/DD/YY';
   ShortDateFormatD = 'M-DD-YY';
   LongDashFormatD = 'M-DD-YYYY';
-  LongDMYDateFormat = 'D/M/YYYY';
-  LongDMYDateFormatD = 'D-M-YYYY';
-  ShortDMYFormat = 'D/M/YY';
-  ShortDMYDateFormatD = 'D-MM-YY';
-  DefaultTimeFormat = 'H:mm:ss am';
+  LongDmyDateFormat = 'D/M/YYYY';
+  LongDmyDateFormatD = 'D-M-YYYY';
+  ShortDmyDateFormat = 'D/M/YY';
+  ShortDmyDateFormatD = 'D-MM-YY';
+  DefaultTimeFormat = 'H:mm:ss ap';
   Time24HourFormat = 'HH:mm:ss';
 
 var
@@ -43,7 +46,7 @@ type
     procedure Init; virtual;
     procedure AddDays(ADays: double);
     procedure AddYears(AYears: double);
-    procedure AddMonths(AMonths: double);
+    procedure AddMonths(AMonths: integer);
     procedure AddHours(AHours: double);
     procedure AddMinutes(AMinutes: double);
     procedure AddSeconds(ASeconds: double);
@@ -85,13 +88,6 @@ type
     function TotalHours: double;
     function TotalDays: double;
     function ToString: string; virtual;
-    procedure Add(ATimeSpan: TTimeSpan);
-    procedure AddHundredths(AHundredths: double);
-    procedure AddTicks(ATicks: double);
-    procedure AddSeconds(ASeconds: double);
-    procedure AddMinutes(AMinutes: double);
-    procedure AddHours(AHours: double);
-    procedure AddDays(ADays: double);
     procedure Init; virtual;
     procedure GetDuration(var ATimeSpan: TTimeSpan);
   public
@@ -111,6 +107,9 @@ type
   end;
 
 implementation
+
+uses
+  AplStr;
 
 type
   MonthArray = array[1..12] of integer;
@@ -297,7 +296,7 @@ begin
   Ticks := n * TicksPerDay;
 end;
 
-procedure TDateTime.AddMonths(AMonths: double);
+procedure TDateTime.AddMonths(AMonths: integer);
 var
   aYear: word;
   aMonth, aDay: byte;
@@ -309,7 +308,7 @@ begin
   GetDateParts(aYear, aMonth, aDay);
   y := aYear;
   d := aDay;
-  m := aMonth + Round(AMonths);
+  m := aMonth + AMonths;
   if m > 0 then
     q := (m - 1) div 12
   else
@@ -433,58 +432,51 @@ end;
 
 function TDateTime.ToStringFormat(const AFormat: string): string;
 var
-  result: string;
   aYear: word;
   aMonth, aDay: byte;
   aHour, aMinute, aSecond, aHundredth: byte;
-  am: boolean;
-  amPos, pmPos: byte;
+  apPos: word;
   amPmString: string;
   is24Hour: boolean;
+  builder: PStringBuilder;
+  str: PChar;
 begin
-  result := AFormat;
+  builder := New(PStringBuilder, CreateString(AFormat));
   GetDateParts(aYear, aMonth, aDay);
   GetTimeParts(aHour, aMinute, aSecond, aHundredth);
-  am := false;
-  amPos := Pos('AM', result);
-  pmPos := Pos('PM', result);
   is24Hour := true;
-  if (amPos > 0) or (pmPos > 0) then begin
-    amPmString := 'PM';
-    if am then
-      amPmString := 'AM';
-    result := Replace(result, 'AM', '{AP}');
+  str := builder^.FindString('ap', 0, [scIgnoreCase], apPos);
+  if Assigned(str) then begin
+    amPmString := 'AM';
     is24Hour := false;
+    if aHour >= 12 then begin
+      amPmString := 'PM';
+      Dec(aHour, 12);
+    end;
   end;
-  amPos := Pos('am', result);
-  pmPos := Pos('pm', result);
-  if (amPos > 0) or (pmPos > 0) then begin
-    amPmString := 'pm';
-    if am then
-      amPmString := 'pm';
-    result := Replace(result, 'am', '{AP}');
-    is24Hour := false;
-  end;
-  if (not is24Hour) and (aHour > 12) then begin
-    Dec(aHour, 12);
-    am := true;
-  end;
-  result := Replace(result, 'YYYY', ZeroPad(aYear, 4));
-  result := Replace(result, 'YY', ZeroPad(aYear mod 100, 2));
-  result := Replace(result, 'MM', ZeroPad(aMonth, 2));
-  result := Replace(result, 'M', IntToStr(aMonth));
-  result := Replace(result, 'DD', ZeroPad(aDay, 2));
-  result := Replace(result, 'D', IntToStr(aDay));
-  result := Replace(result, 'HH', ZeroPad(aHour, 2));
-  result := Replace(result, 'H', IntToStr(aHour));
-  result := Replace(result, 'mm', ZeroPad(aMinute, 2));
-  result := Replace(result, 'm', IntToStr(aMinute));
-  result := Replace(result, 'ss', ZeroPad(aSecond, 2));
-  result := Replace(result, 's', IntToStr(aSecond));
-  result := Replace(result, 'hh', ZeroPad(aHundredth, 2));
-  result := Replace(result, 'h', IntToStr(aHundredth));
-  result := Replace(result, '{AP}', amPmString);
-  ToStringFormat := result;
+  builder^
+    .ReplaceString('YYYY', ZeroPad(aYear, 4), [])^
+    .ReplaceString('YY', ZeroPad(aYear mod 100, 2), [])^
+    .ReplaceString('MM', ZeroPad(aMonth, 2), [])^
+    .ReplaceString('M', IntToStr(aMonth), [])^
+    .ReplaceString('DD', ZeroPad(aDay, 2), [])^
+    .ReplaceString('D', IntToStr(aDay), [])^
+    .ReplaceString('HH', ZeroPad(aHour, 2), [])^
+    .ReplaceString('H', IntToStr(aHour), [])^
+    .ReplaceString('mm', ZeroPad(aMinute, 2), [])^
+    .ReplaceString('m', IntToStr(aMinute), [])^
+    .ReplaceString('ss', ZeroPad(aSecond, 2), [])^
+    .ReplaceString('s', IntToStr(aSecond), [])^
+    .ReplaceString('hh', ZeroPad(aHundredth, 2), [])^
+    .ReplaceString('h', IntToStr(aHundredth), [])^
+    .ReplaceString('{AP}', amPmString, [])^
+    .ReplaceString('ap', LowerCase(amPmString), [])^
+    .ReplaceString('AP', amPmString, []);
+  if not Builder^.HasException then
+    ToStringFormat := builder^.ToString
+  else
+    ToStringFormat := '';
+  FreeAndNil(Builder);
 end;
 
 constructor TTimeSpan.CreateSpan(ATimeSpan: TTimeSpan);
@@ -557,41 +549,6 @@ end;
 function TTimeSpan.TotalDays: double;
 begin
   TotalDays := Ticks / TicksPerDay;
-end;
-
-procedure TTimeSpan.Add(ATimeSpan: TTimeSpan);
-begin
-  Ticks := Ticks + ATimeSpan.Ticks;
-end;
-
-procedure TTimeSpan.AddHundredths(AHundredths: double);
-begin
-  Ticks := Ticks + AHundredths;
-end;
-
-procedure TTimeSpan.AddTicks(ATicks: double);
-begin
-  Ticks := Ticks + ATicks;
-end;
-
-procedure TTimeSpan.AddSeconds(ASeconds: double);
-begin
-  Ticks := Ticks + ASeconds * TicksPerSecond;
-end;
-
-procedure TTimeSpan.AddMinutes(AMinutes: double);
-begin
-  Ticks := Ticks + AMinutes * TicksPerMinute;
-end;
-
-procedure TTimeSpan.AddHours(AHours: double);
-begin
-  Ticks := Ticks + AHours * TicksPerHour;
-end;
-
-procedure TTimeSpan.AddDays(ADays: double);
-begin
-  Ticks := Ticks + ADays * TicksPerDay;
 end;
 
 procedure TTimeSpan.Init;

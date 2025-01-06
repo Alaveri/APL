@@ -18,10 +18,8 @@ type
   PMemoryDriver = ^TMemoryDriver;
   PMemoryAllocErrorProc = ^TMemoryAllocErrorProc;
   PBuffer = ^TBuffer;
-  PReferenceListProc = ^TReferenceListProc;
 
   TMemoryAllocErrorProc = function(ASize: word): boolean;
-  TReferenceListProc = procedure(ASender: PReferenceList; AReference: PReference);
 
   TReferenceList = object(TList)
   private
@@ -34,11 +32,14 @@ type
     procedure Insert(AIndex: integer; AItem: PReference);
   end;
 
+  TReferenceType = (rtConventional, rtXms, rtEms, rtFile);
+
   TReference = record
     Size: word;
-    case Xms: boolean of
-      true: (Handle: word; Unused: word);
-      false: (Ptr: pointer);
+    case ReferenceType: TReferenceType of
+      rtXms, rtEms: (Handle: word; Unused: word);
+      rtConventional: (Ptr: pointer);
+      rtFile: (Offset: longint);
   end;
 
   TXmsMoveRecord = record
@@ -69,7 +70,7 @@ type
     function GetXmsControlFunction: pointer;
     function XmsAlloc(ASize: word): word;
     procedure XmsDealloc(AHandle: word);
-    procedure MoveReference(AMoveRecord: PXmsMoveRecord);
+    procedure MoveReference(var AMoveRecord: TXmsMoveRecord);
     procedure MoveToConventional(AReference: PReference);
     procedure PurgeConventional(ASize: longint);
   public
@@ -83,7 +84,7 @@ type
     function CurrentReference: PReference;
     function ReferencePointer(AReference: PReference): pointer;
     function Alloc(ASize: word): Preference;
-    function GetReference(ABuffer: pointer; ASize: word): PReference;
+    function CreateReference(ABuffer: pointer; ASize: word): PReference;
     procedure InitXms;
     procedure Init; virtual;
     procedure SetCurrentReference(AReference: PReference);
@@ -128,8 +129,6 @@ type
 var
   Memory: TMemoryDriver;
   OutOfMemoryException: PException;
-  XmsControl: pointer;
-  MoveRecord: TXmsMoveRecord;
 
 implementation
 
@@ -138,6 +137,8 @@ uses
 
 var
   PreviousExitProc: PProc;
+  XmsControl: pointer;
+  MoveRecord: TXmsMoveRecord;
 
 const
   HiWord = 1;
@@ -154,15 +155,13 @@ begin
   { Default to return nil on error }
   OnHeapError := 1;
 
-  { Purge conventional references until there is ASize avail + enough space
-  for at least 1 reference to be swapped }
-  minSize := MaxVarSize;
-  Memory.PurgeConventional(minSize);
+  { Purge conventional references until there is enough space }
+  Memory.PurgeConventional(Size);
 
   { If enough could not be purged, try custom OnAllocError function.  If this
-  returns false, then return s1 for "nil on error", otherwise clear
+  returns false, then return 1 for "nil on error", otherwise clear
   error and retry. }
-  if (System.MaxAvail < minSize) or (Memory.HasException) then begin
+  if (System.MaxAvail < Size) or (Memory.HasException) then begin
     if Assigned(Memory.OnAllocError) and TMemoryAllocErrorProc(Memory.OnAllocError)(Size) then
       Memory.ClearException
     else
@@ -194,7 +193,7 @@ begin
   Rewrite(debugFile);
   for index := 0 to FReferences^.Count - 1 do begin
     reference := FReferences^.GetItem(index);
-    if not reference^.Xms then
+    if not (reference^.ReferenceType = rtXms) then
       continue;
     WriteLn(debugFile, IntToStr(reference^.Handle));
   end;
@@ -314,23 +313,19 @@ begin
   CurrentReference := FCurrentReference;
 end;
 
-procedure TMemoryDriver.MoveReference(AMoveRecord: PXmsMoveRecord);
+procedure TMemoryDriver.MoveReference(var AMoveRecord: TXmsMoveRecord);
 var
   result: word;
   xmsError: byte;
 begin
   asm
-    push ds
-    push si
-    lds si, AMoveRecord
+    mov si, offset AMoveRecord
     mov ah, 0Bh
     call [XmsControl]
     mov [result], ax
     mov [xmsError], bl
-    pop si
-    pop ds
   end;
-  if result <> 1 then
+  if result <> 0 then
     Raise(ecXmsError);
 end;
 
@@ -352,7 +347,7 @@ begin
   while (index < FReferences^.Count) and (System.MaxAvail < ASize) do begin
     current := FReferences^.GetItem(index);
     Inc(index);
-    if current^.Xms then
+    if current^.ReferenceType = rtXms then
       continue;
     xmsHandle := XmsAlloc(current^.Size);
 
@@ -364,16 +359,17 @@ begin
 
     FillChar(MoveRecord, SizeOf(TXmsMoveRecord), 0);
     MoveRecord.Length := current^.Size;
+    MoveRecord.SourceHandle := 0;
     MoveRecord.SourcePointer := current^.Ptr;
     MoveRecord.DestHandle := xmsHandle;
-    MoveReference(@MoveRecord);
+    MoveReference(MoveRecord);
 
     { If there was an exception thrown during the move, then error }
     if HasException then
       exit;
     FreeMem(current^.Ptr, current^.Size);
     current^.Ptr := nil;
-    current^.Xms := true;
+    current^.ReferenceType := rtXms;
     current^.Handle := xmsHandle;
   end;
 end;
@@ -397,7 +393,7 @@ begin
   MoveRecord.SourceHandle := AReference^.Handle;
   MoveRecord.DestPointer := ptr;
 
-  MoveReference(@MoveRecord);
+  MoveReference(MoveRecord);
   if HasException then begin
     FreeMem(ptr, AReference^.Size);
     exit;
@@ -405,7 +401,7 @@ begin
 
   XmsDealloc(AReference^.Handle);
   AReference^.Ptr := ptr;
-  AReference^.Xms := false;
+  AReference^.ReferenceType := rtConventional;
   FCurrentReference := AReference;
 end;
 
@@ -429,7 +425,7 @@ begin
   if FCurrentReference = AReference then
     exit;
   FCurrentReference := AReference;
-  if not AReference^.Xms then
+  if not (AReference^.ReferenceType = rtXms) then
     exit;
   MoveToConventional(AReference);
 end;
@@ -484,21 +480,21 @@ begin
   end;
 end;
 
-function TMemoryDriver.GetReference(ABuffer: pointer; ASize: word): PReference;
+function TMemoryDriver.CreateReference(ABuffer: pointer; ASize: word): PReference;
 var
   reference: PReference;
 begin
   reference := New(PReference);
   if not Assigned(reference) then begin
     Raise(ecNotEnoughMemory);
-    GetReference := nil;
+    CreateReference := nil;
     exit;
   end;
   reference^.Size := ASize;
   reference^.Ptr := ABuffer;
-  reference^.Xms := false;
+  reference^.ReferenceType := rtConventional;
   FReferences^.Add(reference);
-  GetReference := reference;
+  CreateReference := reference;
 end;
 
 function TMemoryDriver.Alloc(ASize: word): PReference;
@@ -527,7 +523,7 @@ begin
     end;
     reference^.Ptr := ptr;
     reference^.Size := ASize;
-    reference^.Xms := false;
+    reference^.ReferenceType := rtConventional
   end
   else if FXmsSupported and (ASize <= XmsMaxAvail) then begin
     reference^.Handle := XmsAlloc(ASize);
@@ -538,7 +534,7 @@ begin
       exit;
     end;
     reference^.Size := ASize;
-    reference^.Xms := true;
+    reference^.ReferenceType := rtXms;
   end
   else begin
     Raise(ecNotEnoughMemory);
@@ -559,7 +555,7 @@ begin
   if not Assigned(AReference) then
     exit;
   index := FReferences^.IndexOf(AReference);
-  if AReference^.Xms then
+  if AReference^.ReferenceType = rtXms then
     MoveToConventional(AReference);
   Dispose(AReference);
   if index < 0 then
@@ -577,7 +573,7 @@ begin
   if not Assigned(AReference) then
     exit;
   index := FReferences^.IndexOf(AReference);
-  if AReference^.Xms then
+  if AReference^.ReferenceType = rtXms then
     XmsDealloc(AReference^.Handle)
   else
     FreeMem(AReference^.Ptr, AReference^.Size);
@@ -634,8 +630,9 @@ begin
   if not Assigned(FTransactionReferences) then
     exit;
   while (FTransactionReferences^.Count > 0) do begin
-    current := FReferences^.GetItem(0);
+    current := FTransactionReferences^.GetItem(0);
     FreeReference(current);
+    FTransactionReferences^.Delete(0);
   end;
   FreeAndNil(FTransactionReferences);
 end;
@@ -691,7 +688,6 @@ procedure Finalize; far;
 begin
   ExitProc := PreviousExitProc;
   Memory.Free;
-  WriteLn('Memory driver uninstalled.');
 end;
 
 constructor TBuffer.Create;

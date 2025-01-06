@@ -19,19 +19,20 @@ type
     function New(ASource: string): PChar;
     function CompareLength(AStr1, AStr2: PChar; AMaxLength: word; ACompareOptions: TStringCompareOptions): integer;
     function Compare(AStr1, AStr2: PChar; ACompareOptions: TStringCompareOptions): integer;
-    function CompareShort(AStr1: string; AStr2: PChar; ACompareOptions: TStringCompareOptions): integer;
-    function AppendShort(AStr1: PChar; const AStr2: string): PChar;
+    function CompareString(AStr1: string; AStr2: PChar; ACompareOptions: TStringCompareOptions): integer;
+    function AppendString(AStr1: PChar; const AStr2: string): PChar;
     function Append(var AStr1: PChar; AStr2: PChar): PChar;
     function Copy(ASource: PChar): PChar;
     function CopyLength(ASource: PChar; AMaxLength: word): PChar;
     function EndString(AString: PChar): PChar;
     function EndCopy(ASource: PChar): PChar;
     function GetString(ASource: PChar): string;
-    function Reassign(ADest, ASource: PChar): PChar;
     function IndexOf(ASource: PChar; AChar: char): integer;
     function Length(AString: PChar): word;
+    function GetLineCount(AString: PChar): integer;
     procedure Free(var AString: PChar);
     procedure AssignString(var ADest: PChar; ASource: string);
+    procedure Assign(var ADest: PChar; ASource: PChar);
   end;
 
 var
@@ -65,12 +66,12 @@ begin
   New := dest;
 end;
 
-function TStringUtil.AppendShort(AStr1: PChar; const AStr2: string): PChar;
+function TStringUtil.AppendString(AStr1: PChar; const AStr2: string): PChar;
 var
   str: PChar;
   short: string;
 begin
-  AppendShort := nil;
+  AppendString := nil;
   if not Assigned(AStr1) or (System.Length(AStr2) = 0) then
     exit;
   GetMem(str, StrLen(AStr1) + System.Length(AStr2) + 1);
@@ -78,7 +79,7 @@ begin
     exit;
   short := AStr2 + #0;
   str := StrCat(AStr1, @short[1]);
-  AppendShort := str;
+  AppendString := str;
 end;
 
 function TStringUtil.Append(var AStr1: PChar; AStr2: PChar): PChar;
@@ -109,7 +110,7 @@ end;
 
 function TStringUtil.CopyLength(ASource: PChar; AMaxLength: word): PChar;
 var
-  dest: PChar;
+  dest, start: PChar;
 begin
   dest := nil;
   CopyLength := nil;
@@ -119,9 +120,10 @@ begin
   if not Assigned(dest) then
     exit;
   StrLCopy(dest, ASource, AMaxLength);
+  start := dest;
   Inc(dest, AMaxLength);
   dest^ := #0;
-  CopyLength := dest;
+  CopyLength := start;
 end;
 
 function TStringUtil.EndString(AString: PChar): PChar;
@@ -149,10 +151,10 @@ begin
   Copy := dest;
 end;
 
-function TStringUtil.Reassign(ADest, ASource: PChar): PChar;
+procedure TStringUtil.Assign(var ADest: PChar; ASource: PChar);
 begin
   Free(ADest);
-  Reassign := Copy(ASource);
+  ADest := Copy(ASource);
 end;
 
 function TStringUtil.CompareLength(AStr1, AStr2: PChar; AMaxLength: word; ACompareOptions: TStringCompareOptions): integer;
@@ -171,14 +173,14 @@ begin
     Compare := StrComp(AStr1, AStr2);
 end;
 
-function TStringUtil.CompareShort(AStr1: string; AStr2: PChar;
+function TStringUtil.CompareString(AStr1: string; AStr2: PChar;
   ACompareOptions: TStringCompareOptions): integer;
 var
   str: PChar;
 begin
   AStr1 := AStr1 + #0;
   str := @AStr1[1];
-  CompareShort := Compare(str, AStr2, ACompareOptions);
+  CompareString := Compare(str, AStr2, ACompareOptions);
 end;
 
 procedure TStringUtil.AssignString(var ADest: PChar; ASource: string);
@@ -213,6 +215,22 @@ begin
       IndexOf := index;
       break;
     end;
+end;
+
+function TStringUtil.GetLineCount(AString: PChar): integer;
+var
+  count: integer;
+begin
+  GetLineCount := 0;
+  if (not Assigned(AString)) then
+    exit;
+  count := 0;
+  while AString^ <> #0 do begin
+    if AString^ = #10 then
+      Inc(count);
+    Inc(AString);
+  end;
+  GetLineCount := count;
 end;
 
 begin

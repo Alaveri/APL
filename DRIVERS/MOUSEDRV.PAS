@@ -28,7 +28,7 @@ type
     procedure PopState;
     procedure UpdateState;
     procedure SetMouseResolution(AMaxX, AMaxY: word);
-    procedure SetMousePosition(APx, APy: word);
+    procedure SetMousePosition(APX, APY: word);
     procedure SetIncToPixelRatio(AIncPerPixX, AIncPerPixY: word);
     procedure SetSensitivity(ASensX, ASensY: real);
     function IsMouseWheelSupported: boolean;
@@ -179,7 +179,7 @@ begin
   end;
 end;
 
-procedure TMouseDriver.SetMousePosition(APx, APy: word);
+procedure TMouseDriver.SetMousePosition(APX, APY: word);
 begin
   asm
     mov   ax, 04h

@@ -19,15 +19,9 @@ type
   PInversionPoint = ^TInversionPoint;
   PInversionPointList = ^TInversionPointList;
   PVector2 = ^TVector2;
-  PPointListProc = ^TPointListProc;
-  PRectListProc = ^TRectListProc;
-  PInversionPointListProc = ^TInversionPointListProc;
   PSetPixelProc = ^TSetPixelProc;
 
   TRegionMode = (rmInclude, rmExclude);
-  TPointListProc = procedure(ASender: PObject; APoint: PPoint);
-  TRectListProc = procedure(ASender: PObject; ARect: PRect);
-  TInversionPointListProc = procedure(ASender: PObject; AInversionPoint: PInversionPoint);
   TSetPixelProc = procedure(AX, AY: integer; AData: pointer);
 
   TPointList = object(TObjectList)
@@ -125,17 +119,22 @@ type
     procedure SetDims(AX, AY, AWidth, AHeight: integer);
     procedure SetCoords(AX, AY, ARight, ABottom: integer);
     procedure SetRect(ARect: TRect);
+    procedure SetSize(AWidth, AHeight: integer);
+    procedure SetXY(AX, AY: integer);
     procedure Assign(var ASource: TObject); virtual;
     procedure SetRight(ARight: integer);
     procedure SetBottom(ABottom: integer);
     procedure Translate(ADX, ADY: integer);
     procedure TranslateToOrigin;
+    procedure Clear;
     procedure Grow(ADW, ADH: integer);
     procedure Intersect(var ARect: TRect);
     procedure GetIntersection(ARect: TRect; var AResult: TRect);
     procedure Init; virtual;
-    procedure GetInversionPoints(AList: PInversionPointList;
+    procedure GetInversionPoints(var AList: TInversionPointList;
       AMode: TRegionMode; AY, AStartX, AEndX: integer);
+    procedure GetCoords(var APX, APY, ARight, ABottom: integer);
+    procedure GetDims(var APX, APY, AWidth, AHeight: integer);
     function GetNewObject: PObject; virtual;
     function Equals(ARect: TRect): boolean;
     function EqualsCoords(AX, AY, AWidth, AHeight: integer): boolean;
@@ -171,8 +170,8 @@ type
   public
     procedure Init; virtual;
     procedure Assign(var ASource: TObject); virtual;
-    function GetInversionPoints(AMode: TRegionMode;
-      AY, AStartX, AEndX: integer): PInversionPointList;
+    procedure GetInversionPoints(var AList: TInversionPointList;
+      AMode: TRegionMode; AY, AStartX, AEndX: integer);
     function Contains(AX, AY: integer): boolean;
     function IntersectsRect(var ARect: TRect): boolean;
     function HasRect(var ARect: TRect): boolean;
@@ -244,13 +243,19 @@ end;
 constructor TRect.CreateDims(AX, AY, AWidth, AHeight: integer);
 begin
   inherited Create;
-  SetDims(AX, AY, AWidth, AHeight);
+  if (AWidth < 0) or (AHeight < 0) then
+    SetDims(AX, AY, 0, 0)
+  else
+    SetDims(AX, AY, AWidth, AHeight);
 end;
 
 constructor TRect.CreateCoords(AX, AY, ARight, ABottom: integer);
 begin
   inherited Create;
-  SetCoords(AX, AY, ARight, ABottom);
+  if (ARight < AX) or (ABottom < AY) then
+    SetDims(AX, AY, 0, 0)
+  else
+    SetCoords(AX, AY, ARight, ABottom);
 end;
 
 function TRect.GetNewObject: PObject;
@@ -283,12 +288,16 @@ begin
   Inc(Y, ADY);
 end;
 
+procedure TRect.Clear;
+begin
+  SetDims(0, 0, 0, 0);
+end;
+
 procedure TRect.TranslateToOrigin;
 begin
   X := 0;
   Y := 0;
 end;
-
 
 procedure TRect.Assign(var ASource: TObject);
 var
@@ -321,6 +330,18 @@ begin
   Y := AY;
   Width := ARight - AX + 1;
   Height := ABottom - AY + 1;
+end;
+
+procedure TRect.SetSize(AWidth, AHeight: integer);
+begin
+  Width := AWidth;
+  Height := AHeight;
+end;
+
+procedure TRect.SetXY(AX, AY: integer);
+begin
+  X := AX;
+  Y := AY;
 end;
 
 procedure TRect.Grow(ADW, ADH: integer);
@@ -363,86 +384,40 @@ begin
   ClampY := Clamp(APY, Y, Bottom);
 end;
 
-function TRect.ContainsX(APX: integer): boolean; assembler;
-asm
-    xor ax, ax
-    mov bx, APX
-    mov dx, ES:[DI].TRect.X
-    cmp bx, dx
-    jl @end
-    add dx, ES:[DI].Width
-    dec dx
-    cmp bx, dx
-    jg @end
-    inc ax
-    jmp @end
-  @end:
+procedure TRect.GetCoords(var APX, APY, ARight, ABottom: integer);
+begin
+  APX := X;
+  APY := Y;
+  ARight := Right;
+  ABottom := Bottom;
 end;
 
-function TRect.ContainsY(APY: integer): boolean; assembler;
-asm
-    xor ax, ax
-    mov bx, APY
-    mov dx, ES:[DI].TRect.Y
-    cmp bx, dx
-    jl @end
-    add dx, ES:[DI].TRect.Height
-    dec dx
-    cmp bx, dx
-    jg @end
-    inc ax
-    jmp @end
-  @end:
+procedure TRect.GetDims(var APX, APY, AWidth, AHeight: integer);
+begin
+  APX := X;
+  APY := Y;
+  AWidth := Width;
+  AHeight := Height;
 end;
 
-function TRect.Contains(APX, APY: integer): boolean; assembler;
-asm
-    xor ax, ax
-    les di, self
-    mov bx, APX
-    mov dx, ES:[DI].TRect.X
-    cmp bx, dx
-    jl @end
-    add dx, ES:[DI].TRect.Width
-    dec dx
-    cmp bx, dx
-    jg @end
-    mov bx, APY
-    mov dx, ES:[DI].TRect.Y
-    cmp bx, dx
-    jl @end
-    add dx, ES:[DI].TRect.Height
-    dec dx
-    cmp bx, dx
-    jg @end
-    inc ax
-    jmp @end
-  @end:
+function TRect.ContainsX(APX: integer): boolean;
+begin
+  ContainsX := (APX >= X) and (APX <= Right);
 end;
 
-function TRect.ContainsPoint(APoint: TPoint): boolean; assembler;
-asm
-    mov al, 0
-    les di, self
-    mov bx, APoint.X
-    mov dx, ES:[DI].TRect.X
-    cmp bx, dx
-    jl @end
-    add dx, ES:[DI].TRect.Width
-    dec dx
-    cmp bx, dx
-    jg @end
-    mov bx, APoint.Y
-    mov dx, ES:[DI].TRect.Y
-    cmp bx, dx
-    jl @end
-    add dx, ES:[DI].TRect.Height
-    dec dx
-    cmp bx, dx
-    jg @end
-    inc ax
-    jmp @end
-  @end:
+function TRect.ContainsY(APY: integer): boolean;
+begin
+  ContainsY := (APY >= Y) and (APY <= Bottom);
+end;
+
+function TRect.Contains(APX, APY: integer): boolean;
+begin
+  Contains := ContainsX(APX) and ContainsY(APY);
+end;
+
+function TRect.ContainsPoint(APoint: TPoint): boolean;
+begin
+  ContainsPoint := Contains(APoint.X, APoint.Y);
 end;
 
 function TRect.IntersectsRect(ARect: TRect): boolean;
@@ -454,18 +429,9 @@ begin
      (ARect.Y > Bottom));
 end;
 
-function TRect.IsEmpty: boolean; assembler;
-asm
-  les di, self
-  mov al, 0
-  mov dx, es:[di].TRect.Width
-  cmp dx, 0
-  jg @end
-  mov dx, es:[di].TRect.Height
-  cmp dx, 0
-  jg @end
-  inc ax
-  @end:
+function TRect.IsEmpty: boolean;
+begin
+  IsEmpty := (Width <= 0) or (Height <= 0);
 end;
 
 procedure TRect.Intersect(var ARect: TRect);
@@ -487,7 +453,7 @@ begin
     Min(Right, ARect.Right), Min(Bottom, ARect.Bottom));
 end;
 
-procedure TRect.GetInversionPoints(AList: PInversionPointList;
+procedure TRect.GetInversionPoints(var AList: TInversionPointList;
   AMode: TRegionMode; AY, AStartX, AEndX: integer);
 var
   point: PInversionPoint;
@@ -505,11 +471,11 @@ begin
     exit;
   if AStartX < X then begin
     point := New(PInversionPoint, CreatePoint(on, X));
-    AList^.Add(point);
+    AList.Add(point);
   end;
   if AEndX > Right then begin
     point := New(PInversionPoint, CreatePoint(off, Right));
-    AList^.Add(point);
+    AList.Add(point);
   end;
 end;
 
@@ -746,19 +712,16 @@ begin
   end;
 end;
 
-function TRegion.GetInversionPoints(AMode: TRegionMode;
-  AY, AStartX, AEndX: integer): PInversionPointList;
+procedure TRegion.GetInversionPoints(var AList: TInversionPointList;
+  AMode: TRegionMode; AY, AStartX, AEndX: integer);
 var
-  result: PInversionPointList;
   index: integer;
   rect: PRect;
 begin
-  result := New(PInversionPointList, CreateSortedCapacity(InversionCompare, 2));
   for index := 0 to Count - 1 do begin
     rect := GetItem(index);
-    rect^.GetInversionPoints(result, AMode, AY, AStartX, AEndX);
+    rect^.GetInversionPoints(AList, AMode, AY, AStartX, AEndX);
   end;
-  GetInversionPoints := result;
 end;
 
 constructor TInversionPoint.CreatePoint(AOn: boolean; APosition: integer);

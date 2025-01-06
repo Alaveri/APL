@@ -23,8 +23,8 @@ type
   PStreamListProc = ^TStreamListProc;
   PMemoryStreamListProc = ^TMemoryStreamListProc;
 
-  TStreamListProc = procedure(ASender: PObject; AItem: PStream);
-  TMemoryStreamListProc = procedure(ASender: PObject; AItem: PMemoryStream);
+  TStreamListProc = procedure(AItem: PStream);
+  TMemoryStreamListProc = procedure(AItem: PMemoryStream);
 
   TSeekOrigin =
   (
@@ -73,9 +73,20 @@ type
     procedure WritePChar(AValue: PChar); virtual;
   end;
 
+  TPersistent = object(TStatusObject)
+  private
+  public
+    function IsPersistent: boolean; virtual;
+    procedure LoadFromFile(const AFileName: string); virtual;
+    procedure LoadFromStream(AStream: PStream); virtual;
+    procedure SaveToFile(const AFileName: string); virtual;
+    procedure SaveToStream(AStream: PStream); virtual;
+  end;
+
   TMemoryStream = object(TStream)
   private
     FReferences: PReferenceList;
+    procedure DeallocateReferences;
   public
     FreeBuffers: boolean;
     constructor Create(ASize: longint);
@@ -84,20 +95,19 @@ type
     function Read(ABuffer: pointer; ACount: longint): longint; virtual;
     function Write(ABuffer: pointer; ACount: longint): longint; virtual;
     function WriteToStream(AStream: PStream; ACount: longint): longint; virtual;
-    function ReadFromStream(AStream: PStream; ACount: longint): longint; virtual;
     function CanRead: boolean; virtual;
     function CanWrite: boolean; virtual;
     function CanSeek: boolean; virtual;
     function Fill(ACount: longint; AByte: byte): longint; virtual;
     function FillWord(ACount: longint; AWord: word): longint; virtual;
     function FillLong(ACount: longint; ALong: longint): longint; virtual;
-    procedure DeallocateReferences;
     procedure SetSize(ASize: longint);
     procedure Init; virtual;
   end;
 
   TFileStreamMode =
   (
+    fmCreate,
     fmRead,
     fmWrite,
     fmReadWrite
@@ -119,7 +129,6 @@ type
     function Read(ABuffer: pointer; ACount: longint): longint; virtual;
     function Write(ABuffer: pointer; ACount: longint): longint; virtual;
     function WriteToStream(AStream: PStream; ACount: longint): longint; virtual;
-    function ReadFromStream(AStream: PStream; ACount: longint): longint; virtual;
     function CanRead: boolean; virtual;
     function CanWrite: boolean; virtual;
     function CanSeek: boolean; virtual;
@@ -190,10 +199,12 @@ end;
 
 function TStream.Read(ABuffer: pointer; ACount: longint): longint;
 begin
+  Abstract;
 end;
 
 function TStream.Write(ABuffer: pointer; ACount: longint): longint;
 begin
+  Abstract;
 end;
 
 function TStream.Seek(AOffset: longint; AOrigin: TSeekOrigin): longint;
@@ -283,10 +294,12 @@ end;
 
 function TStream.WriteToStream(AStream: PStream; ACount: longint): longint;
 begin
+  Abstract;
 end;
 
 function TStream.ReadFromStream(AStream: PStream; ACount: longint): longint;
 begin
+  AStream^.WriteToStream(@self, ACount);
 end;
 
 procedure TStream.Init;
@@ -345,7 +358,6 @@ begin
   len := ReadWord;
   if HasException then
     exit;
-  len := ReadWord;
   result := TString.Alloc(len);
   if NilPtr(result, ecNotEnoughMemory) then
     exit;
@@ -420,7 +432,7 @@ var
   reference: PReference;
 begin
   inherited Create;
-  reference := Memory.GetReference(ABuffer, ASize);
+  reference := Memory.CreateReference(ABuffer, ASize);
   Size :=  ASize;
   if not Assigned(reference) then begin
     Raise(Memory.Exception^.Code);
@@ -694,11 +706,6 @@ begin
   WriteToStream := total;
 end;
 
-function TMemoryStream.ReadFromStream(AStream: PStream; ACount: longint): longint;
-begin
-  ReadFromStream := AStream^.WriteToStream(@self, ACount);
-end;
-
 procedure TMemoryStream.Init;
 begin
   inherited Init;
@@ -844,11 +851,6 @@ begin
   WriteToStream := total;
 end;
 
-function TFileStream.ReadFromStream(AStream: PStream; ACount: longint): longint;
-begin
-  ReadFromStream := AStream^.WriteToStream(@self, ACount);
-end;
-
 function TFileStream.CanRead: boolean;
 begin
   CanRead := NoException and ((FMode = fmRead) or (FMode = fmReadWrite));
@@ -856,7 +858,8 @@ end;
 
 function TFileStream.CanWrite: boolean;
 begin
-  CanWrite := NoException and ((FMode = fmWrite) or (FMode = fmReadWrite));
+  CanWrite := NoException and
+  ((FMode = fmWrite) or (FMode = fmReadWrite) or (FMode = fmCreate));
 end;
 
 function TFileStream.CanSeek: boolean;
@@ -869,11 +872,11 @@ begin
   inherited Seek(AOffset, AOrigin);
   if HasException then
     exit;
-  {$I+}
+  {$I-}
   System.Seek(FFile, Position);
   if (IOResult <> 0) then
     Raise(ecStreamSeekError);
-  {$I-}
+  {$I+}
 end;
 
 procedure TFileStream.Open;
@@ -885,11 +888,11 @@ begin
   if FileExists(FFilename) then begin
     System.Assign(FFile, FFilename);
     case FMode of
-      fmRead, fmReadWrite: begin
+      fmRead, fmReadWrite, fmWrite: begin
         Reset(FFile, 1);
         Size := FileSize(FFile);
       end;
-      fmWrite: begin
+      fmCreate: begin
         Rewrite(FFile, 1);
         Size := 0;
       end;
@@ -900,7 +903,7 @@ begin
     System.Assign(FFile, FFilename);
     case FMode of
       fmRead, fmReadWrite: Raise(ecFileNotFound);
-      fmWrite: Rewrite(FFile, 1);
+      fmWrite, fmCreate: Rewrite(FFile, 1);
     end;
   end;
   if IOResult <> 0 then
@@ -1007,6 +1010,43 @@ end;
 procedure TMemoryStreamList.Delete(AIndex: integer);
 begin
   inherited Delete(AIndex);
+end;
+
+function TPersistent.IsPersistent: boolean;
+begin
+  IsPersistent := true;
+end;
+
+procedure TPersistent.LoadFromFile(const AFileName: string);
+var
+  stream: PFileStream;
+begin
+  stream := New(PFileStream, Create(AFileName, fmRead));
+  if not CheckReRaise(stream) then
+    LoadFromStream(stream);
+  CheckReRaise(stream);
+  FreeAndNil(stream);
+end;
+
+procedure TPersistent.LoadFromStream(AStream: PStream);
+begin
+  Abstract;
+end;
+
+procedure TPersistent.SaveToFile(const AFileName: string);
+var
+  stream: PFileStream;
+begin
+  stream := New(PFileStream, Create(AFileName, fmCreate));
+  if not CheckReRaise(stream) then
+    SaveToStream(stream);
+  CheckReRaise(stream);
+  FreeAndNil(stream);
+end;
+
+procedure TPersistent.SaveToStream(AStream: PStream);
+begin
+  Abstract;
 end;
 
 begin

@@ -240,6 +240,7 @@ end;
 
 procedure TLzw.SetCompressionLevel(ALevel: TCompressionLevel);
 begin
+  inherited SetCompressionLevel(ALevel);
   BitSize := LzwCompressionBitSize[ALevel];
 end;
 
@@ -293,7 +294,7 @@ begin
   bits := ASource^.ReadByte;
   total := ASource^.ReadLong;
   ASource^.Seek(startPos, soFromBeginning);
-  CheckReraise(ASource);
+  CheckReRaise(ASource);
   if HasException then
     exit;
   GetOriginalSize := total;

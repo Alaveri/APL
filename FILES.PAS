@@ -19,6 +19,8 @@ type
   PFile = ^TFile;
   PFileList = ^TFileList;
   PFileListProc = ^TFileListProc;
+  PFileFilter = ^TFileFilter;
+  PFileFilterList = ^TFileFilterList;
 
   TFileAttribute = (
     faReadOnly,
@@ -30,7 +32,8 @@ type
   );
 
   TFileAttributes = set of TFileAttribute;
-  TFileListProc = procedure(ASender: PObject; AItem: PFile);
+  TFileListProc = procedure(AItem: PFile);
+
   TFile = object(TObject)
   private
   public
@@ -44,6 +47,34 @@ type
 
   TDirSort = (dsFilename, dsSize, dsTime);
   TDirSortDirection = (dsAsc, dsDesc);
+
+  TFileFilter = object(TIdentifiable)
+  private
+  public
+    Filter: PChar;
+    Description: PChar;
+    constructor CreateFilter(const ADescription, AFilter: string);
+    destructor Free; virtual;
+    procedure Init; virtual;
+    procedure Assign(var ASource: TObject); virtual;
+    procedure SetFilter(const AFilter: string);
+    procedure SetDescription(const ADescription: string);
+    function GetFilter: string;
+    function GetDescription: string;
+  end;
+
+  TFileFilterList = object(TIdentifiableList)
+  private
+  public
+    constructor Create;
+    procedure Init; virtual;
+    function Add(AItem: PIdentifiable): integer;
+    function GetItem(AIndex: integer): PIdentifiable;
+    function IndexOf(AItem: PIdentifiable): integer;
+    procedure SetItem(AIndex: integer; AItem: PIdentifiable);
+    procedure Insert(AIndex: integer; AItem: PIdentifiable);
+    procedure RemoveItem(AItem: PIdentifiable);
+  end;
 
   TDirectoryContents = object(TFile)
   private
@@ -118,8 +149,8 @@ begin
   file2 := PFile(AItem2);
   if SortDirection = dsDesc then
     SwapPointer(pointer(file1), pointer(file2));
-  filename1 := StrPas(file1^.Name);
-  filename2 := StrPas(file2^.Name);
+  filename1 := TString.GetString(file1^.Name);
+  filename2 := TString.GetString(file2^.Name);
   isDir1 := false;
   isDir2 := false;
   if SortDirsFirst then begin
@@ -158,8 +189,8 @@ begin
   file2 := PFile(AItem2);
   if SortDirection = dsDesc then
     SwapPointer(pointer(file1), pointer(file2));
-  filename1 := StrPas(file1^.Name);
-  filename2 := StrPas(file2^.Name);
+  filename1 := TString.GetString(file1^.Name);
+  filename2 := TString.GetString(file2^.Name);
   isDir1 := false;
   isDir2 := false;
   if SortDirsFirst then begin
@@ -198,8 +229,8 @@ begin
   file2 := PFile(AItem2);
   if SortDirection = dsDesc then
     SwapPointer(pointer(file1), pointer(file2));
-  filename1 := StrPas(file1^.Name);
-  filename2 := StrPas(file2^.Name);
+  filename1 := TString.GetString(file1^.Name);
+  filename2 := TString.GetString(file2^.Name);
   isDir1 := false;
   isDir2 := false;
   if SortDirsFirst then begin
@@ -397,11 +428,108 @@ begin
   for index := 0 to Count - 1 do begin
     aFile := GetItem(index);
     if not (faDirectory in aFile^.Attr)
-      and StringsEqualInsensitive(StrPas(aFile^.Name), AFilename) then begin
+      and StringsEqualInsensitive(TString.GetString(aFile^.Name), AFilename) then begin
       result := aFile;
       exit;
     end;
   end;
+end;
+
+procedure TFileFilter.Init;
+begin
+  inherited Init;
+  Filter := nil;
+  Description := nil;
+end;
+
+constructor TFileFilter.CreateFilter(const ADescription, AFilter: string);
+begin
+  inherited Create;
+  Filter := TString.New(AFilter);
+  Description := TString.New(ADescription);
+end;
+
+procedure TFileFilter.Assign(var ASource: TObject);
+var
+  source: PFileFilter;
+begin
+  inherited Assign(ASource);
+  source := PFileFilter(@ASource);
+  TString.Assign(Filter, source^.Filter);
+  TString.Assign(Description, source^.Description);
+end;
+
+function TFileFilter.GetFilter: string;
+begin
+  GetFilter := TString.GetString(Filter);
+end;
+
+function TFileFilter.GetDescription: string;
+begin
+  GetDescription := TString.GetString(Description);
+end;
+
+procedure TFileFilter.SetFilter(const AFilter: string);
+begin
+  TString.AssignString(Filter, AFilter);
+end;
+
+procedure TFileFilter.SetDescription(const ADescription: string);
+begin
+  TString.AssignString(Description, ADescription);
+end;
+
+destructor TFileFilter.Free;
+begin
+  TString.Free(Filter);
+  TString.Free(Description);
+  inherited Free;
+end;
+
+function FileFilterDescCompare(AItem1, AItem2: pointer): integer; far;
+begin
+  FileFilterDescCompare := StrIComp(PFileFilter(AItem1)^.Description,
+    PFileFilter(AItem2)^.Description);
+end;
+
+constructor TFileFilterList.Create;
+begin
+  CreateSorted(FileFilterDescCompare)
+end;
+
+procedure TFileFilterList.Init;
+begin
+  inherited Init;
+end;
+
+function TFileFilterList.Add(AItem: PIdentifiable): integer;
+begin
+  Add := inherited Add(AItem);
+end;
+
+function TFileFilterList.GetItem(AIndex: integer): PIdentifiable;
+begin
+  GetItem := PFileFilter(inherited GetItem(AIndex));
+end;
+
+function TFileFilterList.IndexOf(AItem: PIdentifiable): integer;
+begin
+  IndexOf := inherited IndexOf(AItem);
+end;
+
+procedure TFileFilterList.SetItem(AIndex: integer; AItem: PIdentifiable);
+begin
+  inherited SetItem(AIndex, AItem);
+end;
+
+procedure TFileFilterList.Insert(AIndex: integer; AItem: PIdentifiable);
+begin
+  inherited Insert(AIndex, AItem);
+end;
+
+procedure TFileFilterList.RemoveItem(AItem: PIdentifiable);
+begin
+  inherited RemoveItem(AItem);
 end;
 
 procedure Finalize; far;
