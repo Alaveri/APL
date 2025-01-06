@@ -526,7 +526,6 @@ procedure Finalize; far;
 begin
   ExitProc := PreviousExitProc;
   FreeAndNil(Text);
-  WriteLn('Text driver uninstalled.');
 end;
 
 begin

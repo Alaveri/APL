@@ -27,11 +27,12 @@ type
     function EndString(AString: PChar): PChar;
     function EndCopy(ASource: PChar): PChar;
     function GetString(ASource: PChar): string;
-    function Reassign(ADest, ASource: PChar): PChar;
     function IndexOf(ASource: PChar; AChar: char): integer;
     function Length(AString: PChar): word;
+    function GetLineCount(AString: PChar): integer;
     procedure Free(var AString: PChar);
     procedure AssignString(var ADest: PChar; ASource: string);
+    procedure Assign(var ADest: PChar; ASource: PChar);
   end;
 
 var
@@ -109,7 +110,7 @@ end;
 
 function TStringUtil.CopyLength(ASource: PChar; AMaxLength: word): PChar;
 var
-  dest: PChar;
+  dest, start: PChar;
 begin
   dest := nil;
   CopyLength := nil;
@@ -119,9 +120,10 @@ begin
   if not Assigned(dest) then
     exit;
   StrLCopy(dest, ASource, AMaxLength);
+  start := dest;
   Inc(dest, AMaxLength);
   dest^ := #0;
-  CopyLength := dest;
+  CopyLength := start;
 end;
 
 function TStringUtil.EndString(AString: PChar): PChar;
@@ -149,10 +151,10 @@ begin
   Copy := dest;
 end;
 
-function TStringUtil.Reassign(ADest, ASource: PChar): PChar;
+procedure TStringUtil.Assign(var ADest: PChar; ASource: PChar);
 begin
   Free(ADest);
-  Reassign := Copy(ASource);
+  ADest := Copy(ASource);
 end;
 
 function TStringUtil.CompareLength(AStr1, AStr2: PChar; AMaxLength: word; ACompareOptions: TStringCompareOptions): integer;
@@ -213,6 +215,22 @@ begin
       IndexOf := index;
       break;
     end;
+end;
+
+function TStringUtil.GetLineCount(AString: PChar): integer;
+var
+  count: integer;
+begin
+  GetLineCount := 0;
+  if (not Assigned(AString)) then
+    exit;
+  count := 0;
+  while AString^ <> #0 do begin
+    if AString^ = #10 then
+      Inc(count);
+    Inc(AString);
+  end;
+  GetLineCount := count;
 end;
 
 begin

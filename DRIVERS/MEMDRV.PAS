@@ -630,8 +630,9 @@ begin
   if not Assigned(FTransactionReferences) then
     exit;
   while (FTransactionReferences^.Count > 0) do begin
-    current := FReferences^.GetItem(0);
+    current := FTransactionReferences^.GetItem(0);
     FreeReference(current);
+    FTransactionReferences^.Delete(0);
   end;
   FreeAndNil(FTransactionReferences);
 end;
@@ -687,7 +688,6 @@ procedure Finalize; far;
 begin
   ExitProc := PreviousExitProc;
   Memory.Free;
-  WriteLn('Memory driver uninstalled.');
 end;
 
 constructor TBuffer.Create;

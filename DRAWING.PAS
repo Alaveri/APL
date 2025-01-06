@@ -400,86 +400,24 @@ begin
   AHeight := Height;
 end;
 
-function TRect.ContainsX(APX: integer): boolean; assembler;
-asm
-    xor ax, ax
-    mov bx, APX
-    mov dx, ES:[DI].TRect.X
-    cmp bx, dx
-    jl @end
-    add dx, ES:[DI].Width
-    dec dx
-    cmp bx, dx
-    jg @end
-    inc ax
-    jmp @end
-  @end:
+function TRect.ContainsX(APX: integer): boolean;
+begin
+  ContainsX := (APX >= X) and (APX <= Right);
 end;
 
-function TRect.ContainsY(APY: integer): boolean; assembler;
-asm
-    xor ax, ax
-    mov bx, APY
-    mov dx, ES:[DI].TRect.Y
-    cmp bx, dx
-    jl @end
-    add dx, ES:[DI].TRect.Height
-    dec dx
-    cmp bx, dx
-    jg @end
-    inc ax
-    jmp @end
-  @end:
+function TRect.ContainsY(APY: integer): boolean;
+begin
+  ContainsY := (APY >= Y) and (APY <= Bottom);
 end;
 
-function TRect.Contains(APX, APY: integer): boolean; assembler;
-asm
-    xor ax, ax
-    les di, self
-    mov bx, APX
-    mov dx, ES:[DI].TRect.X
-    cmp bx, dx
-    jl @end
-    add dx, ES:[DI].TRect.Width
-    dec dx
-    cmp bx, dx
-    jg @end
-    mov bx, APY
-    mov dx, ES:[DI].TRect.Y
-    cmp bx, dx
-    jl @end
-    add dx, ES:[DI].TRect.Height
-    dec dx
-    cmp bx, dx
-    jg @end
-    inc ax
-    jmp @end
-  @end:
+function TRect.Contains(APX, APY: integer): boolean;
+begin
+  Contains := ContainsX(APX) and ContainsY(APY);
 end;
 
-function TRect.ContainsPoint(APoint: TPoint): boolean; assembler;
-asm
-    mov al, 0
-    les di, self
-    mov bx, APoint.X
-    mov dx, ES:[DI].TRect.X
-    cmp bx, dx
-    jl @end
-    add dx, ES:[DI].TRect.Width
-    dec dx
-    cmp bx, dx
-    jg @end
-    mov bx, APoint.Y
-    mov dx, ES:[DI].TRect.Y
-    cmp bx, dx
-    jl @end
-    add dx, ES:[DI].TRect.Height
-    dec dx
-    cmp bx, dx
-    jg @end
-    inc ax
-    jmp @end
-  @end:
+function TRect.ContainsPoint(APoint: TPoint): boolean;
+begin
+  ContainsPoint := Contains(APoint.X, APoint.Y);
 end;
 
 function TRect.IntersectsRect(ARect: TRect): boolean;

@@ -814,13 +814,11 @@ begin
   ExitProc := PreviousExitProc;
   Keyboard.Free;
   FreeAndNil(KeyboardShortcuts);
-  WriteLn('Keyboard driver uninstalled.');
 end;
 
 begin
   Keyboard.Create;
   KeyboardShortcuts := New(PKeyboardShortcutList, Create);
-  WriteLn('Keyboard driver installed.');
   PreviousExitProc := ExitProc;
   ExitProc := @Finalize;
 end.

@@ -23,10 +23,10 @@ type
   PObjectStack = ^TObjectStack;
   PQueue = ^TQueue;
   PStringList = ^TStringList;
+  PLongIntList = ^TLongIntList;
   PSortFunc = ^TSortFunc;
   PComparer = ^TComparer;
   PListBuffer = ^TListBuffer;
-  PListNode = ^TListNode;
   PListProc = ^TListProc;
   PIdentifiableList = ^TIdentifiableList;
   PIdentifiableListProc = ^TIdentifiableListProc;
@@ -73,9 +73,10 @@ type
     function Last: pointer;
     function FirstOrDefault(ADefault: pointer): pointer;
     function LastOrDefault(ADefault: pointer): pointer;
-    function FirstThat(AFunc: TPredicate): pointer;
-    function LastThat(AFunc: TPredicate): pointer;
+    function FirstThat(AFunc: TPredicate; var AValue): pointer;
+    function LastThat(AFunc: TPredicate; var AValue): pointer;
     function MoveIndex(AFromIndex, AToIndex: integer): boolean;
+    function Where(AFunc: TPredicate; var AValue): PList;
     procedure ForEach(AProc: PListProc); virtual;
     procedure SetComparer(AComparer: TComparer); virtual;
     procedure Swap(AIndex1, AIndex2: integer); virtual;
@@ -90,11 +91,6 @@ type
     procedure DeletePtr(AItem: pointer); virtual;
     procedure DeleteItem(AItem: pointer);
     procedure Clear; virtual;
-  end;
-
-  TListNode = record
-    Item: pointer;
-    Next: PListNode;
   end;
 
   TObjectList = object(TList)
@@ -151,8 +147,12 @@ type
   end;
 
   TStringList = object(TList)
+  private
+    procedure CreateLinesAny(ALines: PChar; ALength: word; AIncludeEmpty: boolean);
   public
     DisposeStrings: boolean;
+    constructor CreateStringLines(const ALines: string; AIncludeEmpty: boolean);
+    constructor CreateLines(ALines: PChar; AIncludeEmpty: boolean);
     function AddString(const AString: string): integer;
     function GetItem(AIndex: integer): PChar;
     function GetString(AIndex: integer): string;
@@ -174,6 +174,18 @@ type
     procedure SetItem(AIndex: integer; AItem: PIdentifiable);
     procedure Insert(AIndex: integer; AItem: PIdentifiable);
   end;
+
+  TLongIntList = object(TList)
+  private
+  public
+    function Add(AItem: longint): integer;
+    function GetItem(AIndex: integer): longint;
+    function IndexOf(AItem: longint): integer;
+    procedure SetItem(AIndex: integer; AItem: longint);
+    procedure Insert(AIndex: integer; AItem: longint);
+    procedure RemoveItem(AItem: longint);
+  end;
+
 
   TStringComparer = object(TObject)
   private
@@ -380,6 +392,21 @@ begin
     FirstOrDefault := GetItem(0);
 end;
 
+function TList.Where(AFunc: TPredicate; var AValue): PList;
+var
+  index: integer;
+  item: pointer;
+  result: PList;
+begin
+  result := New(PList, Create);
+  for index := 0 to Count - 1 do begin
+    item := GetItem(index);
+    if TPredicate(AFunc)(item, AValue) then
+      result^.Add(item);
+  end;
+  Where := Result;
+end;
+
 function TList.LastOrDefault(ADefault: pointer): pointer;
 begin
   if Count = 0 then
@@ -583,7 +610,7 @@ begin
   until index > Count - 1;
 end;
 
-function TList.FirstThat(AFunc: TPredicate): pointer;
+function TList.FirstThat(AFunc: TPredicate; var AValue): pointer;
 var
   index: integer;
   item: pointer;
@@ -593,14 +620,14 @@ begin
     exit;
   for index := 0 to Count - 1 do begin
     item := GetItem(index);
-    if TPredicate(AFunc)(item) then begin
+    if TPredicate(AFunc)(item, AValue) then begin
       FirstThat := item;
       break;
     end;
   end;
 end;
 
-function TList.LastThat(AFunc: TPredicate): pointer;
+function TList.LastThat(AFunc: TPredicate; var AValue): pointer;
 var
   index: integer;
   item: pointer;
@@ -610,7 +637,7 @@ begin
     exit;
   for index := Count - 1 downto 0 do begin
     item := GetItem(index);
-    if TPredicate(AFunc)(item) then begin
+    if TPredicate(AFunc)(item, AValue) then begin
       LastThat := item;
       break;
     end;
@@ -871,6 +898,69 @@ begin
   Peek := GetItem(Count - 1);
 end;
 
+constructor TStringList.CreateLines(ALines: PChar; AIncludeEmpty: boolean);
+begin
+  inherited Create;
+  CreateLinesAny(ALines, StrLen(ALines), AIncludeEmpty);
+end;
+
+constructor TStringList.CreateStringLines(const ALines: string; AIncludeEmpty: boolean);
+begin
+  inherited Create;
+  CreateLinesAny(@ALines[1], System.Length(ALines), AIncludeEmpty);
+end;
+
+procedure TStringList.CreateLinesAny(ALines: PChar; ALength: word; AIncludeEmpty: boolean);
+var
+  line, newLine, start, next, previous: PChar;
+  len, index, size: word;
+  ch: char;
+begin
+  if not Assigned(ALines) then
+    exit;
+  line := ALines;
+  start := ALines;
+  ch := line^;
+  index := 0;
+  while true do begin
+    if ch = #10 then begin
+      size := line - start;
+      previous := line;
+      next := line;
+      Dec(previous);
+      Inc(next);
+      if (index > 0) and (previous^ = #13) then
+        Dec(size);
+      if (size > 0) or AIncludeEmpty then begin
+        newLine := TString.CopyLength(start, size);
+        if not Assigned(newLine) then begin
+          Raise(ecNotEnoughMemory);
+          exit;
+        end;
+        Add(newLine);
+        line := next;
+        start := line;
+      end;
+    end
+    else
+      Inc(line);
+    Inc(index);
+    ch := line^;
+    if index >= ALength then begin
+      size := line - start;
+      if (size > 0) or AIncludeEmpty then begin
+        newLine := TString.CopyLength(start, size);
+        if not Assigned(newLine) then begin
+          Raise(ecNotEnoughMemory);
+          exit;
+        end;
+        Add(newLine);
+      end;
+      break;
+    end;
+  end;
+end;
+
 procedure TStringList.Init;
 begin
   inherited Init;
@@ -977,6 +1067,36 @@ end;
 procedure TIdentifiableList.Insert(AIndex: integer; AItem: PIdentifiable);
 begin
   inherited Insert(AIndex, AItem);
+end;
+
+function TLongIntList.Add(AItem: longint): integer;
+begin
+  Add := AddPtr(pointer(AItem));
+end;
+
+function TLongIntList.GetItem(AIndex: integer): longint;
+begin
+  GetItem := longint(inherited GetItem(AIndex));
+end;
+
+function TLongIntList.IndexOf(AItem: longint): integer;
+begin
+  IndexOf := inherited IndexOfPtr(pointer(AItem));
+end;
+
+procedure TLongIntList.SetItem(AIndex: integer; AItem: longint);
+begin
+  inherited SetItem(AIndex, pointer(AItem));
+end;
+
+procedure TLongIntList.Insert(AIndex: integer; AItem: longint);
+begin
+  inherited Insert(AIndex, pointer(AItem));
+end;
+
+procedure TLongIntList.RemoveItem(AItem: longint);
+begin
+  inherited DeletePtr(pointer(AItem));
 end;
 
 begin

@@ -21,6 +21,8 @@ uses
 
 type
   PSVga8Mode = ^TSvga8Mode;
+  PSvga8State = ^TSvga8State;
+  PSVga8Driver = ^TSVga8Driver;
 
   TSvga8Mode = object(TGraphicsMode)
   private
@@ -32,27 +34,37 @@ type
     FullGranularity: longint;
     BankShift: word;
     BanksPerPage: word;
-    MaxPage: word;
-    PageCount: word;
+    NumPages: word;
     destructor Free; virtual;
     function PageBank(APage: word): word;
     procedure Init; virtual;
     procedure Assign(var ASource: TObject); virtual;
-    function PopulateMode(var AVbeMode: TVbeMode; AIndex: integer): boolean;
+    function PopulateMode(var AVbeMode: TVbeMode; var AVbeInfo: TVbeInfo;AIndex: integer): boolean;
   end;
 
-  PSVga8Driver = ^TSVga8Driver;
+  TSvga8State = object(TGraphicsState)
+  private
+    FCurrentBank: integer;
+    FOwner: PSvga8Driver;
+  public
+    constructor Create(AOwner: PSVga8Driver);
+    procedure Init; virtual;
+    procedure Assign(var ASource: TObject); virtual;
+    destructor Free; virtual;
+  end;
+
   TSVga8Driver = object(TGraphics8Driver)
   private
     FSVga8Driver: integer;
-    FCurrentBank: integer;
     FWinFunc: pointer;
     FMaxOffset: word;
-    FOffscreenPage: word;
+    FVbeInfo: TVbeInfo;
     procedure SetBank(ABank: word);
+    procedure CopyRect(const ASource, ADest: TRect; ASourcePage, ADestPage: word);
     function SetBankByCoord(APX, APY, APage: integer): longint;
     function GetOffset(APX, APY: integer): longint;
     function GetBankOffset(APX, APY: integer): longint;
+    function SvgaState: PSVga8State;
     function InternalGetScreenPointer(APX, APY: integer; ASetBank: boolean;
       var AOffset: longint): PByte;
   public
@@ -69,14 +81,15 @@ type
     procedure VLine(ApX, APY, AHeight: integer); virtual;
     procedure FillRect(ARect: TRect); virtual;
     procedure FillPattern(ARect: TRect); virtual;
-    procedure VLinePattern(AHeight: integer; APattern: word; APX, APY: integer); virtual;
+    procedure HLinePattern(APattern: TLinePattern; APX, APY, AWidth: integer); virtual;
+    procedure VLinePattern(APattern: word; APX, APY, AHeight: integer); virtual;
     procedure InverseHLine(APX, APY, AWidth: integer); virtual;
     procedure DrawImage(APX, APY, AWidth, AHeight: integer; AImage: PByte); virtual;
     procedure DrawImageT(APX, APY, AWidth, AHeight: integer; AImage: PByte); virtual;
     procedure DrawImageStream(APX, APY, AWidth, AHeight: integer; AStream: PStream); virtual;
     procedure DrawImageStreamT(APX, APY, AWidth, AHeight: integer; AStream: PStream); virtual;
-    procedure CopyToOffScreen(var ASource, ADest: TRect); virtual;
-    procedure CopyFromOffScreen(var ASource, ADest: TRect); virtual;
+    procedure CopyToOffScreen(const ASource, ADest: TRect); virtual;
+    procedure CopyFromOffScreen(const ASource, ADest: TRect); virtual;
     procedure SetDisplayPage(APage: word); virtual;
     procedure SetDrawPage(APage: word); virtual;
     procedure WaitForVSync; virtual;
@@ -115,6 +128,10 @@ begin
   Granularity := mode^.Granularity;
   FullGranularity := mode^.FullGranularity;
   BankShift := mode^.BankShift;
+  BanksPerPage := mode^.BanksPerPage;
+  NumPages := mode^.NumPages;
+  MaxPage := mode^.MaxPage;
+  PageCount := mode^.PageCount;
 end;
 
 destructor TSvga8Mode.Free;
@@ -124,10 +141,10 @@ end;
 
 function TSvga8Mode.PageBank(APage: word): word;
 begin
-  PageBank := Min(APage * BanksPerPage, MaxPage);
+  PageBank := Min(APage, MaxPage) * BanksPerPage;
 end;
 
-function TSvga8Mode.PopulateMode(var AVbeMode: TVbeMode; AIndex: integer): boolean;
+function TSvga8Mode.PopulateMode(var AVbeMode: TVbeMode; var AVbeInfo: TVbeInfo; AIndex: integer): boolean;
 var
   colors: string;
   recordPtr: pointer;
@@ -173,7 +190,7 @@ begin
   BanksPerPage := ScreenSize div FullGranularity;
   if ScreenSize mod FullGranularity <> 0 then
     Inc(BanksPerPage);
-  PageCount := (NumPages * ScreenSize) div (FullGranularity * BanksPerPage);
+  PageCount := (AVbeInfo.TotalMemory * 64) div (BanksPerPage * Granularity);
   if PageCount = 0 then begin
     PageCount := 1;
     MaxPage := 0;
@@ -191,7 +208,7 @@ begin
     ModeFromVbeMode := nil;
     exit;
   end;
-  if not newMode^.PopulateMode(AVbeMode, AIndex) then
+  if not newMode^.PopulateMode(AVbeMode, FVbeInfo, AIndex) then
     FreeAndNil(newMode);
   ModeFromVbeMode := newMode;
 end;
@@ -209,9 +226,10 @@ var
   vbeMode: TVbeMode;
 begin
   inherited Init;
-  FCurrentBank := -1;
+  SvgaState^.FCurrentBank := 0;
   FMaxOffset := 0;
   vbeInfoPtr := @vbeInfo;
+  FillChar(FVbeInfo, SizeOf(FVbeInfo), 0);
   asm
     mov ax, 4F00h
     les di, vbeInfoPtr
@@ -219,6 +237,7 @@ begin
     mov [supported], al
     mov [callStatus], ah
   end;
+  FVbeInfo := vbeInfo;
   if (supported <> $4F) or (callStatus <> 0) then begin
     Raise(ecGraphicsNotSupported);
     exit;
@@ -256,7 +275,7 @@ end;
 
 function TSVga8Driver.CreateGraphicsState: PGraphicsState;
 begin
-  CreateGraphicsState := inherited CreateGraphicsState;
+  CreateGraphicsState := new(PSVga8State, Create(@self));
 end;
 
 function TSvga8Driver.GetScreenPointer(APX, APY: integer): PByte;
@@ -306,11 +325,11 @@ begin
   State^.Bpp := AMode^.Bpp;
   SetVgaPalette;
   FWinFunc := SvgaMode^.WinFunc;
-  FCurrentBank := -1;
+  SvgaState^.FCurrentBank := 0;
   FMaxOffset := word(SvgaMode^.FullGranularity - 1);
-  FOffscreenPage := 0;
+  OffscreenPage := 0;
   if SvgaMode^.PageCount > 1 then
-    FOffscreenPage := 1;
+    OffscreenPage := 1;
 end;
 
 function TSVga8Driver.SVgaMode: PSVga8Mode;
@@ -336,7 +355,7 @@ begin
   offset := GetOffset(APX, APY);
   bank := offset shr 16;
   Inc(bank, SvgaMode^.PageBank(APage));
-  if bank <> FCurrentBank then
+  if bank <> SvgaState^.FCurrentBank then
     SetBank(bank);
   SetBankByCoord := offset;
 end;
@@ -345,9 +364,9 @@ procedure TSVga8Driver.SetBank(ABank: word);
 var
   winFunc: pointer;
 begin
-  if ABank = FCurrentBank then
+  if ABank = SvgaState^.FCurrentBank then
     exit;
-  FCurrentBank := ABank;
+  SvgaState^.FCurrentBank := ABank;
   ABank := ABank shl SvgaMode^.BankShift;
   winFunc := FWinFunc;
   asm
@@ -364,80 +383,21 @@ procedure TSVga8Driver.RenderText(APX, APY, ALength: integer; AText: PChar);
 var
   drawRect: TRect;
   ch: char;
-  maxY, sx, sy, minX, maxX: integer;
-  width: integer;
-  shift, height: word;
-  screen: PByte;
-  charIndex, fore: byte;
-  highBit: word;
+  sx, sy, minX, maxX, maxY, xIndex, charIndex, width, height: integer;
+  currentLine, shift, initialShift: word;
+  linePtr, screen: PByte;
+  fore: byte;
   offset: longint;
-
-  procedure DrawCharLineB;
-  var
-    currentLine: byte;
-    linePtr: PByte;
-    xIndex: integer;
-  begin
-    linePtr := PByte(State^.Font^.FontData);
-    Inc(linePtr, Ord(ch) * height + (sy - APY));
-    currentLine := linePtr^;
-    Inc(linePtr);
-    shift := $80 shr minX;
-    for xIndex := minX to maxX do begin
-      if currentLine and shift > 0 then
-        screen^ := fore;
-      Inc(screen);
-      Inc(offset);
-      shift := shift shr 1;
-      if offset > FMaxOffset then
-        screen := InternalGetScreenPointer(sx + xIndex + 1, sy, true, offset);
-    end;
-    Inc(sy);
-  end;
-
-  procedure DrawCharLineW;
-  var
-    currentLine: word;
-    linePtr: PWord;
-    xIndex: integer;
-  begin
-    linePtr := State^.Font^.FontData;
-    Inc(linePtr, Ord(ch) * height + (sy - APY));
-    currentLine := linePtr^;
-    Inc(linePtr);
-    shift := $8000 shr minX;
-    for xIndex := minX to maxX do begin
-      if currentLine and shift > 0 then
-        screen^ := fore;
-      Inc(screen);
-      Inc(offset);
-      shift := shift shr 1;
-      if offset > FMaxOffset then
-        screen := InternalGetScreenPointer(sx + xIndex + 1, sy, true, offset);
-    end;
-    Inc(sy);
-  end;
-
-  procedure DrawCharLine;
-  begin
-    if State^.Font^.BytesPerCharacter = 1 then
-      DrawCharLineB
-    else
-      DrawCharLineW;
-  end;
-
+  font: PFont;
 begin
   if HasException then
     exit;
   GetDrawRect(drawRect);
-  if drawRect.IsEmpty then
-    exit;
-  if APX > drawRect.Right then
-    exit;
-  if APY > drawRect.Bottom then
-    exit;
-  height := State^.Font^.Height;
-  if APY + height < drawRect.Y then
+  font := State^.Font;
+  height := font^.Height;
+  if drawRect.IsEmpty
+    or (APX > drawRect.Right)
+    or not RangeContains(APY, drawRect.Y - height, drawRect.Bottom) then
     exit;
   sx := APX;
   charIndex := 0;
@@ -446,7 +406,7 @@ begin
   while charIndex < ALength  do begin
     ch := AText[charIndex];
     Inc(charIndex);
-    width := State^.Font^.TextWidth(ch);
+    width := CharWidth(ch);
     if sx > drawRect.Right then
       exit;
     if sx + width < drawRect.X then begin
@@ -456,9 +416,27 @@ begin
     minX := Max(0, drawRect.X - sx);
     maxX := Min(width - 1, drawRect.Right - sx);
     sy := Max(drawRect.Y, APY);
+    initialShift := 1 shl (font^.BytesPerCharLine * 8 - 1);
+    linePtr := font^.FontData;
+    Inc(linePtr, font^.BytesPerCharLine * (Ord(ch) * height + (sy - APY)));
     while sy <= maxY do begin
       screen := InternalGetScreenPointer(sx + minX, sy, true, offset);
-      DrawCharLine;
+      if font^.BytesPerCharLine > 1 then
+        currentLine := PWord(linePtr)^
+      else
+        currentLine := linePtr^;
+      Inc(linePtr, font^.BytesPerCharLine);
+      shift := initialShift shr minX;
+      for xIndex := minX to maxX do begin
+        if currentLine and shift > 0 then
+          screen^ := fore;
+        Inc(screen);
+        Inc(offset);
+        shift := shift shr 1;
+        if offset > FMaxOffset then
+          screen := InternalGetScreenPointer(sx + xIndex + 1, sy, true, offset);
+      end;
+      Inc(sy);
     end;
     Inc(sx, width);
   end;
@@ -520,24 +498,32 @@ end;
 procedure TSVga8Driver.FillPattern(ARect: TRect);
 var
   screen: PByte;
-  px, py, sy, width, partialWidth, index: integer;
+  py, width, partialWidth, index: integer;
   offset: longint;
+  drawRect: TRect;
 begin
+  if HasException then
+    exit;
+  State^.Bounds.GetIntersection(State^.ViewPort, drawRect);
+  drawRect.Intersect(Mode^.Bounds);
+  if drawRect.IsEmpty then
+    exit;
+  if not drawRect.IntersectsRect(ARect) then
+    exit;
+  ARect.Intersect(drawRect);
   width := ARect.Width;
-  for index := 0 to ARect.Height - 1 do begin
-    sy := ARect.Y + index;
-    screen := InternalGetScreenPointer(ARect.X, sy, true, offset);
-    px := ARect.X mod 16;
-    py := sy mod 16;
+  for index := ARect.Y to ARect.Y + ARect.Height - 1 do begin
+    screen := InternalGetScreenPointer(ARect.X, index, true, offset);
+    py := index mod 16;
     if width + offset > FMaxOffset then begin
       partialWidth := FMaxOffset - offset + 1;
-      HLinePattern(partialWidth, screen, State^.FillPattern^[py], px);
-      SetBank(FCurrentBank + 1);
+      HLinePattern(State^.FillPattern^[py], ARect.X, index, partialWidth);
+      SetBank(SvgaState^.FCurrentBank + 1);
       screen := Mode^.FrameBuffer;
-      HLinePattern(width - partialWidth, screen, State^.FillPattern^[py], px);
+      HLinePattern(State^.FillPattern^[py], ARect.X + partialWidth, index, width - partialWidth);
     end
     else
-      HLinePattern(width, screen, State^.FillPattern^[py], px);
+      HLinePattern(State^.FillPattern^[py], ARect.X, index, width);
   end;
 end;
 
@@ -569,7 +555,7 @@ begin
     if width + offset > FMaxOffset then begin
       partialWidth := FMaxOffset - offset + 1;
       FillChar(screen^, partialWidth, color);
-      SetBank(FCurrentBank + 1);
+      SetBank(SvgaState^.FCurrentBank + 1);
       screen := Mode^.FrameBuffer;
       FillChar(screen^, width - partialWidth, color);
     end
@@ -578,23 +564,39 @@ begin
   end;
 end;
 
-procedure TSVga8Driver.VLinePattern(AHeight: integer; APattern: word; APX, APY: integer);
+procedure TSvga8Driver.VLinePattern(APattern: word; APX, APY, AHeight: integer);
 var
   patternIndex: integer;
   fore, back: byte;
   screen: PByte;
   py: integer;
   offset: longint;
+  drawRect: TRect;
 begin
+  GetDrawRect(drawRect);
   fore := State^.ForeColor;
   back := State^.BackColor;
+  if HasException or (APX < drawRect.X) or (APX > drawRect.Right) then
+    exit;
+  if APY < drawRect.Y then begin
+    Dec(AHeight, drawRect.Y - APY);
+    APY := drawRect.Y;
+  end;
+  if APY + AHeight - 1 > drawRect.Bottom then
+    AHeight := drawRect.Bottom - APY + 1;
+  if AHeight <= 0 then
+    exit;
   screen := InternalGetScreenPointer(APX, APY, true, offset);
   for patternIndex := 0 to AHeight - 1 do begin
     py := APY mod 16;
-    if APattern and (1 shl py) > 0 then
-      screen^ := fore
-    else
-      screen^ := back;
+    if APattern and (1 shl py) > 0 then begin
+      if State^.Inverse then
+        screen^ := screen^ xor 15
+      else if fore <> TransparentColor then
+        screen^ := fore;
+    end
+    else if back <> TransparentColor then
+     screen^ := back;
     Inc(screen, Mode^.Width);
     Inc(offset, Mode^.Width);
     Inc(APY);
@@ -605,15 +607,17 @@ begin
   end;
 end;
 
-procedure TSVga8Driver.HLine(APX, APY, AWidth: integer);
+procedure TSVga8Driver.HLinePattern(APattern: TLinePattern; APX, APY, AWidth: integer);
 var
-  screen: PByte;
-  partialWidth, lineWidth: integer;
-  color: byte;
+  patternIndex: integer;
   drawRect: TRect;
+  fore, back: byte;
+  screen: PByte;
   px: integer;
   offset: longint;
 begin
+  fore := State^.ForeColor;
+  back := State^.BackColor;
   GetDrawRect(drawRect);
   if HasException or (APY < drawRect.Y) or (APY > drawRect.Bottom) then
     exit;
@@ -626,12 +630,53 @@ begin
   if AWidth <= 0 then
     exit;
   screen := InternalGetScreenPointer(APX, APY, true, offset);
+  for patternIndex := APX to APX + AWidth - 1 do begin
+    px := patternIndex mod 16;
+    if APattern and (1 shl px) > 0 then begin
+      if State^.Inverse then
+        screen^ := screen^ xor 15
+      else if fore <> TransparentColor then
+        screen^ := fore;
+    end
+    else if back <> TransparentColor then
+      screen^ := back;
+    Inc(screen);
+    Inc(offset);
+    if offset > FMaxOffset then begin
+      offset := 0;
+      SetBank(SvgaState^.FCurrentBank + 1);
+      screen := Mode^.FrameBuffer;
+    end;
+  end;
+end;
+
+procedure TSVga8Driver.HLine(APX, APY, AWidth: integer);
+var
+  screen: PByte;
+  partialWidth, lineWidth: integer;
+  color: byte;
+  drawRect: TRect;
+  offset: longint;
+begin
+  color := byte(State^.ForeColor);
+  if color = TransparentColor then
+    exit;
   if Assigned(State^.LinePattern) then begin
-    px := APX mod 16;
-    HLinePattern(AWidth, screen, State^.LinePattern^, px);
+    HLinePattern(State^.LinePattern^, APX, APY, AWidth);
     exit;
   end;
-  color := byte(State^.ForeColor);
+  GetDrawRect(drawRect);
+  if HasException or (APY < drawRect.Y) or (APY > drawRect.Bottom) then
+    exit;
+  if APX < drawRect.X then begin
+    Dec(AWidth, drawRect.X - APX);
+    APX := drawRect.X;
+  end;
+  if APX + AWidth - 1 > drawRect.Right then
+    AWidth := drawRect.Right - APX + 1;
+  if AWidth <= 0 then
+    exit;
+  screen := InternalGetScreenPointer(APX, APY, true, offset);
   if AWidth + offset > FMaxOffset then begin
     partialWidth := FMaxOffset - offset + 1;
     asm
@@ -640,7 +685,7 @@ begin
       mov al, color
       rep stosb
      end;
-    SetBank(FCurrentBank + 1);
+    SetBank(SvgaState^.FCurrentBank + 1);
     screen := Mode^.FrameBuffer;
     Dec(AWidth, partialWidth);
     asm
@@ -660,6 +705,12 @@ var
   screen: PByte;
   drawRect: TRect;
 begin
+  if State^.ForeColor = TransparentColor then
+    exit;
+  if Assigned(State^.LinePattern) then begin
+    VLinePattern(State^.LinePattern^, APX, APY, AHeight);
+    exit;
+  end;
   GetDrawRect(drawRect);
   if HasException or (APX < drawRect.X) or (APX > drawRect.Right) then
     exit;
@@ -671,11 +722,6 @@ begin
     AHeight := drawRect.Bottom - APY + 1;
   if AHeight <= 0 then
     exit;
-  if Assigned(State^.LinePattern) then begin
-    screen := GetScreenPointer(APX, APY);
-    VLinePattern(AHeight, State^.LinePattern^, APX, APY);
-    exit;
-  end;
   for index := APY to APY + AHeight - 1 do begin
     screen := GetScreenPointer(APX, index);
     screen^ := ForeColor;
@@ -710,7 +756,7 @@ begin
   end;
   for index := 0 to AWidth - 1 do begin
     if offset > FMaxOffset then begin
-      SetBank(FCurrentBank + 1);
+      SetBank(SvgaState^.FCurrentBank + 1);
       screen := Mode^.FrameBuffer;
       offset := 0;
     end;
@@ -744,7 +790,7 @@ begin
       partialWidth := FMaxOffset - offset + 1;
       Move(image^, screen^, partialWidth);
       Inc(image, partialWidth);
-      SetBank(FCurrentBank + 1);
+      SetBank(SvgaState^.FCurrentBank + 1);
       screen := Mode^.FrameBuffer;
       Move(image^, screen^, lineWidth - partialWidth);
       Inc(image, lineWidth - partialWidth);
@@ -811,7 +857,7 @@ begin
     if offset + lineWidth > FMaxOffset then begin
       partialWidth := FMaxOffset - offset + 1;
       AStream^.Read(screen, partialWidth);
-      SetBank(FCurrentBank + 1);
+      SetBank(SvgaState^.FCurrentBank + 1);
       screen := Mode^.FrameBuffer;
       AStream^.Read(screen, lineWidth - partialWidth);
     end
@@ -895,126 +941,87 @@ begin
   inherited SetDrawPage(APage);
 end;
 
-procedure TSVga8Driver.CopyFromOffScreen(var ASource, ADest: TRect);
+procedure TSVga8Driver.CopyRect(const ASource, ADest: TRect; ASourcePage, ADestPage: word);
 var
-  yIndex: integer;
-  sy, dy: word;
-  lineWidth, partialWidth: integer;
-  lineBuffer: PByte;
-  screen: PByte;
-  bank: word;
-  offset: longint;
+  sx, dx, sy, dy: word;
+  buffer, ptr: PByte;
+  sourcePtr, destPtr: PByte;
+  source, dest: TRect;
+  soffset, doffset: longint;
+  lineWidth, partial: word;
+  index: integer;
 begin
   if HasException then
     exit;
-  ASource.Intersect(Mode^.Bounds);
-  ADest.Intersect(Mode^.Bounds);
-  ASource.Width := Min(ASource.Width, ADest.Width);
-  ASource.Height := Min(ASource.Height, ADest.Height);
-  ADest.Width := ASource.Width;
-  ADest.Height := ASource.Height;
-  if ASource.IsEmpty then
+  if Mode^.PageCount < 2 then
+    exit;
+  source.CreateRect(ASource);
+  dest.CreateRect(ADest);
+  source.Intersect(Mode^.Bounds);
+  dest.Intersect(Mode^.Bounds);
+  source.Width := Min(source.Width, dest.Width);
+  source.Height := Min(source.Height, dest.Height);
+  dest.Width := source.Width;
+  dest.Height := source.Height;
+  if source.IsEmpty then
+    exit;
+
+  sx := source.X;
+  sy := source.Y;
+  dx := dest.X;
+  dy := dest.Y;
+
+  lineWidth := source.Width * Mode^.Bpp div 8;
+  GetMem(buffer, lineWidth);
+  if NilPtr(buffer, ecNotEnoughMemory) then
     exit;
 
   PushState;
-  sy := ASource.Y;
-  dy := ADest.Y;
-  lineWidth := ASource.Width;
-  GetMem(lineBuffer, lineWidth);
-  if NilPtr(lineBuffer, ecNotEnoughMemory) then
-    exit;
-  for yIndex := 0 to ASource.Height - 1 do begin
-    SetDrawPage(FOffScreenPage);
-    screen := InternalGetScreenPointer(ASource.X, sy, true, offset);
-    bank := FCurrentBank;
-    if offset + lineWidth > FMaxOffset then begin
-      partialWidth := FMaxOffset - offset + 1;
-      Move(screen^, lineBuffer^, partialWidth);
 
-      SetDrawPage(0);
-      screen := InternalGetScreenPointer(ADest.X, dy, true, offset);
-      Move(lineBuffer^, screen^, partialWidth);
-
-      SetBank(bank + 1);
-      screen := Mode^.FrameBuffer;
-      Move(screen^, lineBuffer^, lineWidth - partialWidth);
-
-      SetDrawPage(0);
-      screen := InternalGetScreenPointer(ADest.X + partialWidth, dy, true, offset);
-      Move(lineBuffer^, screen^, lineWidth - partialWidth);
+  for index := sy to source.Bottom do begin
+    SetDrawPage(ASourcePage);
+    sourcePtr := InternalGetScreenPointer(sx, sy, true, soffset);
+    ptr := buffer;
+    if soffset + lineWidth > FMaxOffset then begin
+      partial := FMaxOffset - soffset + 1;
+      Move(sourcePtr^, ptr^, partial);
+      SetBank(SvgaState^.FCurrentBank + 1);
+      Inc(ptr, partial);
+      sourcePtr := Mode^.FrameBuffer;
+      Move(sourcePtr^, ptr^, lineWidth - partial);
     end
-    else begin
-      Move(screen^, lineBuffer^, lineWidth);
-      SetDrawPage(0);
-      screen := InternalGetScreenPointer(ADest.X, dy, true, offset);
-      Move(lineBuffer^, screen^, lineWidth);
-    end;
-    Inc(sy);
+    else
+      Move(sourcePtr^, buffer^, lineWidth);
+
+    SetDrawPage(ADestPage);
+    destPtr := InternalGetScreenPointer(dx, dy, true, doffset);
+    ptr := buffer;
+    if doffset + lineWidth > FMaxOffset then begin
+      partial := FMaxOffset - doffset + 1;
+      Move(buffer^, destPtr^, partial);
+      SetBank(SvgaState^.FCurrentBank + 1);
+      Inc(ptr, partial);
+      destPtr := Mode^.FrameBuffer;
+      Move(ptr^, destPtr^, lineWidth - partial);
+    end
+    else
+      Move(ptr^, destPtr^, lineWidth);
     Inc(dy);
+    Inc(sy);
   end;
-  FreeMem(lineBuffer, lineWidth);
+
+  FreeMem(buffer, lineWidth);
   PopState;
 end;
 
-procedure TSVga8Driver.CopyToOffScreen(var ASource, ADest: TRect);
-var
-  yIndex: integer;
-  sy, dy: word;
-  lineWidth, partialWidth: integer;
-  lineBuffer: PByte;
-  screen: PByte;
-  bank: word;
-  offset: longint;
+procedure TSVga8Driver.CopyFromOffScreen(const ASource, ADest: TRect);
 begin
-  if HasException then
-    exit;
-  ASource.Intersect(Mode^.Bounds);
-  ADest.Intersect(Mode^.Bounds);
-  ASource.Width := Min(ASource.Width, ADest.Width);
-  ASource.Height := Min(ASource.Height, ADest.Height);
-  ADest.Width := ASource.Width;
-  ADest.Height := ASource.Height;
+  CopyRect(ASource, ADest, OffscreenPage, 0);
+end;
 
-  if ASource.IsEmpty then
-    exit;
-  PushState;
-  sy := ASource.Y;
-  dy := ADest.Y;
-  lineWidth := ASource.Width;
-  GetMem(lineBuffer, lineWidth);
-  if NilPtr(lineBuffer, ecNotEnoughMemory) then
-    exit;
-  for yIndex := 0 to ASource.Height - 1 do begin
-    SetDrawPage(0);
-    screen := InternalGetScreenPointer(ASource.X, sy, true, offset);
-    bank := FCurrentBank;
-    if offset + lineWidth > FMaxOffset then begin
-      partialWidth := FMaxOffset - offset + 1;
-      Move(screen^, lineBuffer^, partialWidth);
-
-      SetDrawPage(FOffScreenPage);
-      screen := InternalGetScreenPointer(ADest.X, dy, true, offset);
-      Move(lineBuffer^, screen^, partialWidth);
-
-      SetBank(bank + 1);
-      screen := Mode^.FrameBuffer;
-      Move(screen^, lineBuffer^, lineWidth - partialWidth);
-
-      SetDrawPage(FOffScreenPage);
-      screen := InternalGetScreenPointer(ADest.X + partialWidth, dy, true, offset);
-      Move(lineBuffer^, screen^, lineWidth - partialWidth);
-    end
-    else begin
-      Move(screen^, lineBuffer^, lineWidth);
-      SetDrawPage(FOffScreenPage);
-      screen := InternalGetScreenPointer(ADest.X, dy, true, offset);
-      Move(lineBuffer^, screen^, lineWidth);
-    end;
-    Inc(sy);
-    Inc(dy);
-  end;
-  FreeMem(lineBuffer, lineWidth);
-  PopState;
+procedure TSVga8Driver.CopyToOffScreen(const ASource, ADest: TRect);
+begin
+  CopyRect(ASource, ADest, 0, OffscreenPage);
 end;
 
 procedure TSVga8Driver.GetImage(APX, APY, AWidth, AHeight: longint; ABuffer: PByte);
@@ -1041,7 +1048,7 @@ begin
       partialWidth := FMaxOffset - offset + 1;
       Move(screen^, image^, partialWidth);
       Inc(image, partialWidth);
-      SetBank(FCurrentBank + 1);
+      SetBank(SvgaState^.FCurrentBank + 1);
       screen := Mode^.FrameBuffer;
       Move(screen^, image^, lineWidth - partialWidth);
       Inc(image, lineWidth - partialWidth);
@@ -1078,7 +1085,7 @@ begin
     if offset + lineWidth > FMaxOffset then begin
       partialWidth := FMaxOffset - offset + 1;
       AStream^.Write(screen, partialWidth);
-      SetBank(FCurrentBank + 1);
+      SetBank(SvgaState^.FCurrentBank + 1);
       screen := Mode^.FrameBuffer;
       AStream^.Write(screen, lineWidth - partialWidth);
     end
@@ -1090,20 +1097,50 @@ begin
     Raise(AStream^.Exception^.Code);
 end;
 
-procedure TSVga8Driver.WaitForVSync;
+procedure TSVga8Driver.WaitForVSync; assembler;
+asm
+  mov dx, 3DAh
+  @loop:
+  in al, dx
+  test al, 8h
+  jz @loop
+end;
+
+function TSvga8Driver.SvgaState: PSvga8State;
 begin
-  asm
-    mov dx, 3DAh
-    @end:
-    in al, dx
-    test al, 8h
-    jz @end
-  end;
+  SvgaState := PSvga8State(State);
 end;
 
 destructor TSVga8Driver.Free;
 begin
   inherited Free;
+end;
+
+constructor TSvga8State.Create(AOwner: PSVga8Driver);
+begin
+  inherited Create;
+  FOwner := AOwner;
+end;
+
+procedure TSvga8State.Init;
+begin
+  inherited Init;
+  FCurrentBank := 0;
+  FOwner := nil;
+end;
+
+destructor TSvga8State.Free;
+begin
+  inherited Free;
+end;
+
+procedure TSvga8State.Assign(var ASource: TObject);
+var
+  source: PSvga8State;
+begin
+  inherited Assign(ASource);
+  source := PSvga8State(@ASource);
+  FOwner := source^.FOwner;
 end;
 
 begin

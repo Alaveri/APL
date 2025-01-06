@@ -24,7 +24,6 @@ type
   TMouseCursor = object(TIdentifiable)
   private
     FBackData: PByte;
-    FBackBuffer: PByte;
   public
     Visible: boolean;
     X, Y: integer;
@@ -33,7 +32,6 @@ type
     Width, Height: word;
     constructor Create(AId: string; AWidth, AHeight: integer; AImage: PByte);
     destructor Free; virtual;
-    function BackBuffer: PByte;
     function BackData: PByte;
     procedure GetBounds(var ARect: TRect);
     procedure Draw;
@@ -66,6 +64,7 @@ type
     function SetMode(AModeId: integer): boolean; virtual;
     procedure Init; virtual;
     procedure InitMouseCursors;
+    procedure Initialized ; virtual;
     procedure ShowMouseCursor; virtual;
     procedure HideMouseCursor; virtual;
     procedure EraseMouseCursor(const AMouseState: TMouseState); virtual;
@@ -152,7 +151,7 @@ const
     ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF)
   );
 
-  DefaultNSCursor: TMouseCursorImage =
+  DefaultEWCursor: TMouseCursorImage =
   (
     ($FF, $FF, $FF, $FF, $FF, $0F, $FF, $FF, $FF, $0F, $FF, $FF, $FF, $FF, $FF),
     ($FF, $FF, $FF, $FF, $0F, $0F, $FF, $FF, $FF, $0F, $0F, $FF, $FF, $FF, $FF),
@@ -171,7 +170,7 @@ const
     ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF)
   );
 
-  DefaultEWCursor: TMouseCursorImage =
+  DefaultNSCursor: TMouseCursorImage =
   (
     ($FF, $FF, $FF, $FF, $FF, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
     ($FF, $FF, $FF, $FF, $0F, $00, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
@@ -195,6 +194,9 @@ var
   Graph8: PGraphics8Driver;
 
 implementation
+
+uses
+  AplConst;
 
 constructor TGraphApp.Create(ADriverId: TGraphDrivers);
 begin
@@ -238,7 +240,6 @@ end;
 procedure TGraphApp.Init;
 begin
   inherited Init;
-  InitMouseCursors;
 end;
 
 procedure TGraphApp.InitMouseCursors;
@@ -263,10 +264,10 @@ begin
   MouseCursors^.Add(cursor);
   cursor := New(PMouseCursor, Create('NS', 15, 15, @DefaultNSCursor));
   cursor^.OffsetX := 6;
-  cursor^.OffsetY := 8;
+  cursor^.OffsetY := 7;
   MouseCursors^.Add(cursor);
   cursor := New(PMouseCursor, Create('EW', 15, 15, @DefaultEWCursor));
-  cursor^.OffsetX := 8;
+  cursor^.OffsetX := 7;
   cursor^.OffsetY := 6;
   MouseCursors^.Add(cursor);
   MouseCursor := MouseCursors^.GetItemById('Default');
@@ -275,6 +276,11 @@ end;
 destructor TGraphApp.Free;
 begin
   inherited Free;
+end;
+
+procedure TGraphApp.Initialized;
+begin
+  InitMouseCursors;
 end;
 
 procedure TGraphApp.RedrawMouseCursor(var AViewPort: TRect;
@@ -296,8 +302,6 @@ end;
 
 procedure TGraphApp.MoveMouseCursor(const AMouseState, AOldMouseState: TMouseState;
   AWaitForVSync: boolean);
-var
-  oldRect, newRect: TRect;
 begin
   if not (MouseCursor^.Visible and AMouseState.Visible) then
     exit;
@@ -358,7 +362,7 @@ begin
   Width := AWidth;
   Height := AHeight;
   Image := AImage;
-  GetMem(FBackData, Width * Height);
+  GetMem(FBackData, Width * Height * Graph^.Mode^.Bpp div 8);
 end;
 
 procedure TMouseCursor.Init;
@@ -372,7 +376,6 @@ begin
   OffsetX := 0;
   OffsetY := 0;
   FBackData := nil;
-  FBackBuffer := nil;
 end;
 
 procedure TMouseCursor.Paint;
@@ -412,14 +415,7 @@ destructor TMouseCursor.Free;
 begin
   if Assigned(FBackData) then
     FreeMem(FBackData, Width * Height);
-  if Assigned(FBackBuffer) then
-    FreeMem(FBackBuffer, Width * Height * 2);
   inherited Free;
-end;
-
-function TMouseCursor.BackBuffer: PByte;
-begin
-  BackBuffer := FBackBuffer;
 end;
 
 function TMouseCursor.BackData: PByte;

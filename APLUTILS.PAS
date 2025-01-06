@@ -48,13 +48,6 @@ function EndZeroPad(AInt: longint; ALength: byte): string;
 function FormatLong(ALong: longint): string;
 function StartsWith(const AString, AStartsWith: string): boolean;
 function EndsWith(const AString, AEndsWith: string): boolean;
-procedure Swap(var ANum1: integer; var ANum2: integer);
-procedure SwapShort(var ANum1: shortint; var ANum2: shortint);
-procedure SwapByte(var ANum1: byte; var ANum2: byte);
-procedure SwapWord(var ANum1: word; var ANum2: word);
-procedure SwapLong(var ANum1: longint; var ANum2: longint);
-procedure SwapPointer(var APointer1: pointer; var APointer2: pointer);
-procedure FillCharLarge(var APtr; ACount: longint; AValue: byte);
 function GetCurrentDirectory: string;
 function ChangeDirectory(const ADirectory: string): boolean;
 function StringsEqualInsensitive(const AString1, AString2: string): boolean;
@@ -62,6 +55,15 @@ function HasWildcard(const AFilename: string): boolean;
 function IsDirectory(const AFilename: string): boolean;
 function IsWhitespace(const AString: string): boolean;
 function AppDir: string;
+procedure Swap(var ANum1: integer; var ANum2: integer);
+procedure SwapShort(var ANum1: shortint; var ANum2: shortint);
+procedure SwapByte(var ANum1: byte; var ANum2: byte);
+procedure SwapWord(var ANum1: word; var ANum2: word);
+procedure SwapLong(var ANum1: longint; var ANum2: longint);
+procedure SwapPointer(var APointer1: pointer; var APointer2: pointer);
+procedure FillCharLarge(var APtr; ACount: longint; AValue: byte);
+procedure Delete(var AString: string; AStart, ACount: integer);
+procedure DeletePChar(var AString: PChar; AStart, ACount: integer);
 
 var
   WhiteSpaceChars: set of char;
@@ -71,6 +73,7 @@ implementation
 uses
   AplConst,
   AplMath,
+  Strings,
   Files;
 
 var
@@ -675,6 +678,18 @@ end;
 function AppDir: string;
 begin
   AppDir := ExtractDirectory(ParamStr(0));
+end;
+
+procedure Delete(var AString: string; AStart, ACount: integer);
+begin
+  AString := Copy(AString, 1, AStart - 1)
+    + Copy(AString, AStart + ACount, Length(AString) - AStart - ACount + 1);
+end;
+
+procedure DeletePChar(var AString: PChar; AStart, ACount: integer);
+begin
+  Move(AString[AStart + ACount], AString[AStart],
+    StrLen(AString) - AStart - ACount + 1);
 end;
 
 procedure Finalize; far;
