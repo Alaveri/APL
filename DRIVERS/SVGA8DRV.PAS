@@ -23,8 +23,6 @@ type
   PSVga8Mode = ^TSvga8Mode;
   PSvga8State = ^TSvga8State;
   PSVga8Driver = ^TSVga8Driver;
-  PSvga8State = ^TSvga8State;
-  PSVga8Driver = ^TSVga8Driver;
 
   TSvga8Mode = object(TGraphicsMode)
   private
