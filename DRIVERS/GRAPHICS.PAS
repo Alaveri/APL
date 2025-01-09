@@ -1134,6 +1134,10 @@ begin
   Transparent := source^.Transparent;
   Height := source^.Height;
   MaxWidth := source^.MaxWidth;
+  AverageWidth := source^.AverageWidth;
+  Spacing := source^.Spacing;
+  BytesPerCharLine := source^.BytesPerCharLine;
+  FFormat := source^.FFormat;
   if Assigned(FFontData) then
     FreeMem(FFontData, FFontDataSize);
   FFontDataSize := source^.FFontDataSize;
@@ -1305,8 +1309,17 @@ begin
 end;
 
 function TMonospaceFont.TextWidthAny(AText: PChar; ALength: word): longint;
+var
+  index: integer;
+  total: integer;
 begin
-  TextWidthAny := ALength * (MaxWidth + Spacing);
+  total := 0;
+  for index := 1 to ALength do begin
+    if (AText^ = #13) or (AText^ = #10) then
+      continue;
+    Inc(total, MaxWidth + Spacing);
+  end;
+  TextWidthAny := total;
 end;
 
 procedure TMonospaceFont.SetCharWidths;
@@ -1415,14 +1428,18 @@ begin
       end;
       Inc(linePtr, BytesPerCharLine);
     end;
-    Inc(AvgTotal);
-    Inc(AvgCount, width);
+    if (width > 0) and not (Chr(charIndex) in WhiteSpaceChars + [#32]) then begin
+      Inc(AvgTotal);
+      Inc(AvgCount, width);
+    end;
     Inc(width);
     CharWidths[charIndex] := width;
   end;
   AverageWidth := Round(avgCount / avgTotal);
   if CharWidths[32] <= 1 then
-    CharWidths[32] := AverageWidth div 2;
+    CharWidths[32] := AverageWidth;
+  CharWidths[10] := 0;
+  CharWidths[13] := 0;
 end;
 
 procedure TFont.SaveToStream(AStream: PStream);
@@ -1596,11 +1613,7 @@ end;
 
 function TSystemFont.TextWidthAny(AText: PChar; ALength: word): longint;
 begin
-  if not Assigned(AText) then begin
-    TextWidthAny := 0;
-    exit;
-  end;
-  TextWidthAny := longint(ALength) * 8;
+  TextWidthAny := inherited TextWidthAny(AText, ALength);
 end;
 
 procedure TSystemFont.SetTextFont(AFontIndex: byte);
