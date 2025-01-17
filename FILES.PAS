@@ -18,7 +18,6 @@ type
   PDirectoryContents = ^TDirectoryContents;
   PFile = ^TFile;
   PFileList = ^TFileList;
-  PFileListProc = ^TFileListProc;
   PFileFilter = ^TFileFilter;
   PFileFilterList = ^TFileFilterList;
 
@@ -32,7 +31,6 @@ type
   );
 
   TFileAttributes = set of TFileAttribute;
-  TFileListProc = procedure(AItem: PFile);
 
   TFile = object(TObject)
   private

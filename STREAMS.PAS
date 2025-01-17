@@ -22,15 +22,25 @@ type
   PMemoryStreamList = ^TMemoryStreamList;
   PStreamListProc = ^TStreamListProc;
   PMemoryStreamListProc = ^TMemoryStreamListProc;
+  PBufferStreamSizeFunc = ^TBufferStreamSizeFunc;
 
   TStreamListProc = procedure(AItem: PStream);
   TMemoryStreamListProc = procedure(AItem: PMemoryStream);
+  TBufferStreamSizeFunc = function(ACapacity: longint): longint;
 
   TSeekOrigin =
   (
     soFromBeginning,
     soFromEnd,
     soFromPosition
+  );
+
+  TFileStreamMode =
+  (
+    fmCreate,
+    fmRead,
+    fmWrite,
+    fmReadWrite
   );
 
   TStream = object(TStatusObject)
@@ -101,17 +111,24 @@ type
     function Fill(ACount: longint; AByte: byte): longint; virtual;
     function FillWord(ACount: longint; AWord: word): longint; virtual;
     function FillLong(ACount: longint; ALong: longint): longint; virtual;
-    procedure SetSize(ASize: longint);
+    procedure SetSize(ASize: longint); virtual;
     procedure Init; virtual;
   end;
 
-  TFileStreamMode =
-  (
-    fmCreate,
-    fmRead,
-    fmWrite,
-    fmReadWrite
-  );
+  TBufferStream = object(TMemoryStream)
+  private
+    FCapacity: longint;
+    procedure SetCapacity(ACapacity: longint);
+    procedure Resize(AMinCapacity: longint);
+  public
+    BufferStreamSizeFunc: PBufferStreamSizeFunc;
+    constructor Create;
+    constructor CreateCapacity(ACapacity: longint);
+    function Write(ABuffer: pointer; ACount: longint): longint; virtual;
+    function WriteToStream(AStream: PStream; ACount: longint): longint; virtual;
+    procedure Init; virtual;
+    destructor Free; virtual;
+  end;
 
   TFileStream = object(TStream)
   private
@@ -162,14 +179,33 @@ type
     procedure Delete(AIndex: integer); virtual;
   end;
 
+function DefaultBufferStreamSizeFunc(ACapacity: word): word; far;
+
 implementation
 
 uses
   Strings,
   AplStr;
 
+function DefaultBufferStreamSizeFunc(ACapacity: word): word;
+var
+  newCapacity: word;
+begin
+  newCapacity := 0;
+  while newCapacity < ACapacity do begin
+    if newCapacity >= 64 then
+      newCapacity := (newCapacity * 3) div 2
+    else if newCapacity >= 8 then
+      newCapacity := newCapacity + 16
+    else
+      newCapacity := newCapacity + 4;
+  end;
+  DefaultBufferStreamSizeFunc := newCapacity;
+end;
+
 const
   DefaultFileStreamBufferSize = 4096;
+  DefaultyBufferStreamCapacity = 4096;
 
 destructor TStream.Free;
 begin
@@ -466,6 +502,8 @@ begin
   end;
   Size := ASize;
   Memory.CommitAllocTransaction;
+  Fill(Size, 0);
+  Position := 0;
 end;
 
 procedure TMemoryStream.DeallocateReferences;
@@ -726,6 +764,97 @@ end;
 function TMemoryStream.CanSeek: boolean;
 begin
   CanSeek := true;
+end;
+
+constructor TBufferStream.Create;
+begin
+  CreateCapacity(DefaultyBufferStreamCapacity);
+end;
+
+constructor TBufferStream.CreateCapacity(ACapacity: longint);
+begin
+  inherited Create(ACapacity);
+end;
+
+procedure TBufferStream.Init;
+begin
+  inherited Init;
+  BufferStreamSizeFunc := @DefaultBufferStreamSizeFunc;
+end;
+
+function TBufferStream.Write(ABuffer: pointer; ACount: longint): longint;
+begin
+  if HasException then
+    exit;
+  if Position + ACount > Size then
+    Resize(Position + ACount);
+  Write := inherited Write(ABuffer, ACount);
+end;
+
+function TBufferStream.WriteToStream(AStream: PStream; ACount: longint): longint;
+begin
+  if HasException then
+    exit;
+  if Position + ACount > Size then
+    Resize(Position + ACount);
+  WriteToStream := inherited WriteToStream(AStream, ACount);
+end;
+
+procedure TBufferStream.Resize(AMinCapacity: longint);
+var
+  newCapacity: longint;
+  reference, last: PReference;
+  newSize, lastSize, refIndex: word;
+  ptr, lastPtr: PByte;
+  initial: boolean;
+begin
+  newCapacity := TBufferStreamSizeFunc(BufferStreamSizeFunc)(AMinCapacity);
+  if newCapacity = Size then
+    exit;
+  if FReferences^.Count = 0 then begin
+    SetSize(newCapacity);
+    exit;
+  end;
+  if newCapacity > Size then begin
+    last := FReferences^.Last;
+    lastSize := last^.Size;
+    lastPtr := Memory.ReferencePointer(last);
+    Memory.FreeReferencePreserve(last);
+    while newCapacity > 0 do begin
+      newSize := MinL(newCapacity, MaxVarSize);
+      reference := Memory.Alloc(newSize);
+      if CheckReRaise(@Memory) then
+        exit;
+      if initial then begin
+        if LastSize > newSize then begin
+          Raise(ecNotEnoughMemory);
+          exit;
+        end;
+        ptr := Memory.ReferencePointer(reference);
+        Move(lastPtr^, ptr^, lastSize);
+        initial := false;
+      end;
+      Dec(newCapacity, lastSize);
+    end;
+  end
+  else begin
+    SetSize(newCapacity);
+  end;
+  Size := newCapacity;
+  if Position > Size then
+    Position := Size;
+end;
+
+destructor TBufferStream.Free;
+begin
+  inherited Free;
+end;
+
+procedure TBufferStream.SetCapacity(ACapacity: longint);
+var
+  newCapacity: longint;
+begin
+  newCapacity := TBufferStreamSizeFunc(BufferStreamSizeFunc)(ACapacity);
 end;
 
 constructor TFileStream.Create(AFilename: string; AMode: TFileStreamMode);

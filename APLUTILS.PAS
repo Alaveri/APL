@@ -55,6 +55,12 @@ function HasWildcard(const AFilename: string): boolean;
 function IsDirectory(const AFilename: string): boolean;
 function IsWhitespace(const AString: string): boolean;
 function AppDir: string;
+function IsAlphaString(const AString: string): boolean;
+function IsAlpha(AString: PChar): boolean;
+function IsAlphaNumeric(AString: PChar): boolean;
+function IsAlphaNumericString(const AString: string): boolean;
+function IsNumericString(const AString: string): boolean;
+function IsNumeric(AString: PChar): boolean;
 procedure Swap(var ANum1: integer; var ANum2: integer);
 procedure SwapShort(var ANum1: shortint; var ANum2: shortint);
 procedure SwapByte(var ANum1: byte; var ANum2: byte);
@@ -690,6 +696,57 @@ procedure DeletePChar(var AString: PChar; AStart, ACount: integer);
 begin
   Move(AString[AStart + ACount], AString[AStart],
     StrLen(AString) - AStart - ACount + 1);
+end;
+
+function IsCharType(AString: PChar; ALength: word; ACharSet: TCharSet): boolean;
+var
+  ptr: PChar;
+  index: word;
+begin
+  if (not Assigned(AString)) or (ALength = 0) then begin
+    IsCharType := false;
+    exit;
+  end;
+  ptr := AString;
+  IsCharType := true;
+  index := 0;
+  while ptr^ <> #0 do begin
+    if (index > ALength) or not (ptr^ in ACharSet) then begin
+      IsCharType := false;
+      exit;
+    end;
+    Inc(ptr);
+  end;
+end;
+
+function IsAlpha(AString: PChar): boolean;
+begin
+  IsAlpha := IsCharType(AString, StrLen(AString), Alpha);
+end;
+
+function IsAlphaString(const AString: string): boolean;
+begin
+  IsAlphaString := IsCharType(@AString[1], Length(AString), Alpha);
+end;
+
+function IsAlphaNumeric(AString: PChar): boolean;
+begin
+  IsAlphaNumeric := IsCharType(AString, StrLen(AString), AlphaNumeric);
+end;
+
+function IsAlphaNumericString(const AString: string): boolean;
+begin
+  IsAlphaNumericString := IsCharType(@AString[1], Length(AString), AlphaNumeric);
+end;
+
+function IsNumeric(AString: PChar): boolean;
+begin
+  IsNumeric := IsCharType(AString, StrLen(AString), Numeric);
+end;
+
+function IsNumericString(const AString: string): boolean;
+begin
+  IsNumericString := IsCharType(@AString[1], Length(AString), Numeric);
 end;
 
 procedure Finalize; far;

@@ -1435,7 +1435,7 @@ begin
     Inc(width);
     CharWidths[charIndex] := width;
   end;
-  AverageWidth := Round(avgCount / avgTotal);
+  AverageWidth := Max(1, Round(avgCount / Max(1, avgTotal)) - 1);
   if CharWidths[32] <= 1 then
     CharWidths[32] := AverageWidth;
   CharWidths[10] := 0;

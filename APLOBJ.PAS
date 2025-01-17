@@ -97,6 +97,7 @@ type
     FBuffer: PChar;
     FLength: word;
     FCapacity: word;
+    FInitialCapacity: word;
     procedure SetCapacity(ACapacity: word);
     function Grow(AMin: word): word;
   public
@@ -427,6 +428,7 @@ constructor TStringBuilder.CreateCapacity(ACapacity: word);
 begin
   inherited Create;
   Grow(ACapacity);
+  FInitialCapacity := ACapacity;
 end;
 
 constructor TStringBuilder.CreateString(const AString: string);
@@ -434,6 +436,7 @@ begin
   inherited Create;
   Grow(System.Length(AString) + 1);
   AppendString(AString);
+  FInitialCapacity := FCapacity;
 end;
 
 procedure TStringBuilder.Init;
@@ -545,8 +548,12 @@ begin
 end;
 
 function TStringBuilder.AppendChar(AChar: char): PStringBuilder;
+var
+  str: array[0..1] of char;
 begin
-  AppendChar := Append(@AChar);
+  str[0] := AChar;
+  str[1] := #0;
+  AppendChar := Append(@str);
 end;
 
 function TStringBuilder.AppendLine(AString: PChar): PStringBuilder;
@@ -670,7 +677,10 @@ end;
 
 function TStringBuilder.Clear: PStringBuilder;
 begin
-  SetCapacity(0);
+  if FCapacity = FInitialCapacity then
+    FillChar(FBuffer^, FCapacity, 0)
+  else
+    SetCapacity(FInitialCapacity);
   FLength := 0;
   Clear := @Self;
 end;

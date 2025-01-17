@@ -17,9 +17,13 @@ type
     constructor Create;
     function Alloc(ALength: word): PChar;
     function New(ASource: string): PChar;
-    function CompareLength(AStr1, AStr2: PChar; AMaxLength: word; ACompareOptions: TStringCompareOptions): integer;
+    function CompareLength(AStr1, AStr2: PChar; AMaxLength: word;
+      ACompareOptions: TStringCompareOptions): integer;
     function Compare(AStr1, AStr2: PChar; ACompareOptions: TStringCompareOptions): integer;
-    function CompareString(AStr1: string; AStr2: PChar; ACompareOptions: TStringCompareOptions): integer;
+    function CompareString(const AStr1: string; AStr2: PChar;
+      ACompareOptions: TStringCompareOptions): integer;
+    function CompareStringLength(const AStr1: string; AStr2: PChar;
+      AMaxLength: word; ACompareOptions: TStringCompareOptions): integer;
     function AppendString(AStr1: PChar; const AStr2: string): PChar;
     function Append(var AStr1: PChar; AStr2: PChar): PChar;
     function Copy(ASource: PChar): PChar;
@@ -157,7 +161,8 @@ begin
   ADest := Copy(ASource);
 end;
 
-function TStringUtil.CompareLength(AStr1, AStr2: PChar; AMaxLength: word; ACompareOptions: TStringCompareOptions): integer;
+function TStringUtil.CompareLength(AStr1, AStr2: PChar; AMaxLength: word;
+  ACompareOptions: TStringCompareOptions): integer;
 begin
   if scIgnoreCase in ACompareOptions then
     CompareLength := StrLIComp(AStr1, AStr2, AMaxLength)
@@ -165,7 +170,8 @@ begin
     CompareLength := StrLComp(AStr1, AStr2, AMaxLength);
 end;
 
-function TStringUtil.Compare(AStr1, AStr2: PChar; ACompareOptions: TStringCompareOptions): integer;
+function TStringUtil.Compare(AStr1, AStr2: PChar;
+  ACompareOptions: TStringCompareOptions): integer;
 begin
   if scIgnoreCase in ACompareOptions then
     Compare := StrIComp(AStr1, AStr2)
@@ -173,14 +179,19 @@ begin
     Compare := StrComp(AStr1, AStr2);
 end;
 
-function TStringUtil.CompareString(AStr1: string; AStr2: PChar;
+function TStringUtil.CompareString(const AStr1: string; AStr2: PChar;
   ACompareOptions: TStringCompareOptions): integer;
+begin
+  CompareString := CompareStringLength(AStr1, AStr2, System.Length(AStr1), ACompareOptions);
+end;
+
+function TStringUtil.CompareStringLength(const AStr1: string; AStr2: PChar;
+  AMaxLength: word; ACompareOptions: TStringCompareOptions): integer;
 var
   str: PChar;
 begin
-  AStr1 := AStr1 + #0;
   str := @AStr1[1];
-  CompareString := Compare(str, AStr2, ACompareOptions);
+  CompareStringLength := CompareLength(str, AStr2, AMaxLength, ACompareOptions);
 end;
 
 procedure TStringUtil.AssignString(var ADest: PChar; ASource: string);
