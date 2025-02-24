@@ -85,16 +85,6 @@ type
     procedure WritePChar(AValue: PChar); virtual;
   end;
 
-  TPersistent = object(TStatusObject)
-  private
-  public
-    function IsPersistent: boolean; virtual;
-    procedure LoadFromFile(const AFileName: string); virtual;
-    procedure LoadFromStream(AStream: PStream); virtual;
-    procedure SaveToFile(const AFileName: string); virtual;
-    procedure SaveToStream(AStream: PStream); virtual;
-  end;
-
   TMemoryStream = object(TStream)
   private
     FReferences: PReferenceList;
@@ -1154,43 +1144,6 @@ end;
 procedure TMemoryStreamList.Delete(AIndex: integer);
 begin
   inherited Delete(AIndex);
-end;
-
-function TPersistent.IsPersistent: boolean;
-begin
-  IsPersistent := true;
-end;
-
-procedure TPersistent.LoadFromFile(const AFileName: string);
-var
-  stream: PFileStream;
-begin
-  stream := New(PFileStream, Create(AFileName, fmRead));
-  if not CheckReRaise(stream) then
-    LoadFromStream(stream);
-  CheckReRaise(stream);
-  FreeAndNil(stream);
-end;
-
-procedure TPersistent.LoadFromStream(AStream: PStream);
-begin
-  Abstract;
-end;
-
-procedure TPersistent.SaveToFile(const AFileName: string);
-var
-  stream: PFileStream;
-begin
-  stream := New(PFileStream, Create(AFileName, fmCreate));
-  if not CheckReRaise(stream) then
-    SaveToStream(stream);
-  CheckReRaise(stream);
-  FreeAndNil(stream);
-end;
-
-procedure TPersistent.SaveToStream(AStream: PStream);
-begin
-  Abstract;
 end;
 
 begin

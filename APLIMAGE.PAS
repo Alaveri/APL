@@ -7,6 +7,7 @@ uses
   AplTypes,
   AplConst,
   AplObj,
+  AplIO,
   Compress,
   Palettes,
   AplUtils,

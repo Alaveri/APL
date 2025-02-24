@@ -921,7 +921,7 @@ begin
   for yIndex := 0 to dest.Height - 1 do begin
     screenPtr := InternalGetScreenPointer(dest.X, dest.Y + yIndex, true, offset);
     imagePtr := image;
-    Inc(imagePtr, yIndex * ASourceBounds.Width + ASourceRect.X);
+    Inc(imagePtr, longint(yIndex) * ASourceBounds.Width + ASourceRect.X);
     if offset + lineWidth > FMaxOffset then begin
       partialWidth := FMaxOffset - offset + 1;
       Move(imagePtr^, screenPtr^, partialWidth);
