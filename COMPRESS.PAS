@@ -18,6 +18,7 @@ type
   TAplCompression = (
     acNone,
     acLzw,
+    acZLib,
     acGif
   );
 
@@ -86,7 +87,8 @@ var
 implementation
 
 uses
-  Lzw;
+  Lzw,
+  ZLib;
 
 const
   DefaultProgressIncrement = 4096;
@@ -356,6 +358,10 @@ begin
       bitSize := LzwCompressionBitSize[ALevel];
       result := New(PLzw, CreateBitSize(bitSize));
       PLzw(result)^.SetLzwCodesProc := @SetLzwCodes;
+      result^.AddTotalToStream := false;
+    end;
+    acZLib: begin
+      result := New(PZlib, Create);
       result^.AddTotalToStream := false;
     end;
     acGif: begin

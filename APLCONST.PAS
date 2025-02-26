@@ -157,6 +157,15 @@ const
   ecKeyNotFound = 1201;
   ecDuplicateKey = 1202;
 
+  { Png Errors }
+  ecInvalidPngSignature = 1301;
+  ecInvalidPngBitDepth = 1302;
+  ecPngNoPaletteChunks = 1303;
+  ecPngNoDataChunks = 1304;
+  ecPngCrcError = 1305;
+  ecPngNoChunks = 1306;
+  ecPngNoHeaderChunk = 1307;
+
   { User defined errors }
   ecUser = 5000;
 
@@ -340,6 +349,13 @@ begin
   AddError(ecImageTooLarge, 'Image too large');
   AddError(ecFileTooLarge, 'File too large');
   AddError(ecMouseError, 'Mouse error');
+  AddError(ecInvalidPngSignature, 'Invalid PNG signature');
+  AddError(ecInvalidPngBitDepth, 'Invalid PNG bit depth');
+  AddError(ecPngNoPaletteChunks, 'PNG file has no palette chunks');
+  AddError(ecPngNoDataChunks, 'PNG file has no data chunks');
+  AddError(ecPngCrcError, 'PNG CRC error');
+  AddError(ecPngNoChunks, 'PNG file has no chunks');
+  AddError(ecPngNoHeaderChunk, 'PNG file has no header chunk');
   AddError(ecCompressedDataTooLarge, 'Compressed data too large');
 end;
 
