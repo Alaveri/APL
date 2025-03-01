@@ -69,7 +69,6 @@ type
     constructor CreateAll(ABitSize: byte; ASetCodesProc: PSetLzwCodesProc);
     destructor Free; virtual;
     function CompressStream(ASource, ADest: PStream; ALength: longint): longint; virtual;
-    function GetOriginalSize(ASource: PStream): longint; virtual;
     procedure Init; virtual;
     procedure DecompressStream(ASource, ADest: PStream; AOriginalSize: longint); virtual;
     procedure SetCompressionLevel(ALevel: TCompressionLevel); virtual;
@@ -142,7 +141,6 @@ begin
   FNextCode := 0;
   FCurrentBitSize := BitSize;
   SetLzwCodesProc := nil;
-  AddTotalToStream := true;
 end;
 
 function TLzw.AllocateDecodeBuffer: boolean;
@@ -283,23 +281,6 @@ begin
   FOverflow := false;
 end;
 
-function TLzw.GetOriginalSize(ASource: PStream): longint;
-var
-  bits: byte;
-  total: longint;
-  startPos: longint;
-begin
-  GetOriginalSize := 0;
-  startPos := ASource^.Position;
-  bits := ASource^.ReadByte;
-  total := ASource^.ReadLong;
-  ASource^.Seek(startPos, soFromBeginning);
-  CheckReRaise(ASource);
-  if HasException then
-    exit;
-  GetOriginalSize := total;
-end;
-
 function TLzw.CompressStream(ASource, ADest: PStream; ALength: longint): longint;
 var
   character: byte;
@@ -324,9 +305,6 @@ begin
     Raise(ADest^.Exception^.Code);
     exit;
   end;
-
-  if AddTotalToStream then
-    ADest^.WriteLong(ALength);
 
   while ReadTotal < ALength do begin
     character:= ReadByte;
@@ -368,6 +346,7 @@ begin
   WriteBits(code, FCurrentBitSize);
   WriteBits(FCodes.EndOfStream, FCurrentBitSize);
   EndWriteBits;
+  EndCompression;
   UpdateProgress(ALength, ReadTotal);
   CompressStream := ADest^.Position - destStart;
 end;
@@ -381,18 +360,15 @@ var
   entry: PDictEntry;
 begin
   inherited DecompressStream(ASource, ADest, AOriginalSize);
-
   if HasException then
     exit;
 
+  Start := ASource^.Position;
   BitSize := ASource^.ReadByte;
   if not (BitSize in SupportedBitSizes) then begin
     Raise(ecStreamFormatNotSupported);
     exit;
   end;
-  if AddTotalToStream then
-    AOriginalSize := ASource^.ReadLong;
-
   InitCoder;
   AllocateDecodeBuffer;
 
@@ -402,10 +378,10 @@ begin
 
   character := oldCode;
   WriteByte(oldCode);
-  if HasException then
-    exit;
 
   repeat
+    if HasException then
+      exit;
     code := ReadBits(FCurrentBitSize);
     if code = FCodes.IncreaseCodeSize then begin
       Inc(FCurrentBitSize);
@@ -453,6 +429,7 @@ begin
     end;
     oldCode := code;
   until false;
+  EndDecompression;
 end;
 
 end.

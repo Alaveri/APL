@@ -97,7 +97,7 @@ type
     Reserved: array[0..250] of byte;
   end;
 
-  TFont = object(TPersistent)
+  TFont = object(TCompressible)
   private
     FFontData: PByte;
     FFontDataSize: word;
@@ -118,10 +118,10 @@ type
     procedure Init; virtual;
     procedure SetPixel(AChar: char; APX, APY: integer); virtual;
     procedure ClearPixel(AChar: char; APX, APY: integer); virtual;
-    procedure SaveToStream(AStream: PStream); virtual;
     procedure LoadFromStream(AStream: PStream); virtual;
     procedure SetCharWidths; virtual;
     procedure SetFormat(AFormat: TFontFormat); virtual;
+    function SaveToStream(AStream: PStream): longint; virtual;
     function Format: TFontFormat; virtual;
     function IsPixelSet(AChar: char; APX, APY: integer): boolean; virtual;
     function CharWidth(AChar: char): integer; virtual;
@@ -1421,11 +1421,9 @@ begin
   CharWidths[13] := 0;
 end;
 
-procedure TFont.SaveToStream(AStream: PStream);
+function TFont.SaveToStream(AStream: PStream): longint;
 var
   header: TFontHeader;
-  lzw: TLzw;
-  stream: TMemoryStream;
 begin
   FillChar(header, SizeOf(header), 0);
   header.MajorVersion := FontMajorVersion;
@@ -1434,30 +1432,14 @@ begin
   header.DataSize := FFontDataSize;
   header.MaxWidth := MaxWidth;
   header.Height := Height;
-  header.Compression := acLzw;
-  header.CompressionLevel := clHigh;
+  header.Compression := Compression;
+  header.CompressionLevel := CompressionLevel;
   header.Spacing := Spacing;
   header.Format := format;
   header.BytesPerCharLine := BytesPerCharLine;
   SetCharWidths;
-  stream.Create(FFontDataSize);
-  stream.Write(PByte(FFontData), FFontDataSize);
-  stream.Seek(0, soFromBeginning);
-  if stream.HasException then
-    Raise(stream.Exception^.Code)
-  else begin
-    AStream^.Write(@header, SizeOf(header));
-    if AStream^.HasException then
-      Raise(AStream^.Exception^.Code)
-    else begin
-      lzw.CreateBitSize(LzwCompressionBitSize[header.CompressionLevel]);
-      lzw.CompressStream(@stream, AStream, FFontDataSize);
-      if lzw.HasException then
-        Raise(lzw.Exception^.Code);
-      lzw.Free;
-    end;
-  end;
-  stream.Free;
+  AStream^.Write(@header, SizeOf(header));
+  SaveToStream := CompressFromBuffer(FFontData, AStream, FFontDataSize);
 end;
 
 procedure TFont.AdjustSize(var AHeader: TFontHeader; ASize: word);
@@ -1493,12 +1475,9 @@ end;
 procedure TFont.LoadFromStream(AStream: PStream);
 var
   header: TFontHeader;
-  stream: TMemoryStream;
-  lzw: TLzw;
   index: integer;
   lineIndex: integer;
   ptr: PByte;
-  size: word;
 begin
   AStream^.Read(@header, SizeOf(header));
   if AStream^.HasException then begin
@@ -1517,48 +1496,19 @@ begin
   if BytesPerCharLine = 0
     then BytesPerCharLine := 2;
 
-  size := (header.MaxWidth div 9 + 1) * header.Height * 256;
   GetMem(FFontData, header.DataSize);
   if not Assigned(FFontData) then begin
     Raise(ecNotEnoughMemory);
     exit;
   end;
   FFontDataSize := header.DataSize;
-  stream.Create(header.DataSize);
-  if stream.HasException then begin
-    FreeMem(FFontData, header.DataSize);
-    Raise(stream.Exception^.Code);
-  end
-  else begin
-    case header.Compression of
-      acNone: begin
-      end;
-      acLzw: begin
-        if (header.MajorVersion = 1) and (header.MinorVersion < 1) then
-          lzw.CreateBitSize(13)
-        else
-          lzw.CreateBitSize(LzwCompressionBitSize[header.CompressionLevel]);
-        lzw.DecompressStream(AStream, @stream, header.DataSize);
-        CheckReRaise(@lzw);
-        lzw.Free;
-        stream.Seek(0, soFromBeginning);
-        stream.Read(PByte(FFontData), header.DataSize);
-        if stream.HasException then
-          Raise(stream.Exception^.Code)
-        else begin
-          if size < header.DataSize then
-            AdjustSize(header, size);
-          Height := header.Height;
-          Spacing := header.Spacing;
-          MaxWidth := header.MaxWidth;
-          SetCharWidths;
-        end;
-      end
-      else
-        Raise(ecFontCompressionNotSupported)
-    end;
-  end;
-  stream.Free;
+  DecompressToBuffer(AStream, FFontData, FFontDataSize);
+  if HasException then
+    exit;
+  Height := header.Height;
+  Spacing := header.Spacing;
+  MaxWidth := header.MaxWidth;
+  SetCharWidths;
 end;
 
 constructor TColoredFont.CreateSize(AMaxWidth, AHeight, ASpacing: byte);

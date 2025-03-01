@@ -65,6 +65,7 @@ function CharUpCase(AChar: char): char;
 function CharLowCase(AChar: char): char;
 function StringCompare(const AString1, AString2: string): integer;
 function StringCompareInsensitive(const AString1, AString2: string): integer;
+function ReverseEndian(AValue: longint): longint;
 procedure Swap(var ANum1: integer; var ANum2: integer);
 procedure SwapShort(var ANum1: shortint; var ANum2: shortint);
 procedure SwapByte(var ANum1: byte; var ANum2: byte);
@@ -825,6 +826,18 @@ end;
 function StringCompareInsensitive(const AString1, AString2: string): integer;
 begin
   StringCompareInsensitive := StringCompare(UpperCase(AString1), UpperCase(AString2));
+end;
+
+function ReverseEndian(AValue: longint): longint;
+var
+  result: longint;
+begin
+  result := 0;
+  result := result or ((AValue and $FF) shl 24);
+  result := result or ((AValue and $FF00) shl 8);
+  result := result or ((AValue and $FF0000) shr 8);
+  result := result or ((AValue and $FF000000) shr 24);
+  ReverseEndian := result;
 end;
 
 procedure Finalize; far;

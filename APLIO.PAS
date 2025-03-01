@@ -28,8 +28,8 @@ type
     function TrySaveToFile(const AFileName: string): boolean;
     procedure LoadFromFile(const AFileName: string); virtual;
     procedure LoadFromStream(AStream: PStream); virtual;
-    procedure SaveToFile(const AFileName: string); virtual;
-    procedure SaveToStream(AStream: PStream); virtual;
+    function SaveToFile(const AFileName: string): longint; virtual;
+    function SaveToStream(AStream: PStream): longint; virtual;
   end;
 
   TCompressible = object(TPersistent)
@@ -42,6 +42,10 @@ type
     procedure Init; virtual;
     function Compression: TAplCompression;
     function CompressionLevel: TCompressionLevel;
+    function CompressStream(ASource, ADest: PStream; ALength: longint): longint; virtual;
+    function CompressFromBuffer(ASource: pointer; ADest: PStream; ALength: longint): longint; virtual;
+    procedure DecompressStream(ASource, ADest: PStream; AOriginalSize: longint); virtual;
+    procedure DecompressToBuffer(ASource: PStream; ADest: pointer; AOriginalSize: longint); virtual;
     procedure SetCompressionType(ACompression: TAplCompression);
     procedure SetCompressionLevel(ACompressionLevel: TCompressionLevel);
     procedure SetCompression(ACompression: TAplCompression; ACompressionLevel: TCompressionLevel);
@@ -75,18 +79,19 @@ begin
   Abstract;
 end;
 
-procedure TPersistent.SaveToFile(const AFileName: string);
+function TPersistent.SaveToFile(const AFileName: string): longint;
 var
   stream: PFileStream;
 begin
+  SaveToFile := 0;
   stream := New(PFileStream, Create(AFileName, fmCreate));
   if not CheckReRaise(stream) then
-    SaveToStream(stream);
+    SaveToFile := SaveToStream(stream);
   CheckReRaise(stream);
   FreeAndNil(stream);
 end;
 
-procedure TPersistent.SaveToStream(AStream: PStream);
+function TPersistent.SaveToStream(AStream: PStream): longint;
 begin
   Abstract;
 end;
@@ -124,6 +129,8 @@ end;
 constructor TCompressible.Create;
 begin
   inherited Create;
+  FCompression := acLzw;
+  FCompressionLevel := clHigh;
 end;
 
 constructor TCompressible.CreateCompression(ACompression: TAplCompression; ACompressionLevel: TCompressionLevel);
@@ -164,6 +171,67 @@ procedure TCompressible.SetCompression(ACompression: TAplCompression; ACompressi
 begin
   FCompression := ACompression;
   FCompressionLevel := ACompressionLevel;
+end;
+
+function TCompressible.CompressStream(ASource, ADest: PStream; ALength: longint): longint;
+var
+  compressor: PCompressor;
+begin
+  if HasException then
+    exit;
+  compressor := TCompression.GetCompressor(FCompression, FCompressionLevel);
+  if NilPtr(compressor, ecNotEnoughMemory) then
+    exit;
+  CompressStream := compressor^.CompressStream(ASource, ADest, ALength);
+  CheckReraise(compressor);
+  FreeAndNil(compressor);
+end;
+
+procedure TCompressible.DecompressStream(ASource, ADest: PStream; AOriginalSize: longint);
+var
+  compressor: PCompressor;
+  size: longint;
+begin
+  if HasException then
+    exit;
+  compressor := TCompression.GetCompressor(FCompression, FCompressionLevel);
+  if NilPtr(compressor, ecNotEnoughMemory) then
+    exit;
+  compressor^.DecompressStream(ASource, ADest, AOriginalSize);
+  CheckReraise(compressor);
+  FreeAndNil(compressor);
+end;
+
+function TCompressible.CompressFromBuffer(ASource: pointer; ADest: PStream; ALength: longint): longint;
+var
+  stream: PMemoryStream;
+begin
+  if HasException then
+    exit;
+  stream := New(PMemoryStream, CreateBuffer(ASource, ALength));
+  if NilPtr(stream, ecNotEnoughMemory) then
+    exit;
+  stream^.FreeBuffers := false;
+  CompressFromBuffer := CompressStream(stream, ADest, ALength);
+  CheckReraise(stream);
+  CheckReraise(ADest);
+  FreeAndNil(stream);
+end;
+
+procedure TCompressible.DecompressToBuffer(ASource: PStream; ADest: pointer; AOriginalSize: longint);
+var
+  stream: PMemoryStream;
+begin
+  if HasException then
+    exit;
+  stream := New(PMemoryStream, CreateBuffer(ADest, AOriginalSize));
+  if NilPtr(stream, ecNotEnoughMemory) then
+    exit;
+  stream^.FreeBuffers := false;
+  DecompressStream(ASource, stream, AOriginalSize);
+  CheckReraise(stream);
+  CheckReRaise(ASource);
+  FreeAndNil(stream);
 end;
 
 var

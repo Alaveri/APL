@@ -56,17 +56,15 @@ type
 
   TRgbColors = array[0..MaxVarSize div SizeOf(TRgbColor) - 1] of TRgbColor;
 
-  TRgbPalette = object(TPersistent)
+  TRgbPalette = object(TCompressible)
   private
     FColors: PRgbColors;
     FColorCount: word;
     FFormat: TPaletteFormat;
-    FCompression: TAplCompression;
-    FCompressionLevel: TCompressionLevel;
+    function SaveAplPalette(AStream: PStream): longint;
     procedure LoadAplPalette(AStream: PStream);
     procedure LoadJascPalette(AStream: PStream);
     procedure LoadGimpPalette(AStream: PStream);
-    procedure SaveAplPalette(AStream: PStream);
     procedure SaveJascPalette(AStream: PStream);
     procedure SaveGimpPalette(AStream: PStream);
     function ReadLine(AStream: PStream): string;
@@ -81,16 +79,12 @@ type
     function GetPaletteDataVga: PRgbColors;
     function ColorCount: word;
     function ByteSize: word;
-    function Compression: TAplCompression;
-    function CompressionLevel: TCompressionLevel;
+    function SaveToStream(AStream: PStream): longint; virtual;
+    procedure LoadFromStream(AStream: PStream); virtual;
     procedure SetCount(ACount: word);
     procedure SetFormat(AFormat: TPaletteFormat);
     procedure SetPaletteData(AData: PRgbColors);
     procedure SetColor(AIndex: word; var AColor: TRgbColor);
-    procedure SaveToStream(AStream: PStream); virtual;
-    procedure LoadFromStream(AStream: PStream); virtual;
-    procedure SetCompression(ACompression: TAplCompression;
-      ACompressionLevel: TCompressionLevel);
     procedure Init; virtual;
     destructor Free; virtual;
   end;
@@ -151,8 +145,6 @@ begin
   FColors := nil;
   FColorCount := 0;
   FFormat := pfApl;
-  FCompression := acLzw;
-  FCompressionLevel := clHigh;
 end;
 
 constructor TRgbPalette.CreateVgaStandard;
@@ -291,13 +283,6 @@ begin
   LoadFromStream(AStream);
 end;
 
-procedure TRgbPalette.SetCompression(ACompression: TAplCompression;
-  ACompressionLevel: TCompressionLevel);
-begin
-  FCompression := ACompression;
-  FCompressionLevel := ACompressionLevel;
-end;
-
 function TRgbPalette.Colors: PRgbColors;
 begin
   Colors := FColors;
@@ -327,16 +312,6 @@ end;
 function TRgbPalette.ByteSize: word;
 begin
   ByteSize := FColorCount * SizeOf(TRgbColor);
-end;
-
-function TRgbPalette.Compression: TAplCompression;
-begin
-  Compression := FCompression;
-end;
-
-function TRgbPalette.CompressionLevel: TCompressionLevel;
-begin
-  CompressionLevel := FCompressionLevel;
 end;
 
 procedure TRgbPalette.WriteLine(AStream: PStream; const ALine: string);
@@ -452,30 +427,16 @@ end;
 
 procedure TRgbPalette.LoadAplPalette(AStream: PStream);
 var
-  compressor: PCompressor;
-  dest: PMemoryStream;
   size: word;
 begin
   SetCount(AStream^.ReadWord);
+  size := SizeOf(TRgbColor) * FColorCount;
   if NilPtr(FColors, ecNotEnoughMemory) then
     exit;
-  case FCompression of
-    acLzw: begin
-      compressor := TCompression.GetCompressor(FCompression, FCompressionLevel);
-      if NilPtr(compressor, ecNotEnoughMemory) then
-        exit;
-      dest := New(PMemoryStream, CreateBuffer(FColors, size));
-      dest^.FreeBuffers := false;
-      compressor^.DecompressStream(AStream, dest, size);
-      FreeAndNil(compressor);
-      FreeAndNil(dest);
-    end;
-    else
-      AStream^.Read(FColors, size);
-  end;
+  DecompresstoBuffer(AStream, FColors, size);
 end;
 
-procedure TRgbPalette.SaveAplPalette(AStream: PStream);
+function TRgbPalette.SaveAplPalette(AStream: PStream): longint;
 var
   compressor: PCompressor;
   source: PMemoryStream;
@@ -483,19 +444,20 @@ var
 begin
   size := FColorCount * SizeOf(TRgbColor);
   AStream^.WriteWord(FColorCount);
-  case FCompression of
+  case Compression of
     acLzw: begin
-      compressor := TCompression.GetCompressor(FCompression, FCompressionLevel);
+      compressor := TCompression.GetCompressor(Compression, CompressionLevel);
       if NilPtr(compressor, ecNotEnoughMemory) then
         exit;
       source := New(PMemoryStream, CreateBuffer(FColors, size));
       source^.FreeBuffers := false;
-      compressor^.CompressStream(source, AStream, size);
+      SaveAplPalette := compressor^.CompressStream(source, AStream, size);
       CheckReRaise(source);
       FreeAndNil(compressor);
       FreeAndNil(source);
     end;
     else
+      SaveAplPalette := size;
       AStream^.Write(FColors, size);
   end;
 end;
@@ -569,10 +531,10 @@ begin
   FFormat := AFormat;
 end;
 
-procedure TRgbPalette.SaveToStream(AStream: PStream);
+function TRgbPalette.SaveToStream(AStream: PStream): longint;
 begin
   case FFormat of
-    pfApl: SaveAplPalette(AStream);
+    pfApl: SaveToStream := SaveAplPalette(AStream);
     pfJasc: SaveJascPalette(AStream);
     pfGimp: SaveGimpPalette(AStream);
   end;

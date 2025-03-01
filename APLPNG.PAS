@@ -11,21 +11,26 @@ uses
   AplTypes,
   AplUtils,
   AplCrc,
+  ZLib,
+  Compress,
   Lists,
+  Palettes,
   Streams,
-  Strings,
-  ZInflate;
+  Strings;
 
 type
   PPngManager = ^TPngManager;
   PPngChunkList = ^TPngChunkList;
   PPngChunk = ^TPngChunk;
+  PPngHeader = ^TPngHeader;
+  PPngRgbColor = ^TPngRgbColor;
 
   TPngChunkTypeArray = array[0..3] of char;
   TPngSignature = array[0..7] of byte;
   TPngBitDepths = set of byte;
 
   TPngColorType = (
+    ctNone,
     ctGrayscale,
     ctRgb,
     ctPalette,
@@ -77,16 +82,15 @@ type
   TPngManager = object(TStatusObject)
   private
     FChunkList: PPngChunkList;
-    FDataSize: longint;
-    FWidth, FHeight, FBpp: word;
+    FBufferPtr: PByte;
+    function ReadAndCheckSignature(AStream: PStream): boolean;
     function BitsPerPixel(AColorType: TPngColorType; ABitDepth: byte): byte;
-    function ReadHeader(AStream: PStream; var AHeader: TPngHeader): boolean;
     function ReadChunks(AStream: PStream): boolean;
-    function ProcessChunk(AChunk: PPngChunk): boolean;
-    function ProcessHeaderChunk(AChunk: PPngChunk): boolean;
-    function ProcessPaletteChunk(AChunk: PPngChunk): boolean;
-    function ProcessDataChunk(AChunk: PPngChunk): boolean;
-    function ProcessChunks: boolean;
+    function ProcessChunk(AChunk: PPngChunk; AImage: PAplImage): boolean;
+    function ProcessHeaderChunk(AChunk: PPngChunk): PAplImage;
+    function ProcessPaletteChunk(AChunk: PPngChunk; AImage: PAplImage): boolean;
+    function ProcessChunks: PAplImage;
+    procedure ProcessDataChunks(AImage: PAplImage);
   public
     constructor Create;
     destructor Free; virtual;
@@ -130,6 +134,7 @@ const
   InternationalTextChunk: TPngChunkTypeArray = 'iTXt';
 
   AllowedBitDepths: array[TPngColorType] of TPngBitDepths = (
+    [],
     [1, 2, 4, 8, 16],
     [8, 16],
     [1, 2, 4, 8],
@@ -138,13 +143,14 @@ const
   );
 
 var
-  PngManager: TPngManager;
+  TPng: TPngManager;
 
 implementation
 
 constructor TPngManager.Create;
 begin
   inherited Create;
+  FBufferPtr := nil;
 end;
 
 destructor TPngManager.Free;
@@ -158,10 +164,6 @@ procedure TPngManager.Init;
 begin
   inherited Init;
   FChunkList := New(PPngChunkList, Create);
-  FDataSize := 0;
-  FWidth := 0;
-  FHeight := 0;
-  FBpp := 0;
 end;
 
 function TPngManager.BitsPerPixel(AColorType: TPngColorType; ABitDepth: byte): byte;
@@ -176,37 +178,140 @@ begin
   end;
 end;
 
-function TPngManager.ProcessHeaderChunk(AChunk: PPngChunk): boolean;
+function TPngManager.ProcessHeaderChunk(AChunk: PPngChunk): PAplImage;
+var
+  header: TPngHeader;
+  result: PAplImage;
+  bpp: byte;
 begin
+  AChunk^.Data^.Seek(0, soFromBeginning);
+  AChunk^.Data^.Read(@header, SizeOf(header));
+  header.Width := ReverseEndian(header.Width);
+  header.Height := ReverseEndian(header.Height);
+  if not (header.BitDepth in AllowedBitDepths[header.ColorType]) then begin
+    Raise(ecInvalidPngBitDepth);
+    exit;
+  end;
+  bpp := BitsPerPixel(header.ColorType, header.BitDepth);
+  if longint(header.Width) * header.Height * (bpp div 8) > MaxVarSize then
+    result := New(PAplStreamImage, CreateDimsBpp(header.Width, header.Height, bpp))
+  else begin
+    result := New(PAplBufferImage, CreateDimsBpp(header.Width, header.Height, bpp));
+    FBufferPtr := PAplBufferImage(result)^.Buffer;
+  end;
+  if NilPtr(result, ecNotEnoughMemory) then
+    exit;
+  ProcessHeaderChunk := result;
 end;
 
-function TPngManager.ProcessPaletteChunk(AChunk: PPngChunk): boolean;
+function TPngManager.ProcessPaletteChunk(AChunk: PPngChunk; AImage: PAplImage): boolean;
+var
+  palette: PRgbPalette;
+  index, count: integer;
+  colorPtr: PPngRgbColor;
+  rgbColor: TRgbColor;
 begin
+  palette := New(PRgbPalette, Create(pfApl));
+  if NilPtr(palette, ecNotEnoughMemory) then begin
+    ProcessPaletteChunk := false;
+    exit;
+  end;
+  count := AChunk^.Length div SizeOf(TPngRgbColor);
+  palette^.SetCount(count);
+  if CheckReRaise(palette) then begin
+    FreeAndNil(palette);
+    ProcessPaletteChunk := false;
+    exit;
+  end;
+  ProcessPaletteChunk := true;
+  colorPtr := AChunk^.Data^.BufferPointer;
+  for index := 0 to count - 1 do begin
+    rgbColor.Red := colorPtr^.Red;
+    rgbColor.Green := colorPtr^.Green;
+    rgbColor.Blue := colorPtr^.Blue;
+    palette^.SetColor(index, rgbColor);
+    Inc(colorPtr);
+  end;
+  AImage^.SetPalette(palette);
 end;
 
-function TPngManager.ProcessDataChunk(AChunk: PPngChunk): boolean;
+procedure TPngManager.ProcessDataChunks(AImage: PAplImage);
+var
+  dest: PMemoryStream;
+  data: PMemoryStream;
+  size, compressedSize: longint;
+  compressor: PCompressor;
+  index: integer;
+  chunk: PPngChunk;
+  method: byte;
+  flags: byte;
 begin
-  FDataSize := AChunk^.Length;
+  compressedSize := 0;
+  for index := 0 to FChunkList^.Count - 1 do begin
+    chunk := FChunkList^.GetItem(index);
+    if not Equal(chunk^.ChunkType, DataChunk, SizeOf(TPngChunkTypeArray)) then
+      continue;
+    Inc(compressedSize, chunk^.Length);
+  end;
+  data := New(PMemoryStream, Create(compressedSize));
+  if NilPtr(data, ecNotEnoughMemory) then
+    exit;
+  size := longint(AImage^.Width) * AImage^.Height * AImage^.Bpp div 8;
+  for index := 0 to FChunkList^.Count - 1 do begin
+    chunk := FChunkList^.GetItem(index);
+    if not Equal(chunk^.ChunkType, DataChunk, SizeOf(TPngChunkTypeArray)) then
+      continue;
+    chunk^.Data^.Seek(0, soFromBeginning);
+    method := chunk^.data^.ReadByte and 15;
+    flags := chunk^.data^.ReadByte;
+    chunk^.Data^.WriteToStream(data, chunk^.Data^.Size - 2);
+  end;
+  data^.Seek(0, soFromBeginning);
+  dest := New(PMemoryStream, Create(size + 1));
+  if NilPtr(dest, ecNotEnoughMemory) then
+    exit;
+  compressor := TCompression.GetCompressor(acZLib, clHigh);
+  if NilPtr(compressor, ecNotEnoughMemory) then begin
+    FreeAndNil(dest);
+    FreeAndNil(data);
+    exit;
+  end;
+
+  compressor^.DecompressStream(data, dest, size);
+  dest^.Seek(1, soFromBeginning);
+  Dec(size);
+  CheckReRaise(data);
+  CheckReRaise(dest);
+  CheckReRaise(compressor);
+  FreeAndNil(data);
+  if not HasException then begin
+    if AImage^.IsBufferImage then begin
+      dest^.Write(FBufferPtr, size);
+      Inc(FBufferPtr, size);
+    end
+    else begin
+      PAplStreamImage(AImage)^.Buffer^.ReadFromStream(dest, size);
+    end;
+  end;
+  FreeAndNil(compressor);
+  FreeAndNil(dest);
 end;
 
-function TPngManager.ProcessChunk(AChunk: PPngChunk): boolean;
+function TPngManager.ProcessChunk(AChunk: PPngChunk; AImage: PAplImage): boolean;
 begin
-  ProcessChunk := false;
-  if Equal(AChunk^.ChunkType, HeaderChunk, SizeOf(TPngChunkTypeArray)) then
-    ProcessChunk := ProcessHeaderChunk(AChunk)
-  else if Equal(AChunk^.ChunkType, PaletteChunk, SizeOf(TPngChunkTypeArray)) then
-    ProcessChunk := ProcessPaletteChunk(AChunk)
-  else if Equal(AChunk^.ChunkType, DataChunk, SizeOf(TPngChunkTypeArray)) then
-    ProcessChunk := ProcessDataChunk(AChunk);
+  ProcessChunk := true;
+  if Equal(AChunk^.ChunkType, PaletteChunk, SizeOf(TPngChunkTypeArray)) then
+    ProcessChunk := ProcessPaletteChunk(AChunk, AImage);
 end;
 
-function TPngManager.ProcessChunks: boolean;
+function TPngManager.ProcessChunks: PAplImage;
 var
   index: integer;
   chunk: PPngChunk;
   useStream: boolean;
+  result: PAplImage;
 begin
-  ProcessChunks := false;
+  ProcessChunks := nil;
   if FChunkList^.Count = 0 then begin
     Raise(ecPngNoChunks);
     exit;
@@ -216,12 +321,18 @@ begin
     Raise(ecPngNoHeaderChunk);
     exit;
   end;
-  for index := 0 to FChunkList^.Count - 1 do begin
+  result := ProcessHeaderChunk(chunk);
+  if not Assigned(result) then
+    exit;
+  for index := 1 to FChunkList^.Count - 1 do begin
     chunk := FChunkList^.GetItem(index);
-    if not ProcessChunk(chunk) then
+    if not ProcessChunk(chunk, result) then
       exit;
   end;
-  ProcessChunks := true;
+  ProcessDataChunks(result);
+  if HasException then
+    FreeAndNil(result);
+  ProcessChunks := result;
 end;
 
 function TPngManager.ImportPngFile(const AFilename: string): PAplImage;
@@ -247,12 +358,12 @@ var
   anyDataChunks, anyPaletteChunks: boolean;
   index: integer;
   length: longint;
-  crc: TCrc;
+  dataCrc: TCrc;
 begin
   ReadChunks := false;
   FChunkList^.Clear;
   while true do begin
-    length := AStream^.ReadLong;
+    length := ReverseEndian(AStream^.ReadLong);
     AStream^.Read(@chunkType, SizeOf(TPngChunkTypeArray));
     if CheckReRaise(AStream) then
       exit;
@@ -265,24 +376,22 @@ begin
     end;
     chunk^.Data^.ReadFromStream(AStream, length);
     chunk^.Data^.Seek(0, soFromBeginning);
-
-    InitCrc(crc);
-    UpdateCrc(crc, length, SizeOf(longint));
-    UpdateCrc(crc, chunkType, SizeOf(TPngChunkTypeArray));
-    UpdateCrcStream(crc, chunk^.Data, length);
-    crc := FinalizeCrc(crc);
-
-    chunk^.Data^.Seek(0, soFromBeginning);
     if CheckReRaise(AStream) then begin
       FreeAndNil(chunk);
       exit;
     end;
-    chunk^.Crc := AStream^.ReadLong;
+
+    InitCrc(dataCrc);
+    UpdateCrc(dataCrc, chunkType, SizeOf(TPngChunkTypeArray));
+    UpdateCrcStream(dataCrc, chunk^.Data, length);
+    dataCrc := FinalizeCrc(dataCrc);
+
+    chunk^.Crc := ReverseEndian(AStream^.ReadLong);
     if CheckReRaise(AStream) then begin
       FreeAndNil(chunk);
       exit;
     end;
-    if chunk^.Crc <> crc then begin
+    if chunk^.Crc <> dataCrc then begin
       Raise(ecPngCrcError);
       FreeAndNil(chunk);
       exit;
@@ -311,50 +420,34 @@ begin
   ReadChunks := true;
 end;
 
-function TPngManager.ReadHeader(AStream: PStream; var AHeader: TPngHeader): boolean;
+function TPngManager.ReadAndCheckSignature(AStream: PStream): boolean;
 var
   signature: TPngSignature;
 begin
-  ReadHeader := false;
-  FillChar(AHeader, SizeOf(AHeader), 0);
+  ReadAndCheckSignature := false;
   AStream^.Read(@signature, SizeOf(signature));
   if CheckReRaise(AStream) then
     exit;
-  if Equal(signature, PngSignature, SizeOf(TPngSignature)) then begin
+  if not Equal(signature, PngSignature, SizeOf(TPngSignature)) then begin
     Raise(ecInvalidPngSignature);
     exit;
   end;
-  AStream^.Read(@AHeader, SizeOf(AHeader));
-  if CheckReRaise(AStream) then
-    exit;
-  if not (AHeader.BitDepth in AllowedBitDepths[AHeader.ColorType]) then begin
-    Raise(ecInvalidPngBitDepth);
-    exit;
-  end;
-  ReadHeader := true;
+  ReadAndCheckSignature := true;
 end;
+
 
 function TPngManager.ImportPngStream(AStream: PStream): PAplImage;
 var
   header: TPngHeader;
-  result: boolean;
-  image: PAplImage;
+  result: PAplImage;
 begin
+  FBufferPtr := nil;
   ImportPngStream := nil;
-  FDataSize := 0;
-  FWidth := 0;
-  FHeight := 0;
-  if not ReadHeader(AStream, header) then
+  if not ReadAndCheckSignature(AStream) then
     exit;
   if not ReadChunks(AStream) then
     exit;
-  result := ProcessChunks;
-  if not Result then
-    exit;
-  if FWidth * FHeight * FBpp > MaxVarSize then
-    image := New(PAplStreamImage, CreateDimsBpp(FWidth, FHeight, FBpp))
-  else
-    image := New(PAplBufferImage, CreateDimsBpp(FWidth, FHeight, FBpp));
+  ImportPngStream := ProcessChunks;
 end;
 
 function TPngManager.TryImportPngFile(const AFilename: string; var AImage: PAplImage): boolean;
@@ -438,11 +531,11 @@ var
 procedure Finalize;
 begin
   ExitProc := PreviousExitProc;
-  PngManager.Free;
+  TPng.Free;
 end;
 
 begin
   PreviousExitProc := ExitProc;
-  PngManager.Create;
+  TPng.Create;
   ExitProc := @Finalize;
 end.

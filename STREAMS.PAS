@@ -952,7 +952,7 @@ end;
 
 function TFileStream.WriteToStream(AStream: PStream; ACount: longint): longint;
 var
-  bytesWritten, bytesRead: word;
+  remaining, bytesWritten, bytesRead, bytes: word;
   buffer: PByte;
   total: longint;
 begin
@@ -961,10 +961,12 @@ begin
     exit;
   total := 0;
   GetMem(buffer, BufferSize);
+  remaining := ACount;
   while total < ACount do begin
     {$I-}
     Seek(Position, soFromBeginning);
-    bytesRead := Read(buffer, BufferSize);
+    bytes := MinW(BufferSize, remaining);
+    bytesRead := Read(buffer, bytes);
     if bytesRead = 0 then
       break;
     {$I+}
@@ -980,6 +982,7 @@ begin
     if bytesWritten = 0 then
       break;
     Inc(total, bytesWritten);
+    Dec(remaining, bytesWritten);
   end;
   FreeMem(buffer, BufferSize);
   WriteToStream := total;

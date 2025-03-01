@@ -7,6 +7,7 @@ uses
   AplObj,
   AplTypes,
   AplConst,
+  AplMath,
   Streams,
   AplUtils;
 
@@ -39,28 +40,37 @@ type
     FReadBitBuffer: longint;
     FWriteBitBuffer: longint;
     FProgressCounter: longint;
+    FWriteByteBuffer: PBufferArray;
+    FReadByteBuffer: PBufferArray;
+    FReadByteIndex: word;
+    FWriteByteIndex: word;
+    FReadByteBufferSize: word;
+    FWriteByteBufferSize: word;
   public
     OnProgress: PCompressProgressProc;
     Source, Dest: PStream;
     ProgressIncrement: word;
     ReadTotal, WriteTotal: longint;
-    AddTotalToStream: boolean;
     CompressionLevel: TCompressionLevel;
+    Start: longint;
     constructor Create;
     function CompressStream(ASource, ADest: PStream; ALength: longint): longint; virtual;
     function CompressFromBuffer(ASource: pointer; ADest: PStream; ALength: word): longint;
-    function CompressBufferToBuffer(ASource: pointer; var ADest: pointer;
-      ALength: word): longint;
     function ReadByte: byte;
     function ReadBits(ABitCount: shortint): word;
-    function GetOriginalSize(ASource: PStream): longint; virtual;
+    function ReadByteBufferSize: word;
+    function WriteByteBufferSize: word;
+    function FlushWriteBuffer: boolean; virtual;
+    procedure SetWriteByteBufferSize(ASize: word);
+    procedure SetReadByteBufferSize(ASize: word);
     procedure WriteBits(ANum: word; ABitCount: shortint);
     procedure WriteByte(AByte: byte);
     procedure EndWriteBits; virtual;
+    procedure EndCompression; virtual;
+    procedure EndDecompression; virtual;
+    procedure FreeBuffers; virtual;
     procedure DecompressStream(ASource, ADest: PStream; AOriginalSize: longint); virtual;
     procedure DecompressToBuffer(ASource: PStream; ADest: pointer; AOriginalSize: word);
-    procedure DecompressBufferToBuffer(ASource: pointer; ADest: pointer;
-      ALength, AOriginalSize: word);
     procedure Init; virtual;
     procedure InitCompression; virtual;
     procedure UpdateProgress(const AMax, ACurrent: longint);
@@ -87,11 +97,12 @@ var
 implementation
 
 uses
-  Lzw,
-  ZLib;
+  Lzw;
+{  ZLib;}
 
 const
   DefaultProgressIncrement = 4096;
+  DefaultByteBufferSize = 4096;
 
 constructor TCompressor.Create;
 begin
@@ -108,24 +119,35 @@ begin
   WriteTotal := 0;
   Source := nil;
   Dest := nil;
+  FWriteByteBuffer := nil;
+  FReadByteBuffer := nil;
   CompressionLevel := clHigh;
   FReadBitCounter := 0;
   FWriteBitCounter := 0;
   FReadBitBuffer := 0;
   FWriteBitBuffer := 0;
-  AddTotalToStream := false;
+  FWriteByteIndex := 0;
+  FReadByteIndex := 0;
   ProgressIncrement := DefaultProgressIncrement;
-end;
-
-function TCompressor.GetOriginalSize(ASource: PStream): longint;
-begin
-  GetOriginalSize := 0;
+  FReadByteBufferSize := DefaultByteBufferSize;
+  FWriteByteBufferSize := DefaultByteBufferSize;
 end;
 
 procedure TCompressor.WriteByte(AByte: byte);
 begin
-  Dest^.WriteByte(AByte);
+  if FWriteByteIndex >= FWriteSize then begin
+    FWriteSize := Dest^.Write(FWriteByteBuffer, FWriteByteIndex);
+    if FWriteSize = 0 then begin
+      Raise(ecWritePastStreamEnd);
+      exit;
+    end;
+    FWriteByteIndex := 0;
+    if CheckReraise(Dest) then
+      exit;
+  end;
+  FWriteByteBuffer^[FWriteByteIndex] := AByte;
   Inc(WriteTotal);
+  Inc(FWriteByteIndex);
 end;
 
 procedure TCompressor.EndWriteBits;
@@ -153,12 +175,46 @@ begin
   end;
 end;
 
+function TCompressor.FlushWriteBuffer: boolean;
+var
+  written: word;
+begin
+  FlushWriteBuffer := true;
+  if Dest^.HasException or HasException or (FWriteByteIndex < 1) then begin
+    FlushWriteBuffer := false;
+    exit;
+  end;
+  written := Dest^.Write(FWriteByteBuffer, FWriteByteIndex);
+  if written = 0 then begin
+    Raise(ecWritePastStreamEnd);
+    FlushWriteBuffer := false;
+    exit;
+  end;
+  if Dest^.HasException then begin
+    Raise(Dest^.Exception^.Code);
+    Dest^.ClearException;
+    FlushWriteBuffer := false;
+  end;
+end;
+
 function TCompressor.ReadByte: byte;
 var
   current: byte;
+  byteCount: longint;
 begin
-  current := Source^.ReadByte;
+  if FReadByteIndex >= FReadSize then begin
+    FReadSize := Source^.Read(FReadByteBuffer, FReadByteBufferSize);
+    if FReadSize = 0 then begin
+      Raise(ecReadPastStreamEnd);
+      exit;
+    end;
+    if CheckReraise(Source) then
+      exit;
+    FReadByteIndex := 0;
+  end;
+  current := FReadByteBuffer^[FReadByteIndex];
   Inc(ReadTotal);
+  Inc(FReadByteIndex);
   ReadByte := current;
 end;
 
@@ -191,6 +247,55 @@ begin
   Dec(FReadBitCounter, ABitCount);
 end;
 
+function TCompressor.ReadByteBufferSize: word;
+begin
+  ReadByteBufferSize := FReadByteBufferSize;
+end;
+
+function TCompressor.WriteByteBufferSize: word;
+begin
+  WriteByteBufferSize := FWriteByteBufferSize;
+end;
+
+procedure TCompressor.SetWriteByteBufferSize(ASize: word);
+begin
+  if Assigned(FWriteByteBuffer) then
+    FreeMem(FWriteByteBuffer, FWriteByteBufferSize);
+  FWriteByteBufferSize := ASize;
+  FWriteByteBuffer := nil;
+end;
+
+procedure TCompressor.SetReadByteBufferSize(ASize: word);
+begin
+  if Assigned(FReadByteBuffer) then
+    FreeMem(FReadByteBuffer, FReadByteBufferSize);
+  FReadByteBufferSize := ASize;
+  FReadByteBuffer := nil;
+end;
+
+procedure TCompressor.EndCompression;
+begin
+  FlushWriteBuffer;
+  FreeBuffers;
+end;
+
+procedure TCompressor.EndDecompression;
+begin
+  FlushWriteBuffer;
+  FreeBuffers;
+  Source^.Seek(Start + ReadTotal + 1, soFromBeginning);
+end;
+
+procedure TCompressor.FreeBuffers;
+begin
+  if Assigned(FWriteByteBuffer) then
+    FreeMem(FWriteByteBuffer, FWriteByteBufferSize);
+  if Assigned(FReadByteBuffer) then
+    FreeMem(FReadByteBuffer, FReadByteBufferSize);
+  FWriteByteBuffer := nil;
+  FReadByteBuffer := nil;
+end;
+
 procedure TCompressor.UpdateProgress(const AMax, ACurrent: longint);
 var
   event: TProgressEvent;
@@ -211,18 +316,35 @@ end;
 
 destructor TCompressor.Free;
 begin
+  FreeBuffers;
   inherited Free;
 end;
 
 procedure TCompressor.InitCompression;
 begin
+  if not Assigned(FWriteByteBuffer) then begin
+    GetMem(FWriteByteBuffer, FWriteByteBufferSize);
+    if NilPtr(FWriteByteBuffer, ecNotEnoughMemory) then
+      exit;
+  end;
+  if not Assigned(FReadByteBuffer) then begin
+    GetMem(FReadByteBuffer, FReadByteBufferSize);
+    if NilPtr(FReadByteBuffer, ecNotEnoughMemory) then begin
+      FreeMem(FWriteByteBuffer, FReadByteBufferSize);
+      exit;
+    end;
+  end;
   WriteTotal := 0;
   ReadTotal := 0;
   FWriteBitBuffer := 0;
   FReadBitCounter := 0;
   FWriteBitCounter := 0;
+  FWriteSize := FWriteByteBufferSize;
+  FReadSize := 0;
   FReadBitBuffer := 0;
   FProgressCounter := 0;
+  FWriteByteIndex := 0;
+  FReadByteIndex := 0;
 end;
 
 function TCompressor.CompressFromBuffer(ASource: pointer; ADest: PStream; ALength: word): longint;
@@ -252,61 +374,6 @@ begin
   CheckReRaise(ASource);
   CheckReRaise(destStream);
   FreeAndNil(destStream);
-end;
-
-procedure TCompressor.DecompressBufferToBuffer(ASource: pointer; ADest: pointer;
-  ALength, AOriginalSize: word);
-var
-  sourceStream: PMemoryStream;
-  destStream: PMemoryStream;
-begin
-  sourceStream := New(PMemoryStream, CreateBuffer(ASource, ALength));
-  if NilPtr(sourceStream, ecNotEnoughMemory) then
-    exit;
-  sourceStream^.FreeBuffers := false;
-  destStream := New(PMemoryStream, CreateBuffer(ADest, AOriginalSize));
-  if NilPtr(destStream, ecNotEnoughMemory) then begin
-    FreeAndNil(sourceStream);
-    exit;
-  end;
-  destStream^.FreeBuffers := false;
-  DecompressStream(sourceStream, destStream, AOriginalSize);
-  CheckReRaise(sourceStream);
-  CheckReRaise(destStream);
-  FreeAndNil(sourceStream);
-  FreeAndNil(destStream);
-end;
-
-function TCompressor.CompressBufferToBuffer(ASource: pointer; var ADest: pointer;
-  ALength: word): longint;
-var
-  sourceStream: PMemoryStream;
-  destStream: PBufferStream;
-  size: longint;
-begin
-  ADest := nil;
-  sourceStream := New(PMemoryStream, CreateBuffer(ASource, ALength));
-  if NilPtr(sourceStream, ecNotEnoughMemory) then
-    exit;
-  sourceStream^.FreeBuffers := false;
-  destStream := New(PBufferStream, Create);
-  if NilPtr(destStream, ecNotEnoughMemory) then begin
-    FreeAndNil(sourceStream);
-    exit;
-  end;
-  destStream^.FreeBuffers := false;
-  size := CompressStream(sourceStream, destStream, ALength);
-  CheckReRaise(sourceStream);
-  CheckReRaise(destStream);
-  if size > MaxVarSize then
-    Raise(ecCompressedDataTooLarge);
-  if not HasException then begin
-    destStream^.Resize(size);
-    ADest := destStream^.BufferPointer;
-  end;
-  FreeAndNil(sourceStream);
-  FreeAndNil(destStream);
-  CompressBufferToBuffer := ALength;
 end;
 
 function TCompressor.CompressStream(ASource, ADest: PStream; ALength: longint): longint;
@@ -358,16 +425,14 @@ begin
       bitSize := LzwCompressionBitSize[ALevel];
       result := New(PLzw, CreateBitSize(bitSize));
       PLzw(result)^.SetLzwCodesProc := @SetLzwCodes;
-      result^.AddTotalToStream := false;
     end;
     acZLib: begin
-      result := New(PZlib, Create);
-      result^.AddTotalToStream := false;
+{      result := New(PZlib, Create);
+      result^.AddTotalToStream := false;}
     end;
     acGif: begin
       result := New(PLzw, CreateBitSize(13));
       PLzw(result)^.SetLzwCodesProc := @SetGifLzwCodes;
-      result^.AddTotalToStream := false;
     end;
     else
       result := nil;
