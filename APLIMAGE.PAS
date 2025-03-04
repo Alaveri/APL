@@ -84,6 +84,7 @@ type
     procedure SetHeader(var AHeader: TAplImageHeader);
     procedure ResetDims(AWidth, AHeight: integer);
     procedure CreateBuffer; virtual;
+    procedure FreeBuffer; virtual;
     procedure SetPalette(APalette: PRgbPalette);
     procedure LoadFromStream(AStream: PStream); virtual;
     procedure Clear(AColor: byte); virtual;
@@ -105,6 +106,7 @@ type
     destructor Free; virtual;
     procedure SetBuffer(ABuffer: PByte);
     procedure CreateBuffer; virtual;
+    procedure FreeBuffer; virtual;
     procedure Clear(AColor: byte); virtual;
     procedure ClearWord(AColor: word); virtual;
     procedure ClearLong(AColor: longint); virtual;
@@ -118,11 +120,13 @@ type
     function IsStreamImage: boolean; virtual;
     destructor Free; virtual;
     procedure CreateBuffer; virtual;
+    procedure FreeBuffer; virtual;
     procedure Clear(AColor: byte); virtual;
     procedure ClearWord(AColor: word); virtual;
     procedure ClearLong(AColor: longint); virtual;
     procedure LoadImage(AStream: PStream; const ABlock: TAplImageBlock); virtual;
     procedure SaveImage(AStream: PStream); virtual;
+    procedure SetBuffer(ABuffer: PMemoryStream);
   end;
 
 implementation
@@ -302,10 +306,7 @@ var
 begin
   if HasException then
     exit;
-  if Assigned(FBuffer) and (DataSize > 0) then begin
-    FreeMem(FBuffer, DataSize);
-    FBuffer := nil;
-  end;
+  FreeBuffer;
 
   { read header }
   LoadHeader(AStream, header);
@@ -371,6 +372,11 @@ begin
 end;
 
 procedure TAplImage.CreateBuffer;
+begin
+  Abstract;
+end;
+
+procedure TAplImage.FreeBuffer;
 begin
   Abstract;
 end;
@@ -591,6 +597,13 @@ begin
     exit;
 end;
 
+procedure TAplBufferImage.FreeBuffer;
+begin
+  if Assigned(FBuffer) and (DataSize > 0) then
+    FreeMem(FBuffer, DataSize);
+  FBuffer := nil;
+end;
+
 function TAplBufferImage.IsBufferImage: boolean;
 begin
   IsBufferImage := true;
@@ -642,6 +655,13 @@ end;
 function TAplStreamImage.Buffer: PMemoryStream;
 begin
   Buffer := PMemoryStream(FBuffer);
+end;
+
+procedure TAplStreamImage.SetBuffer(ABuffer: PMemoryStream);
+begin
+  if Assigned(FBuffer) then
+    FreeAndNil(FBuffer);
+  FBuffer := ABuffer;
 end;
 
 function TAplStreamImage.IsStreamImage: boolean;
@@ -697,6 +717,11 @@ begin
   PMemoryStream(FBuffer)^.FillLong(DataSize, AColor);
 end;
 
+procedure TAplStreamImage.FreeBuffer;
+begin
+  FreeAndNil(FBuffer);
+end;
+
 procedure TAplStreamImage.CreateBuffer;
 begin
   if HasException then
@@ -705,7 +730,7 @@ begin
     Raise(ecInvalidImage);
     exit;
   end;
-  FBuffer := New(PMemoryStream, Create(DataSize));
+  FBuffer := New(PMemoryStream, CreateRefSize(DataSize, 8192));
   if NilPtr(FBuffer, ecNotEnoughMemory) then
     exit;
   PMemoryStream(FBuffer)^.FreeBuffers := true;
@@ -720,15 +745,10 @@ begin
   CreateBuffer;
   if HasException then
     exit;
-  if ABlock.Compression = acNone then
-    AStream^.WriteToStream(Buffer, ABlock.Size)
-  else begin
-    CreateBuffer;
-    DecompressStream(AStream, Buffer, ABlock.Size);
-    FreeAndNil(compressor);
-  end;
-  CheckReraise(Buffer);
+  DecompressStream(AStream, Buffer, ABlock.OriginalSize);
   CheckReraise(AStream);
+  CheckReraise(Buffer);
+  Buffer^.Seek(0, soFromBeginning);
 end;
 
 procedure TAplStreamImage.SaveImage(AStream: PStream);

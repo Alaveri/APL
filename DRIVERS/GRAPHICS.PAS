@@ -266,8 +266,10 @@ type
       AFlags: TImageFlags); virtual;
     procedure DrawImageZoom(const ARect: TRect; AImage: pointer;
       AFlags: TImageFlags; AZoom: integer); virtual;
-    procedure DrawBufferRect(var ASourceBounds, ASourceRect: TRect;
+    procedure DrawFromBufferRect(var ASourceBounds, ASourceRect: TRect;
       const ADestPoint: TPoint; ABuffer: pointer); virtual;
+    procedure DrawFromStreamRect(var ASourceBounds, ASourceRect: TRect;
+      const ADestPoint: TPoint; ABuffer: PStream); virtual;
     procedure DrawText(APX, APY: integer; AText: string); virtual;
     procedure DrawTextLarge(APX, APY: integer; AText: PChar); virtual;
     procedure GetDrawRect(var ARect: TRect); virtual;
@@ -899,8 +901,14 @@ begin
   Abstract;
 end;
 
-procedure TGraphicsDriver.DrawBufferRect(var ASourceBounds, ASourceRect: TRect;
+procedure TGraphicsDriver.DrawFromBufferRect(var ASourceBounds, ASourceRect: TRect;
   const ADestPoint: TPoint; ABuffer: pointer);
+begin
+  Abstract;
+end;
+
+procedure TGraphicsDriver.DrawFromStreamRect(var ASourceBounds, ASourceRect: TRect;
+  const ADestPoint: TPoint; ABuffer: PStream);
 begin
   Abstract;
 end;

@@ -88,8 +88,10 @@ type
       AImage: pointer; AFlags: TImageFlags); virtual;
     procedure DrawImageZoom(const ARect: TRect; AImage: pointer; AFlags: TImageFlags;
       AZoom: integer); virtual;
-    procedure DrawBufferRect(var ASourceBounds, ASourceRect: TRect;
+    procedure DrawFromBufferRect(var ASourceBounds, ASourceRect: TRect;
       const ADestPoint: TPoint; ABuffer: pointer); virtual;
+    procedure DrawFromStreamRect(var ASourceBounds, ASourceRect: TRect;
+      const ADestPoint: TPoint; ABuffer: PStream); virtual;
     procedure CopyToOffScreen(const ASource, ADest: TRect); virtual;
     procedure CopyFromOffScreen(const ASource, ADest: TRect); virtual;
     procedure SetDisplayPage(APage: word); virtual;
@@ -897,7 +899,7 @@ var
 begin
 end;
 
-procedure TSVga8Driver.DrawBufferRect(var ASourceBounds, ASourceRect: TRect;
+procedure TSVga8Driver.DrawFromBufferRect(var ASourceBounds, ASourceRect: TRect;
   const ADestPoint: TPoint; ABuffer: pointer);
 var
   image: PByte;
@@ -917,7 +919,7 @@ begin
   source.Intersect(ASourceBounds);
   if dest.IsEmpty then
     exit;
-  lineWidth := source.Width;
+  lineWidth := dest.Width;
   for yIndex := 0 to dest.Height - 1 do begin
     screenPtr := InternalGetScreenPointer(dest.X, dest.Y + yIndex, true, offset);
     imagePtr := image;
@@ -932,6 +934,40 @@ begin
     end
     else
       Move(imagePtr^, screenPtr^, lineWidth);
+  end;
+end;
+
+procedure TSVga8Driver.DrawFromStreamRect(var ASourceBounds, ASourceRect: TRect;
+  const ADestPoint: TPoint; ABuffer: PStream);
+var
+  screenPtr: PByte;
+  source, dest: TRect;
+  yIndex: integer;
+  offset: longint;
+  lineWidth, partialWidth: integer;
+begin
+  dest.CreateRect(ASourceRect);
+  dest.X := ADestPoint.X;
+  dest.Y := ADestPoint.Y;
+  dest.Intersect(Mode^.Bounds);
+  dest.Intersect(State^.ViewPort);
+  source.CreateRect(ASourceRect);
+  source.Intersect(ASourceBounds);
+  if dest.IsEmpty then
+    exit;
+  lineWidth := dest.Width;
+  for yIndex := 0 to dest.Height - 1 do begin
+    screenPtr := InternalGetScreenPointer(dest.X, dest.Y + yIndex, true, offset);
+    ABuffer^.Seek(longint(yIndex) * ASourceBounds.Width + ASourceRect.X, soFromBeginning);
+    if offset + lineWidth > FMaxOffset then begin
+      partialWidth := FMaxOffset - offset + 1;
+      ABuffer^.Read(screenPtr, partialWidth);
+      SetBank(SvgaState^.FCurrentBank + 1);
+      screenPtr := Mode^.FrameBuffer;
+      ABuffer^.Read(screenPtr, lineWidth - partialWidth);
+    end
+    else
+      ABuffer^.Read(screenPtr, lineWidth);
   end;
 end;
 

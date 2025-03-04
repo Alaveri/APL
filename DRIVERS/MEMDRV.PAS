@@ -69,7 +69,6 @@ type
     function IsXmsSupported: boolean;
     function GetXmsControlFunction: pointer;
     function XmsAlloc(ASize: word): word;
-    procedure XmsDealloc(AHandle: word);
     procedure MoveReference(var AMoveRecord: TXmsMoveRecord);
     procedure MoveToConventional(AReference: PReference);
     procedure PurgeConventional(ASize: longint);
@@ -87,6 +86,7 @@ type
     function CreateReference(ABuffer: pointer; ASize: word): PReference;
     procedure InitXms;
     procedure Init; virtual;
+    procedure XmsDealloc(AHandle: word);
     procedure SetCurrentReference(AReference: PReference);
     procedure Dealloc(var AReference: PReference);
     procedure BeginAllocTransaction;

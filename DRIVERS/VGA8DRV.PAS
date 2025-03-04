@@ -31,6 +31,7 @@ type
     function GetOffset(APX, APY: integer): word;
     function InternalGetScreenPointer(APX, APY, APage: integer): PByte;
   public
+    destructor Free; virtual;
     function GetScreenPointer(APX, APY: integer): PByte; virtual;
     procedure GetImage(APX, APY, AWidth, AHeight: longint; ABuffer: PByte); virtual;
     procedure GetImageStream(APX, APY, AWidth, AHeight: longint; AStream: PStream); virtual;
@@ -46,6 +47,12 @@ type
     procedure InverseHLine(APX, APY, AWidth: integer); virtual;
     procedure DrawImageCoords(APX, APY, AWidth, AHeight: integer;
       AImage: pointer; AFlags: TImageFlags); virtual;
+    procedure DrawImageZoom(const ARect: TRect; AImage: pointer; AFlags: TImageFlags;
+      AZoom: integer); virtual;
+    procedure DrawFromBufferRect(var ASourceBounds, ASourceRect: TRect;
+      const ADestPoint: TPoint; ABuffer: pointer); virtual;
+    procedure DrawFromStreamRect(var ASourceBounds, ASourceRect: TRect;
+      const ADestPoint: TPoint; ABuffer: PStream); virtual;
     procedure CopyToOffScreen(const ASource, ADest: TRect); virtual;
     procedure CopyFromOffScreen(const ASource, ADest: TRect); virtual;
     procedure CopyFullScreenToOff(ASourcePage, ADestPage: word); virtual;
@@ -54,7 +61,6 @@ type
     procedure SetDrawPage(APage: word); virtual;
     procedure WaitForVSync; virtual;
     procedure Init; virtual;
-    destructor Free; virtual;
   end;
 
 implementation
@@ -70,9 +76,11 @@ type
     DrawRect: TRect;
     ImageRect: TRect;
     Screen: PByte;
+    Offset: longint;
     Driver: PVga8Driver;
   end;
   TDrawLineProc = procedure(const ALineInfo: TLineInfo);
+
 
 procedure TVga8Driver.Init;
 var
@@ -193,7 +201,6 @@ begin
     ch := AText[charIndex];
     Inc(charIndex);
     width := CharWidth(ch);
-    width := CharWidth(ch);
     if sx > drawRect.Right then
       exit;
     if sx + width < drawRect.X then begin
@@ -303,7 +310,7 @@ begin
   for index := ARect.Y to ARect.Y + ARect.Height - 1 do begin
     screen := GetScreenPointer(ARect.X, index);
     py := index mod 16;
-    HLinePattern(State^.FillPattern^[py], ARect.X, index, width);
+      HLinePattern(State^.FillPattern^[py], ARect.X, index, width);
   end;
 end;
 
@@ -433,7 +440,12 @@ begin
   if AWidth <= 0 then
     exit;
   screen := GetScreenPointer(APX, APY);
-  FillChar(screen^, AWidth, color);
+  asm
+    les di, screen
+    mov cx, AWidth
+    mov al, color
+    rep stosb
+  end;
 end;
 
 procedure TVga8Driver.VLine(APX, APY, AHeight: integer);
@@ -441,8 +453,6 @@ var
   index: integer;
   screen: PByte;
   drawRect: TRect;
-  color: byte;
-  width: word;
 begin
   if State^.ForeColor = TransparentColor then
     exit;
@@ -461,12 +471,9 @@ begin
     AHeight := drawRect.Bottom - APY + 1;
   if AHeight <= 0 then
     exit;
-  screen := GetScreenPointer(APX, APY);
-  color := byte(State^.ForeColor);
-  width := Mode^.Width;
-  for index := 0 to AHeight - 1 do begin
-    screen^ := color;
-    Inc(screen, width);
+  for index := APY to APY + AHeight - 1 do begin
+    screen := GetScreenPointer(APX, index);
+    screen^ := ForeColor;
   end;
 end;
 
@@ -575,6 +582,71 @@ begin
   end;
 end;
 
+procedure TVga8Driver.DrawImageZoom(const ARect: TRect; AImage: pointer; AFlags: TImageFlags;
+  AZoom: integer);
+var
+  imageRect, drawRect: TRect;
+  yIndex: longint;
+  drawLine: TDrawLineProc;
+  offset: longint;
+  sy: integer;
+  info: TLineInfo;
+begin
+end;
+
+procedure TVga8Driver.DrawFromBufferRect(var ASourceBounds, ASourceRect: TRect;
+  const ADestPoint: TPoint; ABuffer: pointer);
+var
+  image: PByte;
+  screenPtr, imagePtr: PByte;
+  source, dest: TRect;
+  yIndex: integer;
+  lineWidth: integer;
+begin
+  image := PByte(ABuffer);
+  dest.CreateRect(ASourceRect);
+  dest.X := ADestPoint.X;
+  dest.Y := ADestPoint.Y;
+  dest.Intersect(Mode^.Bounds);
+  dest.Intersect(State^.ViewPort);
+  source.CreateRect(ASourceRect);
+  source.Intersect(ASourceBounds);
+  if dest.IsEmpty then
+    exit;
+  lineWidth := source.Width;
+  for yIndex := 0 to dest.Height - 1 do begin
+    screenPtr := GetScreenPointer(dest.X, dest.Y + yIndex);
+    imagePtr := image;
+    Inc(imagePtr, longint(yIndex) * ASourceBounds.Width + ASourceRect.X);
+    Move(imagePtr^, screenPtr^, lineWidth);
+  end;
+end;
+
+procedure TVga8Driver.DrawFromStreamRect(var ASourceBounds, ASourceRect: TRect;
+  const ADestPoint: TPoint; ABuffer: PStream);
+var
+  screenPtr: PByte;
+  source, dest: TRect;
+  yIndex: integer;
+  lineWidth: integer;
+begin
+  dest.CreateRect(ASourceRect);
+  dest.X := ADestPoint.X;
+  dest.Y := ADestPoint.Y;
+  dest.Intersect(Mode^.Bounds);
+  dest.Intersect(State^.ViewPort);
+  source.CreateRect(ASourceRect);
+  source.Intersect(ASourceBounds);
+  if dest.IsEmpty then
+    exit;
+  lineWidth := source.Width;
+  for yIndex := 0 to dest.Height - 1 do begin
+    screenPtr := GetScreenPointer(dest.X, dest.Y + yIndex);
+    ABuffer^.Seek(longint(yIndex) * ASourceBounds.Width + ASourceRect.X, soFromBeginning);
+    ABuffer^.Read(screenPtr, lineWidth);
+  end;
+end;
+
 procedure TVga8Driver.DrawImageCoords(APX, APY, AWidth, AHeight: integer;
   AImage: pointer; AFlags: TImageFlags);
 var
@@ -599,7 +671,7 @@ begin
   else
     drawLine := DrawLineBuffer;
   sy := drawRect.Y;
-  info.Image := @AImage;
+  info.Image := pointer(AImage);
   info.DrawRect.CreateRect(drawRect);
   info.ImageRect.CreateRect(imageRect);
   info.Start := 0;
@@ -612,12 +684,12 @@ begin
     drawLine(info);
     if HasException then
       break;
-    Inc(sy);
   end;
 end;
 
 procedure TVga8Driver.SetDisplayPage(APage: word);
 begin
+  inherited SetDisplayPage(APage);
 end;
 
 procedure TVga8Driver.SetDrawPage(APage: word);
@@ -639,7 +711,7 @@ begin
     exit;
   source.CreateRect(ASource);
   dest.CreateRect(ADest);
-  if source.Equals(dest) and source.Equals(Mode^.Bounds) then begin
+    if source.Equals(dest) and source.Equals(Mode^.Bounds) then begin
     sourcePtr := FPages[ASourcePage];
     destPtr := FPages[ADestPage];
     asm
@@ -666,6 +738,7 @@ begin
   sy := source.Y;
   dx := dest.X;
   dy := dest.Y;
+
 
   lineWidth := source.Width;
   nextLine := Mode^.Width - lineWidth;
@@ -771,6 +844,8 @@ end;
 
 destructor TVga8Driver.Free;
 begin
+  if Assigned(FPages[1]) then
+    FreeMem(FPages[1], 64000);
   inherited Free;
 end;
 
