@@ -22,7 +22,7 @@ type
   PSetPixelProc = ^TSetPixelProc;
 
   TRegionMode = (rmInclude, rmExclude);
-  TSetPixelProc = procedure(AX, AY: integer; AData: pointer);
+  TSetPixelProc = procedure(ASender: PObject; AX, AY: integer; AData: pointer);
 
   TPointList = object(TObjectList)
   private
@@ -186,7 +186,7 @@ procedure BezierInterpolationQuad(const AP1, AP2, AP3: TVector2;
 procedure BezierInterpolationCubic(const AP1, AP2, AP3, AP4: TVector2;
   ATValue: real;  var AResult: TVector2); far;
 
-procedure LineDraw(AX1, AY1, AX2, AY2: integer; ADrawRect: TRect;
+procedure LineDraw(ASender: PObject; AX1, AY1, AX2, AY2: integer; ADrawRect: TRect;
   ASetPixelProc: PSetPixelProc; AData: pointer); far;
 
 implementation
@@ -905,7 +905,7 @@ begin
   inherited Create;
 end;
 
-procedure LineDraw(AX1, AY1, AX2, AY2: integer; ADrawRect: TRect;
+procedure LineDraw(ASender: PObject; AX1, AY1, AX2, AY2: integer; ADrawRect: TRect;
   ASetPixelProc: PSetPixelProc; AData: pointer);
 var
   aError, aError2, sx, sy, dlx, dly: integer;
@@ -933,7 +933,7 @@ begin
   bottom := ADrawRect.Bottom;
   while true do begin
     if ADrawRect.Contains(AX1, AY1) then
-      TSetPixelProc(ASetPixelProc)(AX1, AY1, AData);
+      TSetPixelProc(ASetPixelProc)(ASender, AX1, AY1, AData);
     if (AX1 = AX2) and (AY1 = AY2) then
       break;
     aError2 := 2 * aError;

@@ -183,7 +183,7 @@ constructor TAplImage.CreateDimsBpp(const AWidth, AHeight, ABpp: word);
 begin
   inherited Create;
   InitAll(AWidth, AHeight, ABpp, 1, nil);
-  CreateBuffer;
+    CreateBuffer;
 end;
 
 constructor TAplImage.CreateDims(const AWidth, AHeight: word);

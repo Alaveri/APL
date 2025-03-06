@@ -344,7 +344,7 @@ begin
 
   { Swap any conventional references to XMS until there is enough available
   or there are no more references that can be moved }
-  while (index < FReferences^.Count) and (System.MaxAvail < ASize) do begin
+  while (index < FReferences^.Count) do begin
     current := FReferences^.GetItem(index);
     Inc(index);
     if current^.ReferenceType = rtXms then
@@ -645,7 +645,7 @@ begin
   inherited Init;
   HeapError := @OnHeapError;
   OutOfMemoryException := New(PException, Create(ecNotEnoughMemory));
-  FReferences := New(PReferenceList, Create);
+  FReferences := New(PReferenceList, CreateCapacity(128));
   FCurrentReference := nil;
   FXmsSupported := false;
   FXmsVersion := 0;

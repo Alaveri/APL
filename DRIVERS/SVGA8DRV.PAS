@@ -817,6 +817,7 @@ begin
   with ALineInfo, Driver^ do begin
     imagePtr := PByte(Image);
     screenPtr := Screen;
+    stream := PStream(ALineInfo.Image);
     stream^.Seek(Start + (YIndex + ImageRect.Y) * longint(ImageRect.Width) +
       ImageRect.X, soFromBeginning);
     lineWidth := DrawRect.Width;

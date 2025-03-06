@@ -82,6 +82,9 @@ const
 
 implementation
 
+var
+  Buffer: PDictEntry;
+
 procedure SetLzwCodes(var ACodes: TLzwCodes; ABitSize: byte);
 begin
   ACodes.EndOfStream := 256;
@@ -164,20 +167,11 @@ end;
 function TLzw.AllocateDictionary: boolean;
 begin
   AllocateDictionary := true;
-  DeallocateDictionary;
-
-  GetMem(FDict, FDictSize);
-
-  if not Assigned(FDict) then begin
-    Raise(ecNotEnoughMemory);
-    AllocateDictionary := false;
-  end;
+  FDict := Buffer;
 end;
 
 procedure TLzw.DeallocateDictionary;
 begin
-  if Assigned(FDict) then
-    FreeMem(FDict, FDictSize);
   FDict := nil;
 end;
 
@@ -432,4 +426,17 @@ begin
   EndDecompression;
 end;
 
+var
+  PrevExitProc: PProc;
+
+procedure Finalize; far;
+begin
+  ExitProc := PrevExitProc;
+  FreeMem(Buffer, 9029 * SizeOf(TDictEntry));
+end;
+
+begin
+  PrevExitProc := ExitProc;
+  GetMem(Buffer, 9029 * SizeOf(TDictEntry));
+  ExitProc := @Finalize;
 end.

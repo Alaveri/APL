@@ -166,6 +166,11 @@ const
   ecPngNoChunks = 1306;
   ecPngNoHeaderChunk = 1307;
 
+  { Bmp Errors }
+  ecInvalidBmpSignature = 1401;
+  ecUnsupportedBmpCompression = 1402;
+  ecInvalidBmpSize = 1403;
+
   { User defined errors }
   ecUser = 5000;
 
@@ -356,6 +361,9 @@ begin
   AddError(ecPngCrcError, 'PNG CRC error');
   AddError(ecPngNoChunks, 'PNG file has no chunks');
   AddError(ecPngNoHeaderChunk, 'PNG file has no header chunk');
+  AddError(ecInvalidBmpSignature, 'Invalid BMP signature');
+  AddError(ecUnsupportedBmpCompression, 'Unsupported BMP compression');
+  AddError(ecInvalidBmpSize, 'Invalid BMP size');
   AddError(ecCompressedDataTooLarge, 'Compressed data too large');
 end;
 
