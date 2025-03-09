@@ -63,6 +63,8 @@ var
   dest: PChar;
 begin
   New := nil;
+  if ASource = '' then
+    exit;
   GetMem(dest, System.Length(ASource) + 1);
   if not Assigned(dest) then
     exit;

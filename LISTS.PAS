@@ -14,7 +14,7 @@ uses
 
 const
   ListBufferSize = MaxVarSize div SizeOf(Pointer);
-  DefaultListSize = 4;
+  DefaultListSize = 16;
 
 type
   PObjectList = ^TObjectList;
@@ -101,6 +101,7 @@ type
     DisposeObjects: boolean;
     procedure Init; virtual;
 
+    { Override these in descendant lists }
     function Add(AItem: PObject): integer;
     function GetItem(AIndex: integer): PObject;
     function IndexOf(AItem: PObject): integer;

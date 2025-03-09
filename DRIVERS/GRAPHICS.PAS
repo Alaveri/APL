@@ -375,7 +375,7 @@ begin
   end;
   FOldMode := oldMode;
   OffScreenPage := 0;
-  Modes.Create;
+  Modes.CreateCapacity(32);
   Mode := nil;
   State := CreateGraphicsState;
   StateStack.Create;

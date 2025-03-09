@@ -247,7 +247,7 @@ var
   cursor: PMouseCursor;
   sens: integer;
 begin
-  MouseCursors := New(PMouseCursorList, Create);
+  MouseCursors := New(PMouseCursorList, CreateCapacity(16));
   cursor := New(PMouseCursor, Create('Default', 15, 15, @DefaultMouseCursor));
   MouseCursors^.Add(cursor);
   cursor := New(PMouseCursor, Create('Beam', 15, 15, @DefaultBeamMouseCursor));
