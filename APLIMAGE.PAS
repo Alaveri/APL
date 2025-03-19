@@ -8,6 +8,7 @@ uses
   AplConst,
   AplObj,
   AplIO,
+  MemDrv,
   Compress,
   Palettes,
   AplUtils,
@@ -116,7 +117,7 @@ type
 
   TAplStreamImage = object(TAplImage)
   public
-    function Buffer: PMemoryStream;
+    function Buffer: PStream;
     function IsStreamImage: boolean; virtual;
     destructor Free; virtual;
     procedure CreateBuffer; virtual;
@@ -126,7 +127,7 @@ type
     procedure ClearLong(AColor: longint); virtual;
     procedure LoadImage(AStream: PStream; const ABlock: TAplImageBlock); virtual;
     procedure SaveImage(AStream: PStream); virtual;
-    procedure SetBuffer(ABuffer: PMemoryStream);
+    procedure SetBuffer(ABuffer: PStream);
   end;
 
 implementation
@@ -183,7 +184,7 @@ constructor TAplImage.CreateDimsBpp(const AWidth, AHeight, ABpp: word);
 begin
   inherited Create;
   InitAll(AWidth, AHeight, ABpp, 1, nil);
-    CreateBuffer;
+  CreateBuffer;
 end;
 
 constructor TAplImage.CreateDims(const AWidth, AHeight: word);
@@ -652,12 +653,12 @@ begin
   inherited Free;
 end;
 
-function TAplStreamImage.Buffer: PMemoryStream;
+function TAplStreamImage.Buffer: PStream;
 begin
-  Buffer := PMemoryStream(FBuffer);
+  Buffer := PStream(FBuffer);
 end;
 
-procedure TAplStreamImage.SetBuffer(ABuffer: PMemoryStream);
+procedure TAplStreamImage.SetBuffer(ABuffer: PStream);
 begin
   if Assigned(FBuffer) then
     FreeAndNil(FBuffer);
@@ -681,40 +682,18 @@ begin
     Raise(ecInvalidImage);
     exit;
   end;
-  PMemoryStream(FBuffer)^.Seek(0, soFromBeginning);
-  PMemoryStream(FBuffer)^.Fill(DataSize, AColor);
+  PStream(FBuffer)^.Seek(0, soFromBeginning);
+  PStream(FBuffer)^.Fill(DataSize, AColor);
 end;
 
 procedure TAplStreamImage.ClearWord(AColor: word);
 begin
-  if HasException then
-    exit;
-  if DataSize = 0 then begin
-    Raise(ecInvalidImage);
-    exit;
-  end;
-  if not Assigned(FBuffer) then begin
-    Raise(ecInvalidImage);
-    exit;
-  end;
-  PMemoryStream(FBuffer)^.Seek(0, soFromBeginning);
-  PMemoryStream(FBuffer)^.FillWord(DataSize, AColor);
+  Raise(ecNotImplemented);
 end;
 
 procedure TAplStreamImage.ClearLong(AColor: longint);
 begin
-  if HasException then
-    exit;
-  if DataSize = 0 then begin
-    Raise(ecInvalidImage);
-    exit;
-  end;
-  if not Assigned(FBuffer) then begin
-    Raise(ecInvalidImage);
-    exit;
-  end;
-  PMemoryStream(FBuffer)^.Seek(0, soFromBeginning);
-  PMemoryStream(FBuffer)^.FillLong(DataSize, AColor);
+  Raise(ecNotImplemented);
 end;
 
 procedure TAplStreamImage.FreeBuffer;
@@ -730,10 +709,10 @@ begin
     Raise(ecInvalidImage);
     exit;
   end;
-  FBuffer := New(PMemoryStream, CreateRefSize(DataSize, 8192));
+  FBuffer := CreateMemoryStream(DataSize);
   if NilPtr(FBuffer, ecNotEnoughMemory) then
     exit;
-  PMemoryStream(FBuffer)^.FreeBuffers := true;
+  CheckReraise(@Memory);
 end;
 
 procedure TAplStreamImage.LoadImage(AStream: PStream; const ABlock: TAplImageBlock);

@@ -246,7 +246,8 @@ end;
 procedure TVga8Driver.Line(AX1, AY1, AX2, AY2: integer);
 var
   aError, aError2, sx, sy, dlx, dly: integer;
-  x, y, right, bottom, width: integer;
+  screenPtr: PByte;
+  x, y, right, bottom, drawWidth, screenWidth: integer;
   color: byte;
   drawRect: TRect;
 begin
@@ -264,30 +265,68 @@ begin
     sy := -1;
 
   aError := dlx + dly;
-  x := drawRect.X;
-  y := drawRect.Y;
-  right := drawRect.Right;
-  bottom := drawRect.Bottom;
-  width := Mode^.Width;
+  drawRect.GetCoords(x, y, right, bottom);
+
+  screenPtr := State^.FrameBuffer;
+  screenWidth := Mode^.Width;
+  drawWidth := drawRect.Width;
   color := State^.ForeColor;
-  while true do begin
-    if State^.ViewPort.Contains(AX1, AY1) then
-      GetScreenPointer(AX1, AY1)^ := color;
-    if (AX1 = AX2) and (AY1 = AY2) then
-      break;
-    aError2 := 2 * aError;
-    if aError2 >= dly then begin
-      if AX1 = AX2 then
-        break;
-      Inc(aError, dly);
-      Inc(AX1, sx);
-    end;
-    if aError2 <= dlx then begin
-      if AY1 = AY2 then
-        break;
-      Inc(aError, dlx);
-      Inc(AY1, sy);
-    end;
+  asm
+    mov cx, aError
+    les di, screenPtr
+    @loop:
+      mov ax, AX1
+      cmp ax, x
+      jl @xCompare
+      cmp ax, right
+      jg @xCompare
+      mov ax, AY1
+      cmp ax, y
+      jl @xCompare
+      cmp ax, bottom
+      jg @xCompare
+      mul screenWidth
+      add ax, AX1
+      add di, ax
+      mov bl, color
+      mov es:[di], bl
+      sub di, ax
+    @xCompare:
+      mov ax, AX1
+      mov bx, AX2
+      cmp ax, bx
+      jne @continue
+      mov ax, AY1
+      mov bx, AY2
+      cmp ax, bx
+      jne @continue
+      jmp @endLoop
+    @continue:
+      mov dx, cx
+      shl dx, 1
+      mov ax, dly
+      cmp dx, ax
+      jl @yCompare
+      mov ax, AX1
+      mov bx, AX2
+      cmp ax, bx
+      je @endLoop
+      add cx, dly
+      add ax, sx
+      mov AX1, ax
+    @yCompare:
+      mov ax, dlx
+      cmp dx, ax
+      jg @loop
+      mov AX, AY1
+      mov bx, AY2
+      cmp ax, dx
+      je @endLoop
+      add cx, dlx
+      add ax, sy
+      mov AY1, ax
+      jmp @loop
+    @endLoop:
   end;
 end;
 
@@ -524,13 +563,13 @@ end;
 
 procedure DrawLineStream(const ALineInfo: TLineInfo);
 var
-  screenPtr, imagePtr: PByte;
-  lineWidth, partialWidth: integer;
+  screenPtr: PByte;
+  lineWidth: integer;
   stream: PStream;
   sy, yIndex: integer;
 begin
   with ALineInfo, Driver^ do begin
-    imagePtr := PByte(Image);
+    stream := PStream(Image);
     screenPtr := Screen;
     stream^.Seek(Start + (YIndex + ImageRect.Y) * longint(ImageRect.Width) +
       ImageRect.X, soFromBeginning);
@@ -613,7 +652,7 @@ begin
   source.Intersect(ASourceBounds);
   if dest.IsEmpty then
     exit;
-  lineWidth := source.Width;
+  lineWidth := dest.Width;
   for yIndex := 0 to dest.Height - 1 do begin
     screenPtr := GetScreenPointer(dest.X, dest.Y + yIndex);
     imagePtr := image;
@@ -639,7 +678,7 @@ begin
   source.Intersect(ASourceBounds);
   if dest.IsEmpty then
     exit;
-  lineWidth := source.Width;
+  lineWidth := dest.Width;
   for yIndex := 0 to dest.Height - 1 do begin
     screenPtr := GetScreenPointer(dest.X, dest.Y + yIndex);
     ABuffer^.Seek(longint(yIndex) * ASourceBounds.Width + ASourceRect.X, soFromBeginning);
@@ -739,8 +778,7 @@ begin
   dx := dest.X;
   dy := dest.Y;
 
-
-  lineWidth := source.Width;
+  lineWidth := dest.Width;
   nextLine := Mode^.Width - lineWidth;
   sourcePtr := InternalGetScreenPointer(sx, sy, ASourcePage);
   destPtr := InternalGetScreenPointer(dx, dy, ADestPage);

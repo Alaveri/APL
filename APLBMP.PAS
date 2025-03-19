@@ -236,7 +236,7 @@ end;
 var
   PreviousExitProc: PProc;
 
-procedure Finalize;
+procedure Finalize; far;
 begin
   ExitProc := PreviousExitProc;
   TBmp.Free;

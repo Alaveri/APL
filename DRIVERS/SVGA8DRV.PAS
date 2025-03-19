@@ -809,13 +809,12 @@ end;
 procedure DrawLineStream(const ALineInfo: TLineInfo);
 var
   offset: longint;
-  screenPtr, imagePtr: PByte;
+  screenPtr: PByte;
   lineWidth, partialWidth: integer;
   stream: PStream;
   sy, yIndex: integer;
 begin
   with ALineInfo, Driver^ do begin
-    imagePtr := PByte(Image);
     screenPtr := Screen;
     stream := PStream(ALineInfo.Image);
     stream^.Seek(Start + (YIndex + ImageRect.Y) * longint(ImageRect.Width) +

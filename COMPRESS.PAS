@@ -137,10 +137,8 @@ procedure TCompressor.WriteByte(AByte: byte);
 begin
   if FWriteByteIndex >= FWriteSize then begin
     FWriteSize := Dest^.Write(FWriteByteBuffer, FWriteByteIndex);
-    if FWriteSize = 0 then begin
-      Raise(ecWritePastStreamEnd);
+    if FWriteSize = 0 then
       exit;
-    end;
     FWriteByteIndex := 0;
     if CheckReraise(Dest) then
       exit;
@@ -179,22 +177,19 @@ function TCompressor.FlushWriteBuffer: boolean;
 var
   written: word;
 begin
-  FlushWriteBuffer := true;
-  if Dest^.HasException or HasException or (FWriteByteIndex < 1) then begin
-    FlushWriteBuffer := false;
+  FlushWriteBuffer := false;
+  CheckReraise(Dest);
+  if HasException or (FWriteByteIndex = 0) then
     exit;
-  end;
   written := Dest^.Write(FWriteByteBuffer, FWriteByteIndex);
-  if written = 0 then begin
-    Raise(ecWritePastStreamEnd);
-    FlushWriteBuffer := false;
+  if written = 0 then
     exit;
-  end;
   if Dest^.HasException then begin
     Raise(Dest^.Exception^.Code);
     Dest^.ClearException;
-    FlushWriteBuffer := false;
   end;
+  FWriteByteIndex := 0;
+  FlushWriteBuffer := true;
 end;
 
 function TCompressor.ReadByte: byte;
@@ -202,12 +197,11 @@ var
   current: byte;
   byteCount: longint;
 begin
+  ReadByte := 0;
   if FReadByteIndex >= FReadSize then begin
     FReadSize := Source^.Read(FReadByteBuffer, FReadByteBufferSize);
-    if FReadSize = 0 then begin
-      Raise(ecReadPastStreamEnd);
+    if FReadSize = 0 then
       exit;
-    end;
     if CheckReraise(Source) then
       exit;
     FReadByteIndex := 0;

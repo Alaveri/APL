@@ -17,6 +17,7 @@ uses
 type
   PStream = ^TStream;
   PMemoryStream = ^TMemoryStream;
+  PEmsStream = ^TEmsStream;
   PFileStream = ^TFileStream;
   PStreamList = ^TStreamList;
   PMemoryStreamList = ^TMemoryStreamList;
@@ -70,6 +71,9 @@ type
     function Seek(AOffset: longint; AOrigin: TSeekOrigin): longint; virtual;
     function WriteToStream(AStream: PStream; ACount: longint): longint; virtual;
     function ReadFromStream(AStream: PStream; ACount: longint): longint; virtual;
+    function FillWord(ACount: longint; AWord: word): longint; virtual;
+    function Fill(ACount: longint; AByte: byte): longint; virtual;
+    function FillLong(ACount: longint; ALong: longint): longint; virtual;
     procedure Init; virtual;
     procedure Close; virtual;
     procedure ReadDateTime(var ADateTime: TDateTime); virtual;
@@ -87,13 +91,11 @@ type
 
   TMemoryStream = object(TStream)
   private
-    FReferences: PReferenceList;
-    procedure DeallocateReferences;
+    FBuffers: PMemoryReferenceList;
+    procedure SetSize(ASize: longint);
   public
     FreeBuffers: boolean;
-    RefSize: word;
     constructor Create(ASize: longint);
-    constructor CreateRefSize(ASize: longint; ARefSize: word);
     constructor CreateBuffer(ABuffer: pointer; ASize: word);
     destructor Free; virtual;
     function Read(ABuffer: pointer; ACount: longint): longint; virtual;
@@ -102,11 +104,32 @@ type
     function CanRead: boolean; virtual;
     function CanWrite: boolean; virtual;
     function CanSeek: boolean; virtual;
-    function BufferPointer: pointer;
     function FillWord(ACount: longint; AWord: word): longint; virtual;
     function Fill(ACount: longint; AByte: byte): longint; virtual;
     function FillLong(ACount: longint; ALong: longint): longint; virtual;
-    procedure SetSize(ASize: longint); virtual;
+    procedure Init; virtual;
+  end;
+
+  TEmsReadWriteProc = procedure(var ABuffer; AEmsBuffer: pointer; ACount: longint);
+  TEmsIncBufferFunc = function(var ABuffer; ACount: longint): pointer;
+
+  TEmsStream = object(TStream)
+  private
+    FReference: PEmsReference;
+    function ReadWrite(ABuffer: pointer; ACount: longint; AProc: TEmsReadWriteProc;
+      AIncBufferFunc: TEmsIncBufferFunc): longint;
+  public
+    constructor Create(ASize: longint);
+    destructor Free; virtual;
+    function Read(ABuffer: pointer; ACount: longint): longint; virtual;
+    function Write(ABuffer: pointer; ACount: longint): longint; virtual;
+    function WriteToStream(AStream: PStream; ACount: longint): longint; virtual;
+    function CanRead: boolean; virtual;
+    function CanWrite: boolean; virtual;
+    function CanSeek: boolean; virtual;
+    function FillWord(ACount: longint; AWord: word): longint; virtual;
+    function Fill(ACount: longint; AByte: byte): longint; virtual;
+    function FillLong(ACount: longint; ALong: longint): longint; virtual;
     procedure Init; virtual;
   end;
 
@@ -175,12 +198,21 @@ type
   end;
 
 function DefaultBufferStreamSizeFunc(ACapacity: word): word; far;
+function CreateMemoryStream(ASize: longint): PStream; far;
 
 implementation
 
 uses
   Strings,
   AplStr;
+
+function CreateMemoryStream(ASize: longint): PStream;
+begin
+  if Memory.EmsSupported then
+    CreateMemoryStream := New(PEmsStream, Create(ASize))
+  else
+    CreateMemoryStream := New(PMemoryStream, Create(ASize));
+end;
 
 function DefaultBufferStreamSizeFunc(ACapacity: word): word;
 var
@@ -332,6 +364,21 @@ begin
   ReadWord := aNum;
 end;
 
+function TStream.Fill(ACount: longint; AByte: byte): longint;
+begin
+  Abstract;
+end;
+
+function TStream.FillWord(ACount: longint; AWord: word): longint;
+begin
+  Abstract;
+end;
+
+function TStream.FillLong(ACount: longint; ALong: longint): longint;
+begin
+  Abstract;
+end;
+
 function TStream.WriteToStream(AStream: PStream; ACount: longint): longint;
 begin
   Abstract;
@@ -467,82 +514,25 @@ begin
   SetSize(ASize);
 end;
 
-constructor TMemoryStream.CreateRefSize(ASize: longint; ARefSize: word);
-begin
-  inherited Create;
-  RefSize := ARefSize;
-  SetSize(ASize);
-end;
-
 constructor TMemoryStream.CreateBuffer(ABuffer: pointer; ASize: word);
 var
-  reference: PReference;
+  reference: PMemoryReference;
 begin
   inherited Create;
-  reference := Memory.CreateReference(ABuffer, ASize);
-  Size :=  ASize;
+  reference := Memory.CreateBufferReference(ABuffer, ASize);
+  Size :=  0;
   if not Assigned(reference) then begin
     Raise(Memory.Exception^.Code);
     exit;
   end;
-  FReferences^.Add(reference);
+  FBuffers^.Add(reference);
   Size := ASize;
-end;
-
-procedure TMemoryStream.SetSize(ASize: longint);
-var
-  reference: PReference;
-  remaining: longint;
-  newSize: longint;
-begin
-  DeallocateReferences;
-  Memory.BeginAllocTransaction;
-  remaining := ASize;
-  while remaining > 0 do begin
-    newSize := MinL(remaining, RefSize);
-    reference := Memory.Alloc(newSize);
-    if Memory.HasException then begin
-      Raise(Memory.Exception^.Code);
-      Memory.ClearException;
-      Memory.RollbackAllocTransaction;
-      FReferences^.Clear;
-      exit;
-    end;
-    FReferences^.Add(reference);
-    Dec(remaining, newSize);
-  end;
-  Size := ASize;
-  Memory.CommitAllocTransaction;
-  Fill(Size, 0);
-  Position := 0;
-end;
-
-procedure TMemoryStream.DeallocateReferences;
-var
-  index: integer;
-  reference: PReference;
-begin
-  for index := FReferences^.Count - 1 downto 0 do begin
-    reference := FReferences^.GetItem(index);
-    if FreeBuffers then
-      Memory.DeAlloc(reference)
-    else begin
-      Memory.FreeReferencePreserve(reference);
-    end;
-  end;
-  Size := 0;
-  Position := 0;
-end;
-
-function TMemoryStream.BufferPointer: pointer;
-begin
-  BufferPointer := Memory.ReferencePointer(FReferences^.First);
 end;
 
 destructor TMemoryStream.Free;
 begin
-  DeallocateReferences;
-  FreeAndNil(FReferences);
+  FBuffers^.DisposeObjects := FreeBuffers;
+  FreeAndNil(FBuffers);
   inherited Free;
 end;
 
@@ -551,7 +541,7 @@ var
   bytesRead: longint;
   index: integer;
   offset: longint;
-  reference: PReference;
+  reference: PConventionalReference;
   readSize: longint;
   ptr: PByte;
   buffer: PByte;
@@ -562,15 +552,15 @@ begin
   Read := 0;
   bytesRead := 0;
   while bytesRead < ACount do begin
-    index := Position div RefSize;
+    index := Position div MaxVarSize;
     if index = -1 then
       break;
-    offset := Position mod RefSize;
-    reference := FReferences^.GetItem(index);
+    offset := Position mod MaxVarSize;
+    reference := PConventionalReference(FBuffers^.GetItem(index));
     readSize := MinL(reference^.Size - offset, ACount - bytesRead);
     if readSize <= 0 then
       break;
-    ptr := Memory.ReferencePointer(reference);
+    ptr := reference^.Ptr;
     Inc(ptr, offset);
     Move(ptr^, buffer^, readSize);
     Inc(buffer, readSize);
@@ -584,7 +574,7 @@ function TMemoryStream.Fill(ACount: longint; AByte: byte): longint;
 var
   index: integer;
   written: longint;
-  reference: PReference;
+  reference: PConventionalReference;
   offset: longint;
   writeSize: word;
   aptr: PByte;
@@ -594,15 +584,15 @@ begin
   Fill := 0;
   written := 0;
   while written < ACount do begin
-    index := Position div RefSize;
-    if index > FReferences^.Count - 1 then
+    index := Position div MaxVarSize;
+    if index > FBuffers^.Count - 1 then
       break;
-    offset := Position mod RefSize;
-    reference := FReferences^.GetItem(index);
+    offset := Position mod MaxVarSize;
+    reference := PConventionalReference(FBuffers^.GetItem(index));
     writeSize := MinL(reference^.Size - offset, ACount - written);
     if writeSize < SizeOf(byte) then
       break;
-    aptr := Memory.ReferencePointer(reference);
+    aptr := reference^.Ptr;
     Inc(aptr, offset);
     asm
       les di, aptr
@@ -621,7 +611,7 @@ function TMemoryStream.FillWord(ACount: longint; AWord: word): longint;
 var
   index: integer;
   written: longint;
-  reference: PReference;
+  reference: PConventionalReference;
   offset: longint;
   writeSize: word;
   aptr: PWord;
@@ -632,16 +622,16 @@ begin
   FillWord := 0;
   written := 0;
   while written < ACount do begin
-    index := Position div RefSize;
-    if index > FReferences^.Count - 1 then
+    index := Position div MaxVarSize;
+    if index > FBuffers^.Count - 1 then
       break;
-    offset := Position mod RefSize;
-    reference := FReferences^.GetItem(index);
+    offset := Position mod MaxVarSize;
+    reference := PConventionalReference(FBuffers^.GetItem(index));
     writeSize := MinL(reference^.Size - offset, ACount - written);
     if writeSize < SizeOf(word) then
       break;
     count := writeSize div SizeOf(word);
-    aptr := Memory.ReferencePointer(reference);
+    aptr := PWord(reference^.Ptr);
     Inc(aptr, offset);
     asm
       les di, aptr
@@ -660,7 +650,7 @@ function TMemoryStream.FillLong(ACount: longint; ALong: longint): longint;
 var
   index: word;
   written: longint;
-  reference: PReference;
+  reference: PMemoryReference;
   offset: longint;
   writeSize: word;
   aptr: PLongint;
@@ -671,16 +661,16 @@ begin
   FillLong := 0;
   written := 0;
   while written < ACount do begin
-    index := Position div RefSize;
-    if index > FReferences^.Count - 1 then
+    index := Position div MaxVarSize;
+    if index > FBuffers^.Count - 1 then
       break;
-    offset := Position mod RefSize;
-    reference := FReferences^.GetItem(index);
+    offset := Position mod MaxVarSize;
+    reference := FBuffers^.GetItem(index);
     writeSize := MinL(reference^.Size - offset, ACount - written);
     if writeSize < SizeOf(longint) then
       break;
     count := writeSize div SizeOf(longint);
-    aptr := Memory.ReferencePointer(reference);
+    aptr := PLongint(PConventionalReference(reference)^.Ptr);
     Inc(aptr, offset);
     for index := 0 to count - 1 do begin
       aptr^ := ALong;
@@ -696,7 +686,7 @@ function TMemoryStream.Write(ABuffer: pointer; ACount: longint): longint;
 var
   index: integer;
   written: longint;
-  reference: PReference;
+  reference: PConventionalReference;
   offset: longint;
   writeSize: longint;
   ptr: PByte;
@@ -708,15 +698,15 @@ begin
   Write := 0;
   written := 0;
   while written < ACount do begin
-    index := Position div RefSize;
-    if index > FReferences^.Count - 1  then
+    index := Position div MaxVarSize;
+    if index > FBuffers^.Count - 1 then
       break;
-    offset := Position mod RefSize;
-    reference := FReferences^.GetItem(index);
+    offset := Position mod MaxVarSize;
+    reference := PConventionalReference(FBuffers^.GetItem(index));
     writeSize := MinL(reference^.Size - offset, ACount - written);
     if writeSize <= 0 then
       break;
-    ptr := Memory.ReferencePointer(reference);
+    ptr := reference^.Ptr;
     Inc(ptr, offset);
     Move(buffer^, ptr^, writeSize);
     Inc(buffer, writeSize);
@@ -731,7 +721,7 @@ var
   index: integer;
   refWritten: word;
   bytesWritten, total: longint;
-  reference: PReference;
+  reference: PConventionalReference;
   offset: longint;
   writeSize: longint;
   ptr, destPtr: PByte;
@@ -741,15 +731,15 @@ begin
   WriteToStream := 0;
   total := 0;
   while total < ACount do begin
-    index := Position div RefSize;
-    if index > FReferences^.Count - 1 then
+    index := Position div MaxVarSize;
+    if index > FBuffers^.Count - 1 then
       break;
-    offset := Position mod RefSize;
-    reference := FReferences^.GetItem(index);
+    offset := Position mod MaxVarSize;
+    reference := PConventionalReference(FBuffers^.GetItem(index));
     writeSize := MinL(reference^.Size - offset, ACount - total);
     if writeSize <= 0 then
       break;
-    ptr := Memory.ReferencePointer(reference);
+    ptr := reference^.Ptr;
     Inc(ptr, offset);
     bytesWritten := AStream^.Write(ptr, writeSize);
     if bytesWritten = 0 then
@@ -763,9 +753,35 @@ end;
 procedure TMemoryStream.Init;
 begin
   inherited Init;
-  FReferences := New(PReferenceList, Create);
+  FBuffers := New(PMemoryReferenceList, Create);
   FreeBuffers := true;
-  RefSize := MaxVarSize;
+end;
+
+procedure TMemoryStream.SetSize(ASize: longint);
+var
+  remaining: longint;
+  bytes: word;
+  reference: PMemoryReference;
+begin
+  FBuffers^.Clear;
+  remaining := ASize;
+  Memory.BeginTransaction;
+  while remaining > 0 do begin
+    bytes := MinL(MaxVarSize, remaining);
+    reference := Memory.CreateReference(false, bytes);
+    if CheckReraise(@Memory) then begin
+      Memory.RollbackTransaction;
+      FBuffers^.Clear;
+      exit;
+    end;
+    FBuffers^.Add(reference);
+    Dec(remaining, bytes);
+  end;
+  Memory.CommitTransaction;
+  Size := ASize;
+  Position := 0;
+  Fill(Size, 0);
+  Seek(0, soFromBeginning);
 end;
 
 function TMemoryStream.CanRead: boolean;
@@ -828,13 +844,13 @@ end;
 procedure TBufferStream.Resize(AMinCapacity: longint);
 var
   newCapacity: longint;
-  reference, last: PReference;
+  reference, last: PConventionalReference;
   ptr, newPtr: PByte;
 begin
   newCapacity := TBufferStreamSizeFunc(BufferStreamSizeFunc)(AMinCapacity);
   if newCapacity = Size then
     exit;
-  if FReferences^.Count = 0 then begin
+  if FBuffers^.Count = 0 then begin
     SetSize(newCapacity);
     exit;
   end;
@@ -847,7 +863,7 @@ begin
   if NilPtr(newPtr, ecNotEnoughMemory) then
     exit;
   FillChar(newPtr^, newCapacity, 0);
-  ptr := Memory.ReferencePointer(FReferences^.GetItem(0));
+  ptr := PConventionalReference(FBuffers^.GetItem(0))^.Ptr;
   if newCapacity > FCapacity then
     Move(ptr^, newPtr^, FCapacity)
   else begin
@@ -962,7 +978,8 @@ end;
 
 function TFileStream.WriteToStream(AStream: PStream; ACount: longint): longint;
 var
-  remaining, bytesWritten, bytesRead, bytes: word;
+  bytesWritten, bytesRead, bytes: longint;
+  remaining: longint;
   buffer: PByte;
   total: longint;
 begin
@@ -975,7 +992,7 @@ begin
   while total < ACount do begin
     {$I-}
     Seek(Position, soFromBeginning);
-    bytes := MinW(BufferSize, remaining);
+    bytes := MinL(BufferSize, remaining);
     bytesRead := Read(buffer, bytes);
     if bytesRead = 0 then
       break;
@@ -1152,6 +1169,170 @@ end;
 procedure TMemoryStreamList.Insert(AIndex: integer; AItem: PMemoryStream);
 begin
   inherited Insert(AIndex, AItem);
+end;
+
+constructor TEmsStream.Create(ASize: longint);
+begin
+  inherited Create;
+  FReference := PEmsReference(Memory.CreateReference(true, ASize));
+  Size := ASize;
+  CheckReraise(@Memory);
+end;
+
+procedure EmsRead(var ABuffer; AEmsBuffer: pointer; ACount: longint);
+var
+  buffer: PByte;
+  emsBuffer: PByte;
+begin
+  buffer := PByte(pointer(ABuffer));
+  emsBuffer := PByte(AEmsBuffer);
+  Move(emsBuffer^, buffer^, ACount);
+end;
+
+procedure EmsWrite(var ABuffer; AEmsBuffer: pointer; ACount: longint);
+var
+  buffer: PByte;
+  emsBuffer: PByte;
+begin
+  buffer := PByte(pointer(ABuffer));
+  emsBuffer := PByte(AEmsBuffer);
+  Move(buffer^, emsBuffer^, ACount);
+end;
+
+procedure EmsStreamWrite(var ABuffer; AEmsBuffer: pointer; ACount: longint);
+var
+  stream: PStream;
+  emsBuffer: PByte;
+begin
+  stream := PStream(pointer(ABuffer));
+  emsBuffer := PByte(AEmsBuffer);
+  stream^.Write(emsBuffer, ACount);
+end;
+
+function EmsIncBuffer(var ABuffer; ACount: longint): pointer;
+var
+  result: PByte;
+begin
+  result := PByte(ABuffer);
+  Inc(result, ACount);
+  EmsIncBuffer := result;
+end;
+
+function EmsIncStream(var ABuffer; ACount: longint): pointer;
+begin
+  EmsIncStream := PStream(pointer(ABuffer));
+end;
+
+function TEmsStream.ReadWrite(ABuffer: pointer; ACount: longint;
+  AProc: TEmsReadWriteProc; AIncBufferFunc: TEmsIncBufferFunc): longint;
+var
+  handle, page, offset, bytes: word;
+  bufferPtr, emsPtr: pointer;
+  start, remaining: longint;
+begin
+  if HasException then
+    exit;
+  if Position + ACount > Size then
+    ACount := Size - Position;
+  if ACount <= 0 then begin
+    ReadWrite := 0;
+    exit;
+  end;
+  start := Position;
+  handle := FReference^.Handle;
+  page := Position div EmsPageSize;
+  offset := Position mod EmsPageSize;
+  remaining := ACount;
+  bufferPtr := pointer(ABuffer);
+  Memory.SetCurrentPage(FReference, page);
+  while remaining > 0 do begin
+    bytes := MinL(EmsPageSize - offset, remaining);
+    emsPtr := Ptr(Memory.PhysPageSeg, offset);
+    AProc(bufferPtr, emsPtr, bytes);
+    bufferPtr := AIncBufferFunc(ABuffer, bytes);
+    Inc(Position, bytes);
+    Dec(remaining, bytes);
+    if remaining > 0 then begin
+      Inc(page);
+      offset := 0;
+      Memory.SetCurrentPage(FReference, page);
+    end;
+    if HasException then
+      break;
+  end;
+  ReadWrite := Position - start;
+end;
+
+function TEmsStream.Read(ABuffer: pointer; ACount: longint): longint;
+begin
+  Read := ReadWrite(ABuffer, ACount, EmsRead, EmsIncBuffer);
+end;
+
+function TEmsStream.Write(ABuffer: pointer; ACount: longint): longint;
+begin
+  Write := ReadWrite(ABuffer, ACount, EmsWrite, EmsIncBuffer);
+end;
+
+function TEmsStream.WriteToStream(AStream: PStream; ACount: longint): longint;
+begin
+  WriteToStream := ReadWrite(AStream, ACount, EmsStreamWrite, EmsIncStream);
+end;
+
+function TEmsStream.CanRead: boolean;
+begin
+  CanRead := true;
+end;
+
+function TEmsStream.CanWrite: boolean;
+begin
+  CanWrite := true;
+end;
+
+function TEmsStream.CanSeek: boolean;
+begin
+  CanSeek := true;
+end;
+
+function TEmsStream.Fill(ACount: longint; AByte: byte): longint;
+var
+  buffer: array[0..255] of byte;
+  remaining: longint;
+  result: longint;
+begin
+  FillChar(buffer, SizeOf(buffer), AByte);
+  Fill := 0;
+  remaining := ACount;
+  while remaining > 0 do begin
+    result := Write(@buffer, MinL(remaining, SizeOf(buffer)));
+    if result = 0 then
+      break;
+    Dec(remaining, result);
+    if HasException then
+      break;
+  end;
+  Fill := ACount - remaining;
+end;
+
+function TEmsStream.FillWord(ACount: longint; AWord: word): longint;
+begin
+  Raise(ecNotImplemented);
+end;
+
+function TEmsStream.FillLong(ACount: longint; ALong: longint): longint;
+begin
+  Raise(ecNotImplemented);
+end;
+
+procedure TEmsStream.Init;
+begin
+  inherited Init;
+  FReference := nil;
+end;
+
+destructor TEmsStream.Free;
+begin
+  FreeAndNil(FReference);
+  inherited Free;
 end;
 
 procedure TMemoryStreamList.Delete(AIndex: integer);

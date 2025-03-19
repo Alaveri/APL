@@ -20,6 +20,7 @@ type
   PMouseCursorList = ^TMouseCursorList;
 
   TMouseCursorImage = array[0..14, 0..14] of byte;
+  TSmallMouseCursorImage = array[0..9, 0..9] of byte;
 
   TMouseCursor = object(TIdentifiable)
   private
@@ -189,6 +190,89 @@ const
     ($FF, $FF, $FF, $FF, $FF, $0F, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF)
   );
 
+  SmallDefaultMouseCursor: TSmallMouseCursorImage =
+  (
+    ($FF, $FF, $FF, $FF, $0F, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $0F, $00, $0F, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $0F, $00, $00, $00, $0F, $FF, $FF, $FF),
+    ($FF, $0F, $00, $00, $00, $00, $00, $0F, $FF, $FF),
+    ($FF, $0F, $0F, $0F, $00, $0F, $0F, $0F, $FF, $FF),
+    ($FF, $FF, $FF, $0F, $00, $0F, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $0F, $00, $0F, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $0F, $0F, $0F, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF)
+  );
+
+  SmallDefaultBeamMouseCursor: TSmallMouseCursorImage =
+  (
+    ($FF, $FF, $0F, $0F, $0F, $0F, $0F, $FF, $FF, $FF),
+    ($FF, $FF, $0F, $00, $00, $00, $0F, $FF, $FF, $FF),
+    ($FF, $FF, $0F, $0F, $00, $0F, $0F, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $0F, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $0F, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $0F, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $0F, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $0F, $0F, $00, $0F, $0F, $FF, $FF, $FF),
+    ($FF, $FF, $0F, $00, $00, $00, $0F, $FF, $FF, $FF),
+    ($FF, $FF, $0F, $0F, $0F, $0F, $0F, $FF, $FF, $FF)
+  );
+
+  SmallDefaultNWSECursor: TSmallMouseCursorImage =
+  (
+    ($0F, $0F, $0F, $0F, $0F, $0F, $FF, $FF, $FF, $FF),
+    ($0F, $00, $00, $00, $00, $0F, $FF, $FF, $FF, $FF),
+    ($0F, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF),
+    ($0F, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF),
+    ($0F, $00, $0F, $00, $00, $0F, $FF, $0F, $0F, $FF),
+    ($0F, $0F, $FF, $0F, $00, $00, $0F, $00, $0F, $FF),
+    ($FF, $FF, $FF, $FF, $0F, $00, $00, $00, $0F, $FF),
+    ($FF, $FF, $FF, $FF, $0F, $00, $00, $00, $0F, $FF),
+    ($FF, $FF, $FF, $0F, $00, $00, $00, $00, $0F, $FF),
+    ($FF, $FF, $FF, $0F, $0F, $0F, $0F, $0F, $0F, $FF)
+  );
+
+  SmallDefaultNESWCursor: TSmallMouseCursorImage =
+  (
+    ($FF, $FF, $FF, $0F, $0F, $0F, $0F, $0F, $0F, $FF),
+    ($FF, $FF, $FF, $0F, $00, $00, $00, $00, $0F, $FF),
+    ($FF, $FF, $FF, $FF, $0F, $00, $00, $00, $0F, $FF),
+    ($FF, $FF, $FF, $FF, $0F, $00, $00, $00, $0F, $FF),
+    ($0F, $0F, $FF, $0F, $00, $00, $0F, $00, $0F, $FF),
+    ($0F, $00, $0F, $00, $00, $0F, $FF, $0F, $0F, $FF),
+    ($0F, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF),
+    ($0F, $00, $00, $00, $0F, $FF, $FF, $FF, $FF, $FF),
+    ($0F, $00, $00, $00, $00, $0F, $FF, $FF, $FF, $FF),
+    ($0F, $0F, $0F, $0F, $0F, $0F, $FF, $FF, $FF, $FF)
+  );
+
+  SmallDefaultEWCursor: TSmallMouseCursorImage =
+  (
+    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $0F, $FF, $FF, $0F, $FF, $FF, $FF),
+    ($FF, $FF, $0F, $0F, $FF, $FF, $0F, $0F, $FF, $FF),
+    ($FF, $0F, $00, $0F, $0F, $0F, $0F, $00, $0F, $FF),
+    ($0F, $00, $00, $00, $00, $00, $00, $00, $00, $0F),
+    ($FF, $0F, $00, $0F, $0F, $0F, $0F, $00, $0F, $FF),
+    ($FF, $FF, $0F, $0F, $FF, $FF, $0F, $0F, $FF, $FF),
+    ($FF, $FF, $FF, $0F, $FF, $FF, $0F, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF)
+  );
+
+  SmallDefaultNSCursor: TSmallMouseCursorImage =
+  (
+    ($FF, $FF, $FF, $FF, $0F, $FF, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $0F, $00, $0F, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $0F, $00, $00, $00, $0F, $FF, $FF, $FF),
+    ($FF, $0F, $0F, $0F, $00, $0F, $0F, $0F, $FF, $FF),
+    ($FF, $FF, $FF, $0F, $00, $0F, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $0F, $00, $0F, $FF, $FF, $FF, $FF),
+    ($FF, $0F, $0F, $0F, $00, $0F, $0F, $0F, $FF, $FF),
+    ($FF, $FF, $0F, $00, $00, $00, $0F, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $0F, $00, $0F, $FF, $FF, $FF, $FF),
+    ($FF, $FF, $FF, $FF, $0F, $FF, $FF, $FF, $FF, $FF)
+  );
 
 var
   Graph8: PGraphics8Driver;
@@ -248,29 +332,58 @@ var
   sens: integer;
 begin
   MouseCursors := New(PMouseCursorList, CreateCapacity(16));
-  cursor := New(PMouseCursor, Create('Default', 15, 15, @DefaultMouseCursor));
-  MouseCursors^.Add(cursor);
-  cursor := New(PMouseCursor, Create('Beam', 15, 15, @DefaultBeamMouseCursor));
-  cursor^.OffsetX := 4;
-  cursor^.OffsetY := 7;
-  MouseCursors^.Add(cursor);
-  cursor := New(PMouseCursor, Create('NWSE', 15, 15, @DefaultNWSECursor));
-  cursor^.OffsetX := 6;
-  cursor^.OffsetY := 5;
-  MouseCursors^.Add(cursor);
-  cursor := New(PMouseCursor, Create('NESW', 15, 15, @DefaultNESWCursor));
-  cursor^.OffsetX := 6;
-  cursor^.OffsetY := 5;
-  MouseCursors^.Add(cursor);
-  cursor := New(PMouseCursor, Create('NS', 15, 15, @DefaultNSCursor));
-  cursor^.OffsetX := 6;
-  cursor^.OffsetY := 7;
-  MouseCursors^.Add(cursor);
-  cursor := New(PMouseCursor, Create('EW', 15, 15, @DefaultEWCursor));
-  cursor^.OffsetX := 7;
-  cursor^.OffsetY := 6;
-  MouseCursors^.Add(cursor);
-  MouseCursor := MouseCursors^.GetItemById('Default');
+  if Graph^.Mode^.Width < 512 then begin
+    cursor := New(PMouseCursor, Create('Default', 10, 10, @SmallDefaultMouseCursor));
+    cursor^.OffsetX := 4;
+    cursor^.OffsetY := 0;
+    MouseCursors^.Add(cursor);
+    cursor := New(PMouseCursor, Create('Beam', 10, 10, @SmallDefaultBeamMouseCursor));
+    cursor^.OffsetX := 4;
+    cursor^.OffsetY := 4;
+    MouseCursors^.Add(cursor);
+    cursor := New(PMouseCursor, Create('NWSE', 10, 10, @SmallDefaultNWSECursor));
+    cursor^.OffsetX := 4;
+    cursor^.OffsetY := 4;
+    MouseCursors^.Add(cursor);
+    cursor := New(PMouseCursor, Create('NESW', 10, 10, @SmallDefaultNESWCursor));
+    cursor^.OffsetX := 4;
+    cursor^.OffsetY := 4;
+    MouseCursors^.Add(cursor);
+    cursor := New(PMouseCursor, Create('NS', 10, 10, @SmallDefaultNSCursor));
+    cursor^.OffsetX := 4;
+    cursor^.OffsetY := 4;
+    MouseCursors^.Add(cursor);
+    cursor := New(PMouseCursor, Create('EW', 10, 10, @SmallDefaultEWCursor));
+    cursor^.OffsetX := 4;
+    cursor^.OffsetY := 4;
+    MouseCursors^.Add(cursor);
+    MouseCursor := MouseCursors^.GetItemById('Default');
+  end
+  else begin
+    cursor := New(PMouseCursor, Create('Default', 15, 15, @DefaultMouseCursor));
+    MouseCursors^.Add(cursor);
+    cursor := New(PMouseCursor, Create('Beam', 15, 15, @DefaultBeamMouseCursor));
+    cursor^.OffsetX := 4;
+    cursor^.OffsetY := 7;
+    MouseCursors^.Add(cursor);
+    cursor := New(PMouseCursor, Create('NWSE', 15, 15, @DefaultNWSECursor));
+    cursor^.OffsetX := 6;
+    cursor^.OffsetY := 5;
+    MouseCursors^.Add(cursor);
+    cursor := New(PMouseCursor, Create('NESW', 15, 15, @DefaultNESWCursor));
+    cursor^.OffsetX := 6;
+    cursor^.OffsetY := 5;
+    MouseCursors^.Add(cursor);
+    cursor := New(PMouseCursor, Create('NS', 15, 15, @DefaultNSCursor));
+    cursor^.OffsetX := 6;
+    cursor^.OffsetY := 7;
+    MouseCursors^.Add(cursor);
+    cursor := New(PMouseCursor, Create('EW', 15, 15, @DefaultEWCursor));
+    cursor^.OffsetX := 7;
+    cursor^.OffsetY := 6;
+    MouseCursors^.Add(cursor);
+    MouseCursor := MouseCursors^.GetItemById('Default');
+  end;
 end;
 
 destructor TGraphApp.Free;

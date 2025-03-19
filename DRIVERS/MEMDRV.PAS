@@ -4,101 +4,131 @@ unit MemDrv;
 interface
 
 uses
-  AplTypes,
-  AplObj,
   AplConst,
-  AplUtils,
+  AplObj,
+  AplStr,
+  AplTypes,
   AplMath,
-  Lists;
+  Lists,
+  Strings;
+
+const
+  EmsPageSize = 16384;
 
 type
-  PReferenceList = ^TReferenceList;
-  PReference = ^TReference;
-  PXmsMoveRecord = ^TXmsMoveRecord;
   PMemoryDriver = ^TMemoryDriver;
+  PEmsPhysPage = ^TEmsPhysPage;
+  PEmsPhysPages = ^TEmsPhysPages;
+  PEmsHandles = ^word;
+  PEmsPageMap = ^TEmsPageMap;
+  PEmsPageMaps = ^TEmsPageMaps;
+  PMemoryReference = ^TMemoryReference;
+  PConventionalReference = ^TConventionalReference;
+  PEmsReference = ^TEmsReference;
+  PMemoryReferenceList = ^TMemoryReferenceList;
   PMemoryAllocErrorProc = ^TMemoryAllocErrorProc;
-  PBuffer = ^TBuffer;
 
   TMemoryAllocErrorProc = function(ASize: word): boolean;
 
-  TReferenceList = object(TList)
+  TEmsPhysPage = record
+    Segm: word;
+    PageNumber: word;
+  end;
+
+  TEmsPageMap = record
+    LogPageNumber: word;
+    PhysPageNumber: word;
+  end;
+
+  TMemoryReference = object(TObject)
+  private
+    FPtr: pointer;
+  public
+    function IsEms: boolean; virtual;
+    function Size: longint; virtual;
+    procedure Init; virtual;
+  end;
+
+  TConventionalReference = object(TMemoryReference)
+  private
+    FSize: word;
+  public
+    constructor Create(ASize: word);
+    constructor CreatePtr(APtr: pointer; ASize: word);
+    destructor Free; virtual;
+    function Ptr: PByte;
+    function Size: longint; virtual;
+    function IsEms: boolean; virtual;
+    procedure Init; virtual;
+  end;
+
+  TEmsReference = object(TMemoryReference)
+  private
+    FSize: longint;
+  public
+    constructor Create(ASize: longint);
+    constructor CreateHandle(AHandle, APages: word; ASize: longint);
+    destructor Free; virtual;
+    destructor FreePreserve; virtual;
+    function Handle: word;
+    function Pages: word;
+    function Size: longint; virtual;
+    function IsEms: boolean; virtual;
+    procedure Init; virtual;
+    procedure SetHandle(AHandle, APages: word);
+  end;
+
+  TMemoryReferenceList = object(TObjectList)
   private
   public
-    destructor Free; virtual;
-    function GetItem(AIndex: integer): PReference;
-    function Add(AItem: PReference): integer;
-    function IndexOf(AItem: PReference): integer;
-    procedure SetItem(AIndex: integer; AItem: PReference);
-    procedure Insert(AIndex: integer; AItem: PReference);
+    function Add(AItem: PMemoryReference): integer;
+    function GetItem(AIndex: integer): PMemoryReference;
+    function IndexOf(AItem: PMemoryReference): integer;
+    procedure SetItem(AIndex: integer; AItem: PMemoryReference);
+    procedure Insert(AIndex: integer; AItem: PMemoryReference);
+    procedure RemoveItem(AItem: PMemoryReference);
   end;
 
-  TReferenceType = (rtConventional, rtXms, rtEms, rtFile);
-
-  TReference = record
-    Size: word;
-    case ReferenceType: TReferenceType of
-      rtXms, rtEms: (Handle: word; Unused: word);
-      rtConventional: (Ptr: pointer);
-      rtFile: (Offset: longint);
-  end;
-
-  TXmsMoveRecord = record
-    Length: longint;
-    case boolean of
-      true: (
-        Unused1: word;
-        SourcePointer: pointer;
-        DestHandle: word;
-        DestOffset: longint
-      );
-      false: (
-        SourceHandle: word;
-        SourceOffset: longint;
-        Unused2: word;
-        DestPointer: pointer
-      );
-  end;
+  TEmsPhysPages = array[0..MaxVarSize div SizeOf(TEmsPhysPage)] of TEmsPhysPage;
+  TEmsPageMaps = array[0..MaxVarSize div SizeOf(TEmsPageMap)] of TEmsPageMap;
 
   TMemoryDriver = object(TStatusObject)
   private
-    FXmsSupported: boolean;
-    FReferences: PReferenceList;
-    FCurrentReference: PReference;
-    FXmsVersion: real;
-    FTransactionReferences: PReferenceList;
-    function IsXmsSupported: boolean;
-    function GetXmsControlFunction: pointer;
-    function XmsAlloc(ASize: word): word;
-    procedure MoveReference(var AMoveRecord: TXmsMoveRecord);
-    procedure MoveToConventional(AReference: PReference);
-    procedure PurgeConventional(ASize: longint);
+    FEmsSupported: boolean;
+    FPageFrameSeg: word;
+    FPhysPageSeg: word;
+    FPhysPages: PEmsPhysPages;
+    FPhysCount: word;
+    FCurrentHandle: word;
+    FCurrentPage: integer;
+    FTransaction: PMemoryReferenceList;
+    function InitEms: boolean;
+    function CheckForEmm: boolean;
+    function GetPageFrameSegment(var ASegment: word): byte;
+    function CheckEmsStatus(AStatus: byte): boolean;
+    function GetPhysEntryCount: word;
+    function GetPhysEntries: PEmsPhysPages;
+    function GetPhysPageSeg(AEntries: PEmsPhysPages; APage: word): word;
   public
     OnAllocError: PMemoryAllocErrorProc;
-    constructor Create;
-    destructor Free; virtual;
-    function XmsSupported: boolean;
-    function XmsMaxAvail: longint;
-    function XmsVersion: real;
-    function References: PReferenceList;
-    function CurrentReference: PReference;
-    function ReferencePointer(AReference: PReference): pointer;
-    function Alloc(ASize: word): Preference;
-    function CreateReference(ABuffer: pointer; ASize: word): PReference;
-    procedure InitXms;
+    function EmsSupported: boolean;
+    function EmsSeg: word;
+    function PhysPageSeg: word;
+    function PhysPages: PEmsPhysPages;
+    function PhysPageCount: word;
+    function EmsAllocate(ACount: word): word;
+    function CreateReference(AEms: boolean; ASize: longint): PMemoryReference;
+    function CreateBufferReference(APtr: pointer; ASize: word): PMemoryReference;
+    function CurrentHandle: word;
+    function CurrentPage: integer;
+    function EmsDeallocate(AHandle: word): byte;
+    procedure SetCurrentPage(AReference: PEmsReference; APage: word);
+    procedure BeginTransaction;
+    procedure RollbackTransaction;
+    procedure CommitTransaction;
+    procedure GetPageCount(var ATotal, AUnallocated: word);
     procedure Init; virtual;
-    procedure XmsDealloc(AHandle: word);
-    procedure SetCurrentReference(AReference: PReference);
-    procedure Dealloc(var AReference: PReference);
-    procedure BeginAllocTransaction;
-    procedure CommitAllocTransaction;
-    procedure RollbackAllocTransaction;
-    procedure FreeReference(AReference: PReference);
-    procedure FreeReferencePreserve(AReference: PReference);
-    procedure Fill(AReference: PReference; AByte: byte);
-    {$IFDEF debug}
-    procedure DebugFreeHandles;
-    procedure DebugWriteHandles(ANewHandle: word);
-    {$ENDIF}
+    destructor Free; virtual;
   end;
 
   TBuffer = object(TStatusObject)
@@ -128,22 +158,38 @@ type
 
 var
   Memory: TMemoryDriver;
-  OutOfMemoryException: PException;
 
 implementation
 
 uses
-  AplStr;
-
-var
-  PreviousExitProc: PProc;
-  XmsControl: pointer;
-  MoveRecord: TXmsMoveRecord;
+  Streams,
+  Dos;
 
 const
-  HiWord = 1;
-  LoWord = 2;
-  DebugFilename = 'XmsDebug.bin';
+  EmsInt = $67;
+
+  EmsStatus: byte = $40;
+  EmsGetPageFrameAddress = $41;
+  EmsGetUnallocatedPages = $42;
+  EmsAllocatePages = $43;
+  EmsDealloc = $45;
+  EmsMapPage = $44;
+  EmsGetPhysEntryArray = $5800;
+  EmsGetNumPhysEntries = $5801;
+
+  EmsSuccess = 0;
+  EmsSoftwareError = $80;
+  EmsHardwareError = $81;
+  EmsHandleNotFound = $83;
+  EmsNotSupported = $84;
+  EmsAllHandlesUsed = $85;
+  EmsContextError = $86;
+  EmsNotEnoughPages = $87;
+  EmsNotEnoughUnallocated = $88;
+  EmsZeroPages = $89;
+  EmsLogPageOutOfRange = $8A;
+  EmsPhysPageOutOfRange = $8B;
+  EmsInvalidParam = $8F;
 
 function OnHeapError(Size: word): integer; far;
 var
@@ -154,7 +200,7 @@ begin
 
   { Default to return nil on error }
   OnHeapError := 1;
-
+(*
   { Purge conventional references until there is enough space }
   Memory.PurgeConventional(Size);
 
@@ -166,528 +212,539 @@ begin
       Memory.ClearException
     else
       exit;
-  end;
+  end;*)
 
   { Flag as now available and retry }
-  OnHeapError := 2;
+ { OnHeapError := 2;}
 end;
 
-constructor TMemoryDriver.Create;
+function TMemoryReference.IsEms: boolean;
+begin
+  IsEms := false;
+end;
+
+function TMemoryReference.Size: longint;
+begin
+  Abstract;
+end;
+
+procedure TMemoryReference.Init;
+begin
+  inherited Init;
+  FPtr := nil;
+end;
+
+constructor TConventionalReference.Create(ASize: word);
 begin
   inherited Create;
+  FSize := ASize;
 end;
 
-{$IFDEF debug}
-{ If compiling in debug mode, this writes XMS handles to a file called
-XmsDebug.bin as they are allocated, so if the program crashes or is reset
-while debugging, XMS handles will be deallocated on startup by reading the
-handles from the file }
-procedure TMemoryDriver.DebugWriteHandles(ANewHandle: word);
+constructor TConventionalReference.CreatePtr(APtr: pointer; ASize: word);
+begin
+  Create(ASize);
+  FPtr := APtr;
+end;
+
+function TConventionalReference.Ptr: PByte;
+begin
+  Ptr := FPtr;
+end;
+
+function TConventionalReference.Size: longint;
+begin
+  Size := FSize;
+end;
+
+function TConventionalReference.IsEms: boolean;
+begin
+  IsEms := false;
+end;
+
+procedure TConventionalReference.Init;
+begin
+  inherited Init;
+  FSize := 0;
+end;
+
+destructor TConventionalReference.Free;
+begin
+  if Assigned(FPtr) and (FSize > 0) then
+    FreeMem(FPtr, FSize);
+  inherited Free;
+end;
+
+constructor TEmsReference.Create(ASize: longint);
+begin
+  inherited Create;
+  FPtr := pointer(0);
+  FSize := ASize;
+end;
+
+constructor TEmsReference.CreateHandle(AHandle, APages: word; ASize: longint);
+var
+  value: longint;
+begin
+  Create(ASize);
+  value := longint(AHandle) shl 16;
+  value := value or APages;
+  FPtr := pointer(value);
+end;
+
+destructor TEmsReference.Free;
+begin
+  if longint(FPtr) > 0 then
+    Memory.EmsDeallocate(Handle);
+  inherited Free;
+end;
+
+destructor TEmsReference.FreePreserve;
+begin
+  inherited Free;
+end;
+
+function TEmsReference.Handle: word;
+begin
+  Handle := word(longint(FPtr) shr 16);
+end;
+
+function TEmsReference.Pages: word;
+begin
+  Pages := word(longint(FPtr) and $FFFF);
+end;
+
+function TEmsReference.Size: longint;
+begin
+  Size := FSize;
+end;
+
+function TEmsReference.IsEms: boolean;
+begin
+  IsEms := true;
+end;
+
+procedure TEmsReference.Init;
+begin
+  inherited Init;
+  FSize := 0;
+end;
+
+procedure TEmsReference.SetHandle(AHandle, APages: word);
+begin
+  FPtr := pointer(longint(AHandle) shl 16 or APages);
+end;
+
+function TMemoryDriver.CheckEmsStatus(AStatus: byte): boolean;
+begin
+  CheckEmsStatus := false;
+  case AStatus of
+    EmsSuccess: CheckEmsStatus := true;
+    EmsNotSupported: Raise(ecEmsFunctionNotSupported);
+    EmsSoftwareError: Raise(ecEmsSoftwareError);
+    EmsHardwareError: Raise(ecEmsHardwareError);
+    EmsAllHandlesUsed, EmsNotEnoughPages, EmsNotEnoughUnallocated: Raise(ecNotEnoughMemory);
+    EmsZeroPages: Raise(ecEmsZeroPages);
+    EmsInvalidParam: Raise(ecEmsInvalidParam);
+    EmsLogPageOutOfRange: Raise(ecEmsLogPageOutOfRange);
+    EmsPhysPageOutOfRange: Raise(ecEmsPhysPageOutOfRange);
+    else Raise(ecEmsUnknownError);
+  end;
+end;
+
+function TMemoryDriver.CheckForEmm: boolean;
+const
+  asciiDeviceName: array[1..8] of char = 'EMMXXXX0';
+var
+  result: boolean;
+begin
+  asm
+    push ds
+    mov ax, 3567h
+    int 21h
+    mov cx, 8
+    mov si, offset asciiDeviceName
+    mov di, 0Ah
+    cld
+    rep cmpsb
+    jne @error
+  @ok:
+    pop ds
+    mov result, 1
+    jmp @end
+  @error:
+    pop ds
+    mov result, 0
+  @end:
+  end;
+end;
+
+function TMemoryDriver.InitEms: boolean;
+var
+  emmPresent: boolean;
+  result: byte;
+begin
+  FEmsSupported := false;
+  InitEms := false;
+  if not CheckForEmm then
+    exit;
+  asm
+    mov ah, EmsStatus
+    int EmsInt
+    mov result, ah
+  end;
+  if not CheckEmsStatus(result) then
+    exit;
+  result := GetPageFrameSegment(FPageFrameSeg);
+  if not CheckEmsStatus(result) then
+    exit;
+  FPhysPages := GetPhysEntries;
+  if HasException then
+    exit;
+  FEmsSupported := true;
+  InitEms := true;
+end;
+
+function TMemoryDriver.GetPageFrameSegment(var ASegment: word): byte;
+var
+  segm: word;
+  result: byte;
+begin
+  ASegment := 0;
+  asm
+    mov ah, EmsGetPageFrameAddress
+    int EmsInt
+    mov result, ah
+    mov segm, bx
+  end;
+  if result = 0 then
+    ASegment := segm;
+  GetPageFrameSegment := result;
+end;
+
+function TMemoryDriver.EmsSupported: boolean;
+begin
+  EmsSupported := FEmsSupported;
+end;
+
+function TMemoryDriver.PhysPageSeg: word;
+begin
+  PhysPageSeg := FPhysPageSeg;
+end;
+
+function TMemoryDriver.EmsSeg: word;
+begin
+  EmsSeg := FPageFrameSeg;
+end;
+
+procedure TMemoryDriver.GetPageCount(var ATotal, AUnallocated: word);
+var
+  total, unallocated: word;
+  result: byte;
+begin
+  ATotal := 0;
+  AUnallocated := 0;
+  if HasException or not FEmsSupported then
+    exit;
+  asm
+    mov ah, EmsGetUnallocatedPages
+    int EmsInt
+    mov result, ah
+    mov unallocated, bx
+    mov total, dx
+  end;
+  if CheckEmsStatus(result) then begin
+    ATotal := total;
+    AUnallocated := unallocated;
+  end;
+end;
+
+function TMemoryDriver.GetPhysEntryCount: word;
+var
+  result: byte;
+  count: word;
+begin
+  GetPhysEntryCount := 0;
+  if HasException then
+    exit;
+  asm
+    mov ax, EmsGetNumPhysEntries
+    int EmsInt
+    mov result, ah
+    mov count, cx
+  end;
+  if CheckEmsStatus(result) then
+    GetPhysEntryCount := count;
+end;
+
+function TMemoryDriver.GetPhysPageSeg(AEntries: PEmsPhysPages; APage: word): word;
 var
   index: integer;
-  reference: PReference;
-  debugFile: Text;
 begin
-  {$I-}
-  System.Assign(debugFile, DebugFilename);
-  Rewrite(debugFile);
-  for index := 0 to FReferences^.Count - 1 do begin
-    reference := FReferences^.GetItem(index);
-    if not (reference^.ReferenceType = rtXms) then
-      continue;
-    WriteLn(debugFile, IntToStr(reference^.Handle));
+  GetPhysPageSeg := 0;
+  for index := 0 to FPhysCount - 1 do begin
+    if AEntries^[index].PageNumber = APage then begin
+      GetPhysPageSeg := AEntries^[index].Segm;
+      exit;
+    end;
   end;
-  WriteLn(debugFile, IntToStr(ANewHandle));
-  Close(debugFile);
-  {$I+}
 end;
-{$ENDIF}
 
-{$IFDEF debug}
-{ If compiling in Debug mode, this reads previously allocated XMS handles
-from a file called XmsDebug.bin and deallocates them.  That way if the program
-crashes or is reset during debugging and the Memory.Free wasn't called to
-deallocate XMS handles, this will deallocate them on startup }
-procedure TMemoryDriver.DebugFreeHandles;
+function TMemoryDriver.GetPhysEntries: PEmsPhysPages;
 var
-  debugFile: Text;
-  handleStr: string;
-  handle: word;
-  code: integer;
+  result: byte;
+  entries: PEmsPhysPages;
+  count: word;
 begin
-  if not FileExists(debugFilename) then
+  GetPhysEntries := nil;
+  FPhysCount := 0;
+  FPhysPageSeg := 0;
+  count := GetPhysEntryCount;
+  if HasException then
     exit;
-  if not FXmsSupported then
+  GetMem(entries, SizeOf(TEmsPhysPage) * count);
+  if entries = nil then
     exit;
-
-  XmsControl := GetXmsControlFunction;
-  if not Assigned(XmsControl) then
-    exit;
-
-  System.Assign(debugFile, debugFilename);
-  {$I-}
-  Reset(debugFile);
-  while not Eof(debugFile) do begin
-    ReadLn(debugFile, handleStr);
-    if IOResult <> 0 then
-      continue;
-    Val(handleStr, handle, code);
-
-    if code <> 0 then
-      continue;
-    XmsDealloc(handle);
+  asm
+    mov ax, EmsGetPhysEntryArray
+    les di, entries
+    int EmsInt
+    mov result, ah
   end;
-  System.Close(debugFile);
-  {$I+}
+  if CheckEmsStatus(result) then begin
+    GetPhysEntries := entries;
+    FPhysCount := count;
+    FPhysPageSeg := GetPhysPageSeg(entries, 0);
+  end
+  else
+    FreeMem(entries, SizeOf(TEmsPhysPage) * count);
 end;
-{$ENDIF}
 
-function TMemoryDriver.References: PReferenceList;
+function TMemoryDriver.PhysPages: PEmsPhysPages;
 begin
-  References := FReferences;
+  PhysPages := nil;
+  if HasException or not FEmsSupported then
+    exit;
+  PhysPages := FPhysPages;
 end;
 
-function TMemoryDriver.XmsSupported: boolean;
+function TMemoryDriver.PhysPageCount: word;
 begin
-  XmsSupported := FXmsSupported;
+  PhysPageCount := 0;
+  if HasException or not FEmsSupported then
+    exit;
+  PhysPageCount := FPhysCount;
 end;
 
-function TMemoryDriver.IsXmsSupported: boolean;
+function TMemoryDriver.EmsAllocate(ACount: word): word;
+var
+  handle, total, unallocated: word;
+  result: byte;
+begin
+  EmsAllocate := 0;
+  if HasException or not FEmsSupported then
+    exit;
+  GetPageCount(total, unallocated);
+  if HasException or (unallocated < ACount) then begin
+    Raise(ecNotEnoughMemory);
+    exit;
+  end;
+  asm
+    mov ah, EmsAllocatePages
+    mov bx, ACount
+    int EmsInt
+    mov result, ah
+    mov handle, dx
+  end;
+  if not CheckEmsStatus(result) then
+    exit;
+  EmsAllocate := handle;
+end;
+
+function TMemoryDriver.EmsDeallocate(AHandle: word): byte;
 var
   result: byte;
 begin
-  asm
-    mov ax, 4300h
-    int 2Fh
-    mov [result], al
-  end;
-  IsXmsSupported := result = $80;
-end;
-
-procedure TMemoryDriver.InitXms;
-var
-  version: word;
-  code: integer;
-  hex: string;
-  kbytes: word;
-begin
-  FXmsSupported := IsXmsSupported;
-  if not FXmsSupported then
-    exit;
-
-  XmsControl := GetXmsControlFunction;
-  if not Assigned(XmsControl) then
-    exit;
-
-  {$IFDEF debug}
-  DebugFreeHandles;
-  {$ENDIF}
-
-  asm
-    { Get XMS version }
-    mov ah, 00h
-    call [XmsControl]
-    mov [version], ax
-  end;
-
-  hex := Copy(IntToHex(version), 3, 3);
-  Val(hex, FXmsVersion, code);
-  FXmsVersion := FXmsVersion / 100;
-end;
-
-function TMemoryDriver.GetXmsControlFunction: pointer;
-var
-  result: pointer;
-begin
-  asm
-    mov ax, 4310h
-    int 2Fh
-    mov word ptr [result], bx
-    mov word ptr [result + 2], es
-  end;
-  GetXmsControlFunction := result;
-end;
-
-function TMemoryDriver.CurrentReference: PReference;
-begin
-  CurrentReference := FCurrentReference;
-end;
-
-procedure TMemoryDriver.MoveReference(var AMoveRecord: TXmsMoveRecord);
-var
-  result: word;
-  xmsError: byte;
-begin
-  asm
-    mov si, offset AMoveRecord
-    mov ah, 0Bh
-    call [XmsControl]
-    mov [result], ax
-    mov [xmsError], bl
-  end;
-  if result <> 0 then
-    Raise(ecXmsError);
-end;
-
-procedure TMemoryDriver.PurgeConventional(ASize: longint);
-var
-  index: integer;
-  current: PReference;
-  xmsHandle: word;
-begin
-  { If there is no XMS available or there are no references to move, then error }
-  if (FReferences^.Count = 0) or not FXmsSupported then begin
-    Raise(ecNotEnoughMemory);
-    exit;
-  end;
-  index := 0;
-
-  { Swap any conventional references to XMS until there is enough available
-  or there are no more references that can be moved }
-  while (index < FReferences^.Count) do begin
-    current := FReferences^.GetItem(index);
-    Inc(index);
-    if current^.ReferenceType = rtXms then
-      continue;
-    xmsHandle := XmsAlloc(current^.Size);
-
-    { If no handle returned, then XMS does not have enough space, so error }
-    if xmsHandle = 0 then begin
-      Raise(ecNotEnoughMemory);
-      exit;
-    end;
-
-    FillChar(MoveRecord, SizeOf(TXmsMoveRecord), 0);
-    MoveRecord.Length := current^.Size;
-    MoveRecord.SourceHandle := 0;
-    MoveRecord.SourcePointer := current^.Ptr;
-    MoveRecord.DestHandle := xmsHandle;
-    MoveReference(MoveRecord);
-
-    { If there was an exception thrown during the move, then error }
-    if HasException then
-      exit;
-    FreeMem(current^.Ptr, current^.Size);
-    current^.Ptr := nil;
-    current^.ReferenceType := rtXms;
-    current^.Handle := xmsHandle;
-  end;
-end;
-
-procedure TMemoryDriver.MoveToConventional(AReference: PReference);
-var
-  ptr: pointer;
-begin
-  PurgeConventional(AReference^.Size);
-  if HasException then
-    exit;
-
-  GetMem(ptr, AReference^.Size);
-  if not Assigned(ptr) then begin
-    Raise(ecNotEnoughMemory);
-    exit;
-  end;
-
-  FillChar(MoveRecord, SizeOf(TXmsMoveRecord), 0);
-  MoveRecord.Length := AReference^.Size;
-  MoveRecord.SourceHandle := AReference^.Handle;
-  MoveRecord.DestPointer := ptr;
-
-  MoveReference(MoveRecord);
-  if HasException then begin
-    FreeMem(ptr, AReference^.Size);
-    exit;
-  end;
-
-  XmsDealloc(AReference^.Handle);
-  AReference^.Ptr := ptr;
-  AReference^.ReferenceType := rtConventional;
-  FCurrentReference := AReference;
-end;
-
-function TMemoryDriver.XmsMaxAvail: longint;
-var
-  kbytes: word;
-begin
-  XmsMaxAvail := 0;
-  if not FXmsSupported then
+  if HasException or not FEmsSupported then
     exit;
   asm
-    mov ah, 08h
-    call [XmsControl]
-    mov [kbytes], dx
+    mov ah, EmsDealloc
+    mov dx, AHandle
+    int EmsInt
+    mov result, ah
   end;
-  XmsMaxAvail := longint(kbytes) * 1024;
+  EmsDeallocate := result;
+  if CheckEmsStatus(result) then
+    exit;
 end;
 
-procedure TMemoryDriver.SetCurrentReference(AReference: PReference);
-begin
-  if FCurrentReference = AReference then
-    exit;
-  FCurrentReference := AReference;
-  if not (AReference^.ReferenceType = rtXms) then
-    exit;
-  MoveToConventional(AReference);
-end;
-
-function TMemoryDriver.ReferencePointer(AReference: PReference): pointer;
-begin
-  ReferencePointer := nil;
-  SetCurrentReference(AReference);
-  if HasException then
-    exit;
-  ReferencePointer := AReference^.Ptr;
-end;
-
-function TMemoryDriver.XmsAlloc(ASize: word): word;
-var
-  xmsResult: word;
-  xmsError: byte;
-  xmsSize: word;
-  xmsHandle: word;
-begin
-  XmsAlloc := 0;
-  xmsSize := ASize div 1024;
-  xmsHandle := 0;
-  xmsResult := 0;
-  xmsError := 0;
-  if (ASize mod 1024 > 0) then
-    Inc(xmsSize, 1);
-  asm
-    mov ah, 09h
-    mov dx, [xmsSize]
-    call [XmsControl]
-    mov [xmsResult], ax
-    mov [xmsHandle], dx
-    mov [xmsError], bl
-  end;
-  if (xmsError > 0) or (xmsResult = 0) then begin
-    Raise(ecNotEnoughMemory);
-    exit;
-  end;
-  {$IFDEF debug}
-  DebugWriteHandles(xmsHandle);
-  {$ENDIF}
-  XmsAlloc := xmsHandle;
-end;
-
-procedure TMemoryDriver.XmsDealloc(AHandle: word);
-begin
-  asm
-    mov ah, 0Ah
-    mov dx, [AHandle]
-    call [XmsControl]
-  end;
-end;
-
-function TMemoryDriver.CreateReference(ABuffer: pointer; ASize: word): PReference;
-var
-  reference: PReference;
-begin
-  reference := New(PReference);
-  if not Assigned(reference) then begin
-    Raise(ecNotEnoughMemory);
-    CreateReference := nil;
-    exit;
-  end;
-  reference^.Size := ASize;
-  reference^.Ptr := ABuffer;
-  reference^.ReferenceType := rtConventional;
-  FReferences^.Add(reference);
-  CreateReference := reference;
-end;
-
-function TMemoryDriver.Alloc(ASize: word): PReference;
-var
-  reference: PReference;
-  ptr: pointer;
-begin
-  Alloc := nil;
-  if ASize = 0 then begin
-    Raise(ecInvalidAllocSize);
-    exit;
-  end;
-  reference := New(PReference);
-  if not Assigned(reference) then begin
-    Raise(ecNotEnoughMemory);
-    Alloc := nil;
-    exit;
-  end;
-  reference^.Size := ASize;
-  reference^.Ptr := nil;
-  if ASize <= System.MaxAvail then begin
-    GetMem(ptr, ASize);
-    if not Assigned(ptr) then begin
-      Raise(ecNotEnoughMemory);
-      exit;
-    end;
-    reference^.Ptr := ptr;
-    reference^.Size := ASize;
-    reference^.ReferenceType := rtConventional
-  end
-  else if FXmsSupported and (ASize <= XmsMaxAvail) then begin
-    reference^.Handle := XmsAlloc(ASize);
-    if reference^.Handle = 0 then begin
-      Raise(ecNotEnoughMemory);
-      Dispose(reference);
-      Alloc := nil;
-      exit;
-    end;
-    reference^.Size := ASize;
-    reference^.ReferenceType := rtXms;
-  end
-  else begin
-    Raise(ecNotEnoughMemory);
-    Dispose(reference);
-    Alloc := nil;
-    exit;
-  end;
-  FReferences^.Add(reference);
-  if Assigned(FTransactionReferences) then
-    FTransactionReferences^.Add(reference);
-  Alloc := reference;
-end;
-
-procedure TMemoryDriver.FreeReferencePreserve(AReference: PReference);
-var
-  index: integer;
-begin
-  if not Assigned(AReference) then
-    exit;
-  index := FReferences^.IndexOf(AReference);
-  if AReference^.ReferenceType = rtXms then
-    MoveToConventional(AReference);
-  Dispose(AReference);
-  if index < 0 then
-    exit;
-  FReferences^.Delete(index);
-end;
-
-procedure TMemoryDriver.FreeReference(AReference: PReference);
-var
-  xmsResult: word;
-  xmsError: byte;
-  xmsHandle: word;
-  index: integer;
-begin
-  if not Assigned(AReference) then
-    exit;
-  index := FReferences^.IndexOf(AReference);
-  if AReference^.ReferenceType = rtXms then
-    XmsDealloc(AReference^.Handle)
-  else
-    FreeMem(AReference^.Ptr, AReference^.Size);
-  Dispose(AReference);
-  if index < 0 then
-    exit;
-  FReferences^.Delete(index);
-end;
-
-procedure TMemoryDriver.Dealloc(var AReference: PReference);
-begin
-  FreeReference(AReference);
-  AReference := nil;
-end;
-
-function TMemoryDriver.XmsVersion: real;
-begin
-  XmsVersion := FXmsVersion;
-end;
-
-destructor TMemoryDriver.Free;
+procedure TMemoryDriver.SetCurrentPage(AReference: PEmsReference; APage: word);
 var
   handle: word;
+  page: word;
+  result: byte;
 begin
-  FreeAndNil(OutOfMemoryException);
-  while FReferences^.Count > 0 do
-    FreeReference(FReferences^.GetItem(0));
-  FreeAndNil(FReferences);
-  inherited Free;
-end;
-
-procedure TMemoryDriver.BeginAllocTransaction;
-begin
-  FTransactionReferences := New(PReferenceList, Create);
-end;
-
-procedure TMemoryDriver.Fill(AReference: PReference; AByte: byte);
-var
-  ptr: PByte;
-begin
-  ptr := ReferencePointer(AReference);
-  FillChar(ptr, AReference^.Size, AByte);
-end;
-
-procedure TMemoryDriver.CommitAllocTransaction;
-begin
-  FreeAndNil(FTransactionReferences);
-end;
-
-procedure TMemoryDriver.RollbackAllocTransaction;
-var
-  current: PReference;
-begin
-  if not Assigned(FTransactionReferences) then
+  handle := AReference^.Handle;
+  if APage >= AReference^.Pages then
+    Raise(ecEmsLogPageOutOfRange);
+  if HasException or not FEmsSupported then
     exit;
-  while (FTransactionReferences^.Count > 0) do begin
-    current := FTransactionReferences^.GetItem(0);
-    FreeReference(current);
-    FTransactionReferences^.Delete(0);
+  if (FCurrentHandle = handle) and (APage = FCurrentPage) then
+    exit;
+  page := APage;
+  asm
+    mov ah, EmsMapPage
+    xor al, al
+    mov bx, page
+    mov dx, handle
+    int EmsInt
+    mov result, ah
   end;
-  FreeAndNil(FTransactionReferences);
+  if not CheckEmsStatus(result) then
+    exit;
+  FCurrentPage := page;
+  FCurrentHandle := handle;
 end;
 
 procedure TMemoryDriver.Init;
-var
-  reference: PReference;
-  size: word;
 begin
   inherited Init;
   HeapError := @OnHeapError;
-  OutOfMemoryException := New(PException, Create(ecNotEnoughMemory));
-  FReferences := New(PReferenceList, CreateCapacity(128));
-  FCurrentReference := nil;
-  FXmsSupported := false;
-  FXmsVersion := 0;
-  FTransactionReferences := nil;
-  XmsControl := nil;
-  InitXms;
+  OnAllocError := nil;
+  FPageFrameSeg := 0;
+  FPhysPageSeg := 0;
+  FPhysPages := nil;
+  FPhysCount := 0;
+  FCurrentHandle := 0;
+  FCurrentPage := -1;
+  FTransaction := nil;
+  InitEms;
 end;
 
-destructor TReferenceList.Free;
+function TMemoryDriver.CurrentHandle: word;
 begin
+  CurrentHandle := FCurrentHandle;
+end;
+
+function TMemoryDriver.CurrentPage: integer;
+begin
+  CurrentPage := FCurrentPage;
+end;
+
+function TMemoryDriver.CreateBufferReference(APtr: pointer; ASize: word): PMemoryReference;
+var
+  reference: PConventionalReference;
+  ptr: PByte;
+begin
+  CreateBufferReference := nil;
+  reference := New(PConventionalReference, CreatePtr(APtr, ASize));
+  if NilPtr(reference, ecNotEnoughMemory) then
+    exit;
+  CreateBufferReference := reference;
+end;
+
+function TMemoryDriver.CreateReference(AEms: boolean; ASize: longint): PMemoryReference;
+var
+  reference: PMemoryReference;
+  pages, handle: word;
+begin
+  CreateReference := nil;
+  if (ASize > MaxVarSize) and not (AEms) then begin
+    Raise(ecInvalidAllocSize);
+    exit;
+  end;
+  if AEms then begin
+    reference := New(PEmsReference, Create(ASize));
+    if NilPtr(reference, ecNotEnoughMemory) then
+      exit;
+    pages := ASize div EmsPageSize;
+    if pages mod EmsPageSize > 0 then
+      Inc(pages);
+    handle := EmsAllocate(pages);
+    if HasException then begin
+      FreeAndNil(reference);
+      exit;
+    end;
+    PEmsReference(reference)^.SetHandle(handle, pages);
+  end
+  else begin
+    reference := New(PConventionalReference, Create(ASize));
+    if NilPtr(reference, ecNotEnoughMemory) then
+      exit;
+    GetMem(reference^.FPtr, ASize);
+    if NilPtr(reference^.FPtr, ecNotEnoughMemory) then begin
+      FreeAndNil(reference);
+      exit;
+    end;
+  end;
+  CreateReference := reference;
+end;
+
+procedure TMemoryDriver.BeginTransaction;
+begin
+  FTransaction := New(PMemoryReferenceList, Create);
+  if NilPtr(FTransaction, ecNotEnoughMemory) then
+    exit;
+  FTransaction^.DisposeObjects := false;
+end;
+
+procedure TMemoryDriver.RollbackTransaction;
+var
+  reference: PMemoryReference;
+begin
+  if not Assigned(FTransaction) then
+    exit;
+  while FTransaction^.Count > 0 do begin
+    reference := FTransaction^.GetItem(0);
+    FreeAndNil(reference);
+    FTransaction^.Delete(0);
+  end;
+  FreeAndNil(FTransaction);
+end;
+
+procedure TMemoryDriver.CommitTransaction;
+begin
+  FreeAndNil(FTransaction);
+end;
+
+destructor TMemoryDriver.Free;
+begin
+  if Assigned(FPhysPages) then
+    FreeMem(FPhysPages, SizeOf(TEmsPhysPage) * FPhysCount);
+  FreeAndNil(FTransaction);
   inherited Free;
 end;
 
-function TReferenceList.GetItem(AIndex: integer): PReference;
+function TMemoryReferenceList.Add(AItem: PMemoryReference): integer;
 begin
-  GetItem := PReference(Inherited GetItem(AIndex));
+  Add := inherited Add(AItem);
 end;
 
-function TReferenceList.Add(AItem: PReference): integer;
+procedure TMemoryReferenceList.RemoveItem(AItem: PMemoryReference);
+var
+  index: integer;
 begin
-  Add := Inherited Add(AItem);
+  index := inherited IndexOf(AItem);
+  inherited Delete(index);
 end;
 
-function TReferenceList.IndexOf(AItem: PReference): integer;
+function TMemoryReferenceList.GetItem(AIndex: integer): PMemoryReference;
 begin
-  IndexOf := Inherited IndexOf(AItem);
+  GetItem := PMemoryReference(inherited GetItem(AIndex));
 end;
 
-procedure TReferenceList.SetItem(AIndex: integer; AItem: PReference);
+function TMemoryReferenceList.IndexOf(AItem: PMemoryReference): integer;
 begin
-  Inherited SetItem(AIndex, AItem);
+  IndexOf := inherited IndexOf(AItem);
 end;
 
-procedure TReferenceList.Insert(AIndex: integer; AItem: PReference);
+procedure TMemoryReferenceList.SetItem(AIndex: integer; AItem: PMemoryReference);
 begin
-  Inherited Insert(AIndex, AItem);
+  inherited SetItem(AIndex, AItem);
 end;
 
-procedure Finalize; far;
+procedure TMemoryReferenceList.Insert(AIndex: integer; AItem: PMemoryReference);
 begin
-  ExitProc := PreviousExitProc;
-  Memory.Free;
+  inherited Insert(AIndex, AItem);
 end;
 
 constructor TBuffer.Create;
@@ -837,8 +894,44 @@ begin
   inherited Free;
 end;
 
+var
+  PreviousExitProc: PProc;
+{$IFDEF debug}
+  handle: byte;
+  total, unallocated: word;
+{$ENDIF}
+
+procedure Finalize; far;
+begin
+  Memory.Free;
+  ExitProc := PreviousExitProc;
+end;
+
+procedure Initialize; far;
+{$IFDEF debug}
+var
+  result: byte;
+  stream: TFileStream;
+  handle: word;
+{$ENDIF}
 begin
   Memory.Create;
+  {$IFDEF debug}
+  stream.Create('emsalloc.bin', fmRead);
+  if not stream.HasException then begin
+    handle := stream.ReadWord;
+    result := Memory.EmsDeallocate(handle);
+  end;
+  stream.Free;
+  Memory.ClearException;
+  Memory.GetPageCount(total, unallocated);
+  WriteLn('Total Pages Available: ',
+    total, ', Unallocated: Pages ', unallocated);
+  {$ENDIF}
+end;
+
+begin
   PreviousExitProc := ExitProc;
   ExitProc := @Finalize;
+  Initialize;
 end.

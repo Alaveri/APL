@@ -95,11 +95,18 @@ const
   ecXmsNotInitialized = 305;
   ecXmsNotSupported = 306;
   ecXmsError = 307;
+  ecEmsFunctionNotSupported = 308;
+  ecEmsSoftwareError = 309;
+  ecEmsHardwareError = 310;
+  ecEmsUnknownError = 311;
+  ecEmsZeroPages = 312;
+  ecEmsInvalidParam = 313;
+  ecEmsHandleNotFound = 314;
+  ecEmsContextError = 315;
+  ecEmsLogPageOutOfRange = 316;
+  ecEmsPhysPageOutOfRange = 317;
 
   { Stream errors }
-  ecSeekPastStreamEnd = 400;
-  ecWritePastStreamEnd = 401;
-  ecReadPastStreamEnd = 402;
   ecStreamSeekNotSupported = 403;
   ecStreamWriteNotSupported = 404;
   ecStreamReadNotSupported = 405;
@@ -152,6 +159,7 @@ const
   ecNullParameter = 1101;
   ecInvalidOperation = 1102;
   ecInvalidArgument = 1103;
+  ecNotImplemented = 1104;
 
   { Dictionary errors }
   ecKeyNotFound = 1201;
@@ -314,12 +322,20 @@ begin
   AddError(ecStreamSeekNotSupported, 'Stream does not support seeking');
   AddError(ecStreamWriteNotSupported, 'Stream does not support writing');
   AddError(ecStreamReadNotSupported, 'Stream does not support reading');
-  AddError(ecSeekPastStreamEnd, 'Seek past end of stream');
-  AddError(ecWritePastStreamEnd, 'Write past end of stream');
-  AddError(ecReadPastStreamEnd, 'Read past end of stream');
   AddError(ecStreamNotOpen, 'Stream is not open');
   AddError(ecXmsNotInitialized, 'XMS memory could not be initialized');
   AddError(ecXmsNotSupported, 'XMS memory is not supported');
+  AddError(ecXmsError, 'XMS error');
+  AddError(ecEmsFunctionNotSupported, 'EMS function is not supported');
+  AddError(ecEmsSoftwareError, 'EMS software error');
+  AddError(ecEmsHardwareError, 'EMS hardware error');
+  AddError(ecEmsUnknownError, 'Unknown EMS error');
+  AddError(ecEmsZeroPages, 'Zero EMS pages requested');
+  AddError(ecEmsInvalidParam, 'Invalid EMS function parameter');
+  AddError(ecEmsHandleNotFound, 'EMS handle not found');
+  AddError(ecEmsContextError, 'EMS context error');
+  AddError(ecEmsLogPageOutOfRange, 'EMS logical page out of range');
+  AddError(ecEmsPhysPageOutOfRange, 'EMS physical page out of range');
   AddError(ecStreamCloseError, 'Error closing stream');
   AddError(ecStreamOpenError, 'Error opening stream');
   AddError(ecStreamReadError, 'Error reading stream');
@@ -344,6 +360,7 @@ begin
   AddError(ecNullParameter, 'Null parameter');
   AddError(ecInvalidOperation, 'Invalid operation');
   AddError(ecInvalidArgument, 'Invalid argument');
+  AddError(ecNotImplemented, 'Function not implemented');
   AddError(ecUnsupportedPaletteFormat, 'Unsupported palette format');
   AddError(ecInvalidPalette, 'Invalid palette');
   AddError(ecCompressionBitSizeError, 'Compression bit size too large');

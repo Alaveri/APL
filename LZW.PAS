@@ -289,7 +289,8 @@ begin
   destStart := ADest^.Position;
 
   if Source^.Position + ALength > Source^.Size then
-    Raise(ecReadPastStreamEnd);
+    ALength := Source^.Size - Source^.Position;
+
   if HasException then
     exit;
 

@@ -30,6 +30,7 @@ function BoolToInt(ABool: boolean): byte;
 function BoolToIntStr(ABool: boolean): string;
 function FileExists(const AFilename: string): boolean;
 function DirectoryExists(const ADir: string): boolean;
+function CreateDirectory(const ADir: string): boolean;
 function GetExtension(const AFilename: string): string;
 function UpperCase(const AString: string): string;
 function LowCase(const AChar: char): char;
@@ -506,6 +507,19 @@ begin
     DirectoryExists := false;
 end;
 
+function CreateDirectory(const ADir: string): boolean;
+var
+  error: integer;
+begin
+  {$I-}
+  MkDir(ADir);
+  error := IOResult;
+  if error = 0 then
+    CreateDirectory := true
+  else
+    CreateDirectory := false;
+  {$I+}
+end;
 
 function IncludeBackslash(const AString: string): string;
 begin

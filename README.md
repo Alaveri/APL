@@ -5,7 +5,7 @@ Alaveri Pascal Library
 
 The Alaveri Pascal Library contains a comprehensive set of Borland/Turbo Pascal 7 units including graphics utilities (CGA/VGA/EGA/SVGA), mouse support, objects, lists, streams, sorting and searching, large strings, memory management (including Extended Memory support for real mode), and more.
 
-The APL is still under development, but already contains significant functionality.  Note: some unit names and identifier names may change in the future until it is finalized as version 1.0.
+The APL is still under development, but already contains significant functionality.  Note: some unit names and identifier names may change in the future until it is Finalized as version 1.0.
 
 Supported features currently include:
 
